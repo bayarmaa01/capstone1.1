@@ -1,19 +1,12 @@
-FROM node:18-alpine
+FROM node:18
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm ci --only=production
 
-# Copy source code
 COPY . .
-
-# Create uploads directory
 RUN mkdir -p uploads
 
 EXPOSE 4000
-
 CMD ["npm", "start"]
