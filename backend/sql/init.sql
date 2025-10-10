@@ -61,7 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
 -- Username: admin
 -- Password: admin123
 INSERT INTO users (username, password_hash, role) 
-VALUES ('admin', '$2b$10$rqY7YqZQxj8k.h5jXKYq5OX5xK4k4W0p8oYqXKqZQxj8k.h5jXKYq5', 'admin')
+VALUES ('admin', '$2a$10$TvD0sEYySdWLPCrOLDUckOD23EiBTbiggQdG05zjyWyYciNBl4vpK', 'admin')
 ON CONFLICT (username) DO NOTHING;
 
 -- Log completion
