@@ -75,31 +75,42 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
+  const handleDeleteStudent = async (studentId, studentName) => {
+    if (!window.confirm(`Are you sure you want to delete ${studentName}? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`${apiUrl}/api/students/${studentId}`);
+      fetchStudents();
+      alert('✓ Student deleted successfully!');
+    } catch (error) {
+      alert('Error: ' + (error.response?.data?.error || 'Failed to delete student'));
+    }
+  };
+
   const downloadQR = (studentId) => {
-  // Get the SVG element
     const svg = document.getElementById(`qr-${studentId}`);
-  
+    
     if (!svg) return;
-  
-  // Convert SVG to canvas
+    
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const svgData = new XMLSerializer().serializeToString(svg);
     const img = new Image();
-  
+    
     img.onload = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
-    
-    // Download as PNG
+      
       const url = canvas.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `${studentId}-QRCode.png`;
       link.href = url;
       link.click();
     };
-  
+    
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
@@ -223,7 +234,6 @@ export default function Dashboard({ user, onLogout }) {
                     <h4>{student.name}</h4>
                     <p style={styles.studentId}>ID: {student.student_id}</p>
                     
-                    {/* QR Code */}
                     <div style={styles.qrCodeWrapper}>
                       <QRCodeSVG
                         id={`qr-${student.student_id}`}
@@ -256,9 +266,7 @@ export default function Dashboard({ user, onLogout }) {
                       src={`${apiUrl}/uploads/${student.photo_url}`} 
                       alt={student.name}
                       style={styles.photo}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
+                      onError={(e) => e.target.style.display = 'none'}
                     />
                   )}
                   <div style={styles.studentInfo}>
@@ -272,6 +280,13 @@ export default function Dashboard({ user, onLogout }) {
                       </>
                     )}
                   </div>
+                  <button 
+                    onClick={() => handleDeleteStudent(student.id, student.name)}
+                    style={styles.deleteBtn}
+                    title="Delete student"
+                  >
+                    🗑️ Delete
+                  </button>
                 </div>
               ))}
               {students.length === 0 && (
@@ -318,10 +333,7 @@ const styles = {
     borderRadius: '6px', 
     cursor: 'pointer', 
     fontWeight: '600',
-    transition: 'transform 0.2s',
-    ':hover': {
-      transform: 'scale(1.05)'
-    }
+    transition: 'transform 0.2s'
   },
   grid: { 
     display: 'grid', 
@@ -453,8 +465,6 @@ const styles = {
     padding: '20px',
     fontStyle: 'italic'
   },
-  
-  // QR Code Section Styles
   qrSection: {
     marginTop: '20px',
     padding: '20px',
@@ -493,6 +503,17 @@ const styles = {
     width: '100%',
     padding: '8px',
     background: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background 0.3s'
+  },
+  deleteBtn: {
+    padding: '6px 12px',
+    background: '#dc3545',
     color: 'white',
     border: 'none',
     borderRadius: '6px',

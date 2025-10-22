@@ -47,35 +47,91 @@ export default function AttendancePage() {
   };
 
   const handleQRScan = async (decodedText) => {
-    // Assuming QR code contains student_id
-    const studentId = decodedText.trim();
-    
-    if (recognizedIds.has(studentId)) {
-      alert(`Student ${studentId} already marked present!`);
-      return;
-    }
-
     try {
+    // Extract student ID
+      let studentId = decodedText.trim();
+    
+    // Handle URL-based QR codes
+      if (studentId.includes('http')) {
+        const match = studentId.match(/STU\d+/i);
+        if (match) {
+          studentId = match[0].toUpperCase();
+        } else {
+          alert('⚠️ QR code should contain student ID');
+          return;
+        }
+      }
+    
+    // Validate format
+      if (!studentId.match(/^STU\d+$/i)) {
+        alert('⚠️ Invalid student ID format: ' + studentId);
+        return;
+      }
+    
+    // Check if already present
+      if (recognizedIds.has(studentId)) {
+        alert(`✓ Student ${studentId} already marked present!`);
+        return;
+      }
+
+    // Find student in attendance list
+      const student = attendance.find(s => s.student_id === studentId);
+    
+      if (!student) {
+        alert(`⚠️ Student ${studentId} is not enrolled in this class!`);
+        return;
+      }
+
+    // Record attendance with student's database ID
       await axios.post(`${apiUrl}/api/attendance/record`, {
-        class_id: classId,
-        student_id: studentId,
+        class_id: parseInt(classId),
+        student_id: student.id,  // Use database ID
         session_date: sessionDate,
         method: 'qr',
         confidence: 1.0
       });
-      
+    
       setRecognizedIds(prev => new Set([...prev, studentId]));
       fetchTodayAttendance();
-      alert(`✓ Attendance recorded for student ${studentId}`);
+      alert(`✓ Attendance recorded for ${student.name} (${studentId})`);
+    
     } catch (error) {
+      console.error('QR scan error:', error);
       alert('Error: ' + (error.response?.data?.error || 'Failed to record attendance'));
     }
   };
 
-  const handleFaceRecognized = (match) => {
-    if (!recognizedIds.has(match.student_id)) {
+  const handleFaceRecognized = async (match) => {
+    try {
+    // match = { student_id: "STU001", confidence: 0.95 }
+    
+      if (recognizedIds.has(match.student_id)) {
+        return; // Already marked
+      }
+    
+    // Find student in attendance list
+      const student = attendance.find(s => s.student_id === match.student_id);
+    
+      if (!student) {
+        console.log(`Student ${match.student_id} not enrolled in this class`);
+        return;
+      }
+    
+    // Record attendance
+      await axios.post(`${apiUrl}/api/attendance/record`, {
+        class_id: parseInt(classId),
+        student_id: student.id,  // Use database ID
+        session_date: sessionDate,
+        method: 'face',
+        confidence: match.confidence
+      });
+    
       setRecognizedIds(prev => new Set([...prev, match.student_id]));
       fetchTodayAttendance();
+      console.log(`✓ Attendance recorded for ${student.name}`);
+    
+    } catch (error) {
+      console.error('Face recognition error:', error);
     }
   };
 

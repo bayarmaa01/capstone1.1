@@ -169,6 +169,7 @@ def unenroll(student_id):
         else:
             return jsonify({"error": "Student not found"}), 404
     except Exception as e:
+        print(f"❌ Unenroll error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

@@ -111,23 +111,42 @@ router.post('/', upload.single('photo'), async (req, res) => {
 });
 
 // Delete student
+// Delete student
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await db.query('DELETE FROM students WHERE id = $1 RETURNING *', [req.params.id]);
-    if (result.rows.length === 0) {
+    const { id } = req.params;
+    
+    // Get student info first
+    const student = await db.query('SELECT * FROM students WHERE id = $1', [id]);
+    
+    if (student.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
     
+    const studentData = student.rows[0];
+    
     // Delete photo file if exists
-    if (result.rows[0].photo_url) {
-      const photoPath = path.join(__dirname, '../../uploads/', result.rows[0].photo_url);
+    if (studentData.photo_url) {
+      const photoPath = path.join(__dirname, '../../uploads/', studentData.photo_url);
       if (fs.existsSync(photoPath)) {
         fs.unlinkSync(photoPath);
       }
     }
     
-    res.json({ success: true, message: 'Student deleted' });
+    // Delete face encoding
+    try {
+      const faceServiceUrl = process.env.FACE_SERVICE_URL || 'http://localhost:5001';
+      await axios.delete(`${faceServiceUrl}/unenroll/${studentData.student_id}`);
+    } catch (error) {
+      console.log('Face unenroll error (continuing):', error.message);
+    }
+    
+    // Delete from database (CASCADE will handle enrollments and attendance)
+    await db.query('DELETE FROM students WHERE id = $1', [id]);
+    
+    res.json({ success: true, message: 'Student deleted successfully' });
   } catch (error) {
+    console.error('Delete student error:', error);
     res.status(500).json({ error: error.message });
   }
 });

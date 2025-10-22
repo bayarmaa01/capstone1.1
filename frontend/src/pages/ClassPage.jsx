@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
+import AttendanceChart from '../components/AttendanceChart';
 
 export default function ClassPage() {
   const { classId } = useParams();
@@ -235,57 +236,8 @@ export default function ClassPage() {
         )}
       </div>
 
-      {/* Student Performance Table */}
-      {stats.length > 0 && (
-        <div style={styles.section}>
-          <h2>📈 Student Performance</h2>
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Student ID</th>
-                  <th style={styles.th}>Name</th>
-                  <th style={styles.th}>Present</th>
-                  <th style={styles.th}>Total</th>
-                  <th style={styles.th}>Attendance %</th>
-                  <th style={styles.th}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.map(student => (
-                  <tr key={student.id} style={styles.tr}>
-                    <td style={styles.td}>{student.student_id}</td>
-                    <td style={styles.td}>{student.name}</td>
-                    <td style={styles.td}>{student.total_present || 0}</td>
-                    <td style={styles.td}>{student.total_sessions || 0}</td>
-                    <td style={styles.td}>
-                      <span style={{
-                        ...styles.percentage,
-                        color: student.attendance_percentage >= 75 ? '#28a745' : 
-                               student.attendance_percentage >= 50 ? '#ffc107' : '#dc3545'
-                      }}>
-                        {student.attendance_percentage || 0}%
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{
-                        ...styles.badge,
-                        background: student.attendance_percentage >= 75 ? '#d4edda' : 
-                                    student.attendance_percentage >= 50 ? '#fff3cd' : '#f8d7da',
-                        color: student.attendance_percentage >= 75 ? '#155724' : 
-                               student.attendance_percentage >= 50 ? '#856404' : '#721c24'
-                      }}>
-                        {student.attendance_percentage >= 75 ? '✓ Good' : 
-                         student.attendance_percentage >= 50 ? '⚠ Warning' : '✗ At Risk'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {/* Statistics and Charts */}
+      <AttendanceChart stats={stats} dates={dates} />
 
       {/* Recent Sessions */}
       <div style={styles.section}>
@@ -531,40 +483,6 @@ const styles = {
   },
   enrolledInfo: {
     flex: 1
-  },
-  tableContainer: { 
-    overflowX: 'auto', 
-    marginTop: '20px' 
-  },
-  table: { 
-    width: '100%', 
-    borderCollapse: 'collapse' 
-  },
-  th: { 
-    background: '#f8f9fa', 
-    padding: '12px', 
-    textAlign: 'left', 
-    fontWeight: '600', 
-    borderBottom: '2px solid #dee2e6',
-    whiteSpace: 'nowrap'
-  },
-  tr: { 
-    borderBottom: '1px solid #dee2e6',
-    transition: 'background 0.2s'
-  },
-  td: { 
-    padding: '12px' 
-  },
-  percentage: { 
-    fontWeight: '600', 
-    fontSize: '16px' 
-  },
-  badge: { 
-    padding: '4px 12px', 
-    borderRadius: '12px', 
-    fontSize: '12px', 
-    fontWeight: '600',
-    display: 'inline-block'
   },
   sessionsList: { 
     display: 'flex', 
