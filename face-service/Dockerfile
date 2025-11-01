@@ -1,21 +1,37 @@
-FROM python:3.10-slim
-
-# Install system dependencies for dlib and face_recognition
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgtk-3-dev \
-    libboost-python-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Use official face_recognition base image (has dlib pre-installed)
+FROM jjanzic/docker-python3-opencv:latest AS base
 
 WORKDIR /app
 
-# Copy requirements and install Python packages
+# Install Python dependencies
+RUN pip install --upgrade pip
+
+
+# Development stage
+FROM base AS development
+
+# Copy requirements and install
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create encodings directory
+RUN mkdir -p encodings
+
+EXPOSE 5001
+
+# Run with Flask development server
+CMD ["python", "app.py"]
+
+
+# Production stage
+FROM base AS production
+
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 # Copy application code
 COPY . .

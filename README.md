@@ -40,7 +40,7 @@ Make sure you have installed:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/automated-attendance-system.git
+git clone https://github.com/bayarmaa01/capstone1.1.git
 cd automated-attendance-system
 ```
 

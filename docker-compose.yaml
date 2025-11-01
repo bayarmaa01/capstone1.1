@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:14-alpine
@@ -24,35 +26,56 @@ services:
       DATABASE_URL: postgresql://app:secret@db:5432/attendance
       FACE_SERVICE_URL: http://face-service:5001
       PORT: 4000
-      JWT_SECRET: your_jwt_secret_change_this_in_production
+      JWT_SECRET: aB3$xK9#mN7@qL2!pR5&wT8*vD4%zF6^hJ1-cG0+yU
+      NODE_ENV: development
     ports:
       - "4000:4000"
     volumes:
       - ./backend/uploads:/app/uploads
-      - ./backend/src:/app/src  # Live code updates
+      - ./backend/src:/app/src
+      - /app/node_modules
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
 
   face-service:
-    build: ./face-service
+    build:
+      context: ./face-service
+      target: development  # Use development stage
     container_name: attendance-face-service
     ports:
       - "5001:5001"
     volumes:
       - ./face-service/encodings:/app/encodings
-      - ./face-service/app.py:/app/app.py  # Live code updates
+      - ./face-service/app.py:/app/app.py
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      target: development  # ← IMPORTANT: Use development stage
     container_name: attendance-frontend
     ports:
-      - "3000:80"
+      - "3000:3000"  # ← IMPORTANT: Changed from 80 to 3000
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+      - REACT_APP_API_URL=http://localhost:4000
+      - REACT_APP_FACE_SERVICE_URL=http://localhost:5001
+      - WDS_SOCKET_PORT=3000
+    volumes:
+      - ./frontend/src:/app/src  # ← Live code sync
+      - ./frontend/public:/app/public
+      - /app/node_modules  # ← Don't overwrite node_modules
     depends_on:
       - backend
       - face-service
+    stdin_open: true
+    tty: true
     restart: unless-stopped
 
 volumes:

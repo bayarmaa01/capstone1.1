@@ -6,20 +6,27 @@ import {
 
 export default function AttendanceChart({ stats, dates }) {
   
+  // Check if we have data
   if (!stats || stats.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-        <p>No attendance data yet. Take attendance to see charts.</p>
+      <div style={styles.chartSection}>
+        <h3>📊 Statistics & Charts</h3>
+        <div style={styles.emptyState}>
+          <p>📋 No attendance data yet</p>
+          <p style={{ fontSize: '14px', color: '#999' }}>
+            Start taking attendance to see charts and statistics
+          </p>
+        </div>
       </div>
     );
   }
-
+  
   // Prepare data for charts
   const attendanceData = stats.map(student => ({
-    name: student.name.length > 15 ? student.name.substring(0, 15) + '...' : student.name,
-    percentage: parseFloat(student.attendance_percentage) || 0,
-    present: parseInt(student.total_present) || 0,
-    absent: (parseInt(student.total_sessions) || 0) - (parseInt(student.total_present) || 0)
+    name: student.name,
+    percentage: student.attendance_percentage || 0,
+    present: student.total_present || 0,
+    absent: (student.total_sessions || 0) - (student.total_present || 0)
   }));
 
   // Color based on percentage
@@ -31,28 +38,13 @@ export default function AttendanceChart({ stats, dates }) {
 
   // Summary data for pie chart
   const summary = [
-    { 
-      name: 'Good (≥75%)', 
-      value: stats.filter(s => parseFloat(s.attendance_percentage) >= 75).length, 
-      color: '#28a745' 
-    },
-    { 
-      name: 'Warning (50-74%)', 
-      value: stats.filter(s => {
-        const p = parseFloat(s.attendance_percentage);
-        return p >= 50 && p < 75;
-      }).length, 
-      color: '#ffc107' 
-    },
-    { 
-      name: 'At Risk (<50%)', 
-      value: stats.filter(s => parseFloat(s.attendance_percentage) < 50).length, 
-      color: '#dc3545' 
-    }
+    { name: 'Good (≥75%)', value: stats.filter(s => (s.attendance_percentage || 0) >= 75).length, color: '#28a745' },
+    { name: 'Warning (50-74%)', value: stats.filter(s => (s.attendance_percentage || 0) >= 50 && (s.attendance_percentage || 0) < 75).length, color: '#ffc107' },
+    { name: 'At Risk (<50%)', value: stats.filter(s => (s.attendance_percentage || 0) < 50).length, color: '#dc3545' }
   ].filter(item => item.value > 0); // Only show categories with data
 
   // Trend over time
-  const trendData = dates ? dates.map(date => ({
+  const trendData = dates && dates.length > 0 ? dates.map(date => ({
     date: new Date(date.session_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     attendance: Math.round((date.present_count / date.total_students) * 100)
   })) : [];
@@ -63,7 +55,7 @@ export default function AttendanceChart({ stats, dates }) {
       <div style={styles.chartSection}>
         <h3>📊 Student Attendance Percentage</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={attendanceData} margin={{ bottom: 80 }}>
+          <BarChart data={attendanceData} margin={{ top: 5, right: 30, left: 20, bottom: 80 }}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
               dataKey="name" 
@@ -71,9 +63,13 @@ export default function AttendanceChart({ stats, dates }) {
               textAnchor="end" 
               height={100}
               interval={0}
+              style={{ fontSize: '12px' }}
             />
             <YAxis domain={[0, 100]} label={{ value: 'Percentage', angle: -90, position: 'insideLeft' }} />
-            <Tooltip />
+            <Tooltip 
+              contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+              formatter={(value) => `${value}%`}
+            />
             <Legend />
             <Bar dataKey="percentage" fill="#667eea" name="Attendance %" />
           </BarChart>
@@ -110,22 +106,25 @@ export default function AttendanceChart({ stats, dates }) {
       {/* Line Chart - Trend Over Time */}
       {trendData.length > 0 && (
         <div style={styles.chartSection}>
-          <h3>📈 Attendance Trend</h3>
+          <h3>📈 Attendance Trend Over Time</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={trendData}>
+            <LineChart data={trendData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
-              <YAxis domain={[0, 100]} label={{ value: 'Percentage', angle: -90, position: 'insideLeft' }} />
-              <Tooltip />
+              <YAxis domain={[0, 100]} label={{ value: 'Attendance %', angle: -90, position: 'insideLeft' }} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc' }}
+                formatter={(value) => `${value}%`}
+              />
               <Legend />
               <Line 
                 type="monotone" 
                 dataKey="attendance" 
                 stroke="#667eea" 
                 strokeWidth={2} 
-                name="Class Attendance %"
-                dot={{ r: 5 }}
-                activeDot={{ r: 8 }}
+                name="Class Attendance %" 
+                dot={{ r: 4 }}
+                activeDot={{ r: 6 }}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -135,7 +134,7 @@ export default function AttendanceChart({ stats, dates }) {
       {/* Detailed Table */}
       <div style={styles.chartSection}>
         <h3>📋 Detailed Statistics</h3>
-        <div style={styles.tableWrapper}>
+        <div style={styles.tableContainer}>
           <table style={styles.table}>
             <thead>
               <tr>
@@ -143,7 +142,7 @@ export default function AttendanceChart({ stats, dates }) {
                 <th style={styles.th}>Present</th>
                 <th style={styles.th}>Absent</th>
                 <th style={styles.th}>Total</th>
-                <th style={styles.th}>%</th>
+                <th style={styles.th}>Attendance %</th>
                 <th style={styles.th}>Status</th>
               </tr>
             </thead>
@@ -154,14 +153,15 @@ export default function AttendanceChart({ stats, dates }) {
                   <td style={styles.td}>{student.present}</td>
                   <td style={styles.td}>{student.absent}</td>
                   <td style={styles.td}>{student.present + student.absent}</td>
-                  <td style={{...styles.td, color: getColor(student.percentage), fontWeight: 'bold'}}>
-                    {student.percentage.toFixed(1)}%
+                  <td style={{...styles.td, color: getColor(student.percentage), fontWeight: 'bold', fontSize: '16px'}}>
+                    {student.percentage}%
                   </td>
                   <td style={styles.td}>
                     <span style={{
-                      padding: '4px 8px',
+                      padding: '4px 12px',
                       borderRadius: '12px',
                       fontSize: '12px',
+                      fontWeight: '600',
                       background: student.percentage >= 75 ? '#d4edda' : student.percentage >= 50 ? '#fff3cd' : '#f8d7da',
                       color: student.percentage >= 75 ? '#155724' : student.percentage >= 50 ? '#856404' : '#721c24'
                     }}>
@@ -186,7 +186,13 @@ const styles = {
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
     marginBottom: '20px'
   },
-  tableWrapper: {
+  emptyState: {
+    textAlign: 'center',
+    padding: '40px',
+    color: '#666',
+    fontSize: '16px'
+  },
+  tableContainer: {
     overflowX: 'auto',
     marginTop: '15px'
   },
@@ -204,7 +210,8 @@ const styles = {
     whiteSpace: 'nowrap'
   },
   tr: {
-    borderBottom: '1px solid #dee2e6'
+    borderBottom: '1px solid #dee2e6',
+    transition: 'background 0.2s'
   },
   td: {
     padding: '12px'

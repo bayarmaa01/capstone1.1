@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useNavigate } from 'react-router-dom';
 import AttendanceChart from '../components/AttendanceChart';
+import ClassSchedule from '../components/ClassSchedule';
+import ScheduleCalendar from '../components/ScheduleCalendar';
 
 export default function ClassPage() {
   const { classId } = useParams();
@@ -12,15 +14,24 @@ export default function ClassPage() {
   const [stats, setStats] = useState([]);
   const [dates, setDates] = useState([]);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [loading, setLoading] = useState(true);
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
-    fetchClassInfo();
-    fetchStudents();
-    fetchAllStudents();
-    fetchStats();
-    fetchDates();
+    fetchAllData();
   }, [classId]);
+
+  const fetchAllData = async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchClassInfo(),
+      fetchStudents(),
+      fetchAllStudents(),
+      fetchStats(),
+      fetchDates()
+    ]);
+    setLoading(false);
+  };
 
   const fetchClassInfo = async () => {
     try {
@@ -53,6 +64,7 @@ export default function ClassPage() {
     try {
       const response = await axios.get(`${apiUrl}/api/attendance/class/${classId}/stats`);
       setStats(response.data);
+      console.log('📊 Stats loaded:', response.data.length, 'students');
     } catch (error) {
       console.error('Error fetching stats:', error);
     }
@@ -62,6 +74,7 @@ export default function ClassPage() {
     try {
       const response = await axios.get(`${apiUrl}/api/attendance/class/${classId}/dates`);
       setDates(response.data);
+      console.log('📅 Dates loaded:', response.data.length, 'sessions');
     } catch (error) {
       console.error('Error fetching dates:', error);
     }
@@ -80,8 +93,8 @@ export default function ClassPage() {
       await axios.post(`${apiUrl}/api/classes/${classId}/enroll`, {
         student_id: studentId
       });
-      fetchStudents();
-      fetchStats();
+      await fetchStudents();
+      await fetchStats();
       alert('✓ Student enrolled successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to enroll student'));
@@ -93,7 +106,14 @@ export default function ClassPage() {
     return allStudents.filter(s => !enrolledIds.includes(s.id));
   };
 
-  if (!classInfo) return <div style={styles.loading}>⏳ Loading...</div>;
+  if (loading || !classInfo) {
+    return (
+      <div style={styles.loading}>
+        <div style={styles.spinner}></div>
+        <p>⏳ Loading class information...</p>
+      </div>
+    );
+  }
 
   const unenrolledStudents = getUnenrolledStudents();
 
@@ -199,6 +219,12 @@ export default function ClassPage() {
           </div>
         </div>
       </div>
+      {/* 📅 Class Schedule Section */}
+        <div style={styles.section}>
+          <h2>📅 Class Schedule</h2>
+          <ClassSchedule classId={parseInt(classId)} />
+          <ScheduleCalendar classId={classId} />
+        </div>
 
       {/* Enrolled Students */}
       <div style={styles.section}>
@@ -288,7 +314,19 @@ const styles = {
     textAlign: 'center', 
     padding: '50px', 
     fontSize: '18px',
-    color: '#667eea'
+    color: '#667eea',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '15px'
+  },
+  spinner: {
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
   },
   backBtn: { 
     padding: '10px 20px', 
