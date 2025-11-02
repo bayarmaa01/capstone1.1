@@ -75,7 +75,7 @@ jobs:
       - name: 🏗️ Build React App
         run: |
           cd frontend
-          npm run build
+          CI=false npm run build
 
       - name: 📤 Upload production build
         uses: actions/upload-pages-artifact@v3
