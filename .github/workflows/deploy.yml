@@ -1,74 +1,33 @@
-name: CI/CD Pipeline - Automated Attendance System
+name: CI/CD Deployment
 
 on:
   push:
     branches:
-      - main  # Trigger only when pushing to main branch
+      - main  # or master
 
 jobs:
-  build:
-    name: 🧱 Build & Test
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Install dependencies (frontend)
-        working-directory: frontend
-        run: npm install
-
-      - name: Install dependencies (backend)
-        working-directory: backend
-        run: npm install
-
-      - name: Run Lint (optional)
-        run: echo "✅ Lint checks passed (add eslint here if needed)"
-
-      - name: Build Docker images
-        run: |
-          docker build -t attendance-backend ./backend
-          docker build -t attendance-frontend ./frontend
-          docker build -t attendance-face ./face-service
-
   deploy:
-    name: 🚀 Deploy to Server
     runs-on: ubuntu-latest
-    needs: build  # Wait for build job to complete
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup SSH Connection
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: 🚀 Deploy via SSH and Docker Compose
+      - name: Deploy via SSH
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
-            echo "📦 Pulling latest code..."
-            cd /home/ubuntu/automated-attendance-system || git clone https://github.com/<your-username>/automated-attendance-system.git
+            cd /home/ubuntu/automated-attendance-system || git clone https://github.com/bayarmaa01/capstone1.1.git
             cd automated-attendance-system
             git pull origin main
-
-            echo "🧹 Stopping old containers..."
-            docker-compose down || true
-
-            echo "🔨 Building new containers..."
+            docker-compose down
             docker-compose build
-
-            echo "🚀 Starting app..."
             docker-compose up -d
-
-            echo "✅ Deployment successful!"
+            docker system prune -f
           EOF
