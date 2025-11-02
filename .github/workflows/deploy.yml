@@ -90,8 +90,13 @@ jobs:
     needs: deploy-frontend
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: https://bayarmaa01.github.io/capstone1.1/
     steps:
       - name: 🚀 Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: 🌐 Deployment Info
+        run: |
+          echo "✅ Deployed successfully!"
+          echo "🌍 Visit your site at: https://bayarmaa01.github.io/capstone1.1/"
