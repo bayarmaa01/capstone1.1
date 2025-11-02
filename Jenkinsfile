@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         DOCKER_HUB_USER = 'bayarmaa'
-        DOCKER_HUB_PASS = credentials('dockerhub-token')
+        DOCKER_HUB_PASS = credentials('dockerhub-credentials')
         APP_NAME = 'automated-attendance'
     }
 
