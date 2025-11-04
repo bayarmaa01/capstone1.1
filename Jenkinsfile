@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKER_HUB_USER = 'bayarmaa'
         DOCKER_HUB_PASS = credentials('dockerhub-credentials')
-        APP_NAME = 'automated-attendance'
+        APP_NAME = 'attendance-system'
     }
 
     stages {
@@ -18,6 +18,7 @@ pipeline {
             steps {
                 sh 'docker build -t $DOCKER_HUB_USER/$APP_NAME-backend ./backend'
                 sh 'docker build -t $DOCKER_HUB_USER/$APP_NAME-frontend ./frontend'
+                sh 'docker build -t $DOCKER_HUB_USER/$APP_NAME-face-service ./face-service'
             }
         }
 
@@ -26,18 +27,27 @@ pipeline {
                 sh 'echo $DOCKER_HUB_PASS | docker login -u $DOCKER_HUB_USER --password-stdin'
                 sh 'docker push $DOCKER_HUB_USER/$APP_NAME-backend'
                 sh 'docker push $DOCKER_HUB_USER/$APP_NAME-frontend'
+                sh 'docker push $DOCKER_HUB_USER/$APP_NAME-face-service'
             }
         }
 
-        stage('Deploy on Server') {
+        stage('Deploy Application') {
             steps {
                 sh '''
-                docker pull $DOCKER_HUB_USER/$APP_NAME-backend
-                docker pull $DOCKER_HUB_USER/$APP_NAME-frontend
                 docker compose down || true
-                docker compose up -d
+                docker compose up -d --build
+                docker image prune -f
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Deployment successful!'
+        }
+        failure {
+            echo '❌ Deployment failed.'
         }
     }
 }
