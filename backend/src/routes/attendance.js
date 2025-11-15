@@ -17,24 +17,50 @@ router.post('/record', async (req, res) => {
       return res.status(400).json({ error: 'class_id, student_id, and session_date are required' });
     }
 
-    // Insert or update attendance — prevents duplicates
+    console.log('📥 Received:', { class_id, student_id, session_date });
+
+    // Convert string student_id (like "STU001") to numeric database ID
+    let numericStudentId;
+    
+    if (typeof student_id === 'string' && isNaN(student_id)) {
+      const lookup = await db.query('SELECT id FROM students WHERE student_id = $1', [student_id]);
+      
+      if (lookup.rows.length === 0) {
+        return res.status(404).json({ error: `Student ${student_id} not found` });
+      }
+      
+      numericStudentId = lookup.rows[0].id;
+      console.log(`🔍 ${student_id} → ID: ${numericStudentId}`);
+    } else {
+      numericStudentId = parseInt(student_id);
+    }
+
+    // Check enrollment
+    const enrolled = await db.query(
+      'SELECT * FROM enrollments WHERE class_id = $1 AND student_id = $2',
+      [class_id, numericStudentId]
+    );
+
+    if (enrolled.rows.length === 0) {
+      return res.status(400).json({ error: 'Student not enrolled in this class' });
+    }
+
+    // Mark attendance
     const result = await db.query(`
       INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
       VALUES ($1, $2, $3, true, $4, $5)
       ON CONFLICT (class_id, student_id, session_date)
-      DO UPDATE SET 
-        present = true,
-        method = COALESCE(EXCLUDED.method, attendance.method),
-        confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
-        recorded_at = now()
+      DO UPDATE SET present = true, method = EXCLUDED.method, 
+                    confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
+                    recorded_at = now()
       RETURNING *;
-    `, [class_id, student_id, session_date, method || 'manual', confidence || 1.0]);
+    `, [class_id, numericStudentId, session_date, method || 'facial_recognition', confidence || 1.0]);
 
-    console.log(`✅ Attendance recorded: Student ${student_id} | Class ${class_id} | Date ${session_date}`);
+    console.log(`✅ Marked: ${student_id} (ID: ${numericStudentId})`);
     res.json({ success: true, attendance: result.rows[0] });
 
   } catch (error) {
-    console.error('❌ Attendance recording error:', error);
+    console.error('❌ Error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
