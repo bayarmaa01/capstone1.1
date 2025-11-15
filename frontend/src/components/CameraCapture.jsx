@@ -1,245 +1,311 @@
-import React, { useRef, useEffect, useState } from "react";
-import axios from "axios";
+// src/components/CameraCapture.jsx
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import axios from 'axios';
 
 export default function CameraCapture({ classId, sessionDate, onRecognized, onError }) {
   const videoRef = useRef(null);
-  const canvasRef = useRef(null);
+  const debugCanvasRef = useRef(null);
+
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
-  const recognizedSet = useRef(new Set());
-  const cameraStarted = useRef(false);
+  const recognizedRef = useRef(new Set());
 
-  // UI State
-  const [cameraStatus, setCameraStatus] = useState("initializing");
-  const [permissionError, setPermissionError] = useState("");
-  const [scanStatus, setScanStatus] = useState("Idle");
-  const [scanColor, setScanColor] = useState("#17a2b8");
+  const [cameraStatus, setCameraStatus] = useState('idle'); // 'idle'|'requesting'|'active'|'stopped'|'error'
+  const [permissionError, setPermissionError] = useState('');
+  const [scanStatus, setScanStatus] = useState('Idle');
+  const [scanColor, setScanColor] = useState('#17a2b8');
   const [scanCount, setScanCount] = useState(0);
-  const [lastRecognition, setLastRecognition] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
 
-  // API URLs
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:4000";
-  const FACE_URL = process.env.REACT_APP_FACE_SERVICE_URL || "http://localhost:5001";
+  const BACKEND_URL = (process.env.REACT_APP_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+  const FACE_URL = (process.env.REACT_APP_FACE_SERVICE_URL || 'http://localhost:5001').replace(/\/$/, '');
 
-  // -------------------------------------------------------------------
-  // 🎥 Start Camera (FIXED — No play() interruption)
-  // -------------------------------------------------------------------
-  useEffect(() => {
-    let isMounted = true;
-
-    async function startCamera() {
-      try {
-        setCameraStatus("requesting");
-
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: "user" },
-          audio: false,
-        });
-
-        if (!isMounted) return;
-
-        streamRef.current = stream;
-        setCameraStatus("active");
-        setScanStatus("Camera Active");
-        setScanColor("#28a745");
-
-        if (videoRef.current && !cameraStarted.current) {
-          cameraStarted.current = true;
-
-          videoRef.current.srcObject = stream;
-
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current
-              .play()
-              .catch((err) => console.warn("⚠ play() blocked:", err));
-          };
-        }
-
-        // Start scanning every 3 seconds
-        intervalRef.current = setInterval(() => {
-          captureAndRecognize();
-        }, 3000);
-      } catch (err) {
-        console.error("Camera error:", err);
-        setCameraStatus("error");
-        setPermissionError(err.message);
-        setScanStatus("Camera Error");
-        setScanColor("#dc3545");
-        onError?.(err.message);
-      }
-    }
-
-    startCamera();
-
-    return () => {
-      isMounted = false;
-
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (streamRef.current)
-        streamRef.current.getTracks().forEach((t) => t.stop());
-
-      if (videoRef.current) videoRef.current.srcObject = null;
-
-      setCameraStatus("stopped");
-    };
+  const setBanner = useCallback((text, color) => {
+    setScanStatus(text);
+    setScanColor(color);
   }, []);
 
-  // -------------------------------------------------------------------
-  // 📸 Capture Frame + Send to Face Recognition
-  // -------------------------------------------------------------------
-  async function captureAndRecognize() {
-    if (!videoRef.current || cameraStatus !== "active") return;
-    if (!classId || !sessionDate) return;
+  const showSuccessNotification = useCallback((studentId, confidencePercent) => {
+    const note = document.createElement('div');
+    note.style.cssText = `
+      position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
+      color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
+    `;
+    note.innerHTML = `✅ ${studentId} recognized<br/><small>${Math.round(confidencePercent)}%</small>`;
+    document.body.appendChild(note);
+    setTimeout(() => note.remove(), 3000);
+  }, []);
 
-    setScanStatus("Scanning...");
-    setScanColor("#ffc107");
-    setScanCount((c) => c + 1);
+  // small helper sleep
+  const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+
+  // Generic retry wrapper for async functions
+  const retry = async (fn, attempts = 3, baseDelay = 700) => {
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        const delay = baseDelay * Math.pow(2, i); // exponential-ish backoff
+        console.warn(`Attempt ${i + 1} failed. Retrying in ${delay}ms...`, err?.message || err);
+        await sleep(delay);
+      }
+    }
+    throw lastErr;
+  };
+
+  // send attendance to backend (sends both raw and percent)
+  const recordAttendance = useCallback(async (match, rawConfidence, confidencePercent) => {
+    const payload = {
+      class_id: parseInt(classId, 10),
+      student_id: match.student_id,
+      session_date: sessionDate,
+      method: 'face',
+      confidence: rawConfidence,
+      confidence_percent: confidencePercent
+    };
 
     try {
-      const canvas = document.createElement("canvas");
-      const w = videoRef.current.videoWidth;
-      const h = videoRef.current.videoHeight;
+      // retry posting attendance up to 2 times (2 attempts)
+      const fn = async () => {
+        // 10s timeout per attempt
+        const resp = await axios.post(`${BACKEND_URL}/api/attendance/record`, payload, { timeout: 10000 });
+        return resp;
+      };
+      const resp = await retry(fn, 2, 500);
+      console.debug('Backend attendance response:', resp?.data);
+      return true;
+    } catch (err) {
+      console.error('Failed to record attendance after retries', err?.response?.data || err?.message || err);
+      return false;
+    }
+  }, [BACKEND_URL, classId, sessionDate]);
 
+  const captureAndRecognize = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video || cameraStatus !== 'active' || !isScanning) return;
+    if (video.paused || video.ended) return;
+
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return;
+
+    setBanner('🟡 Scanning...', '#ffc107');
+    setScanCount(c => c + 1);
+
+    try {
+      // draw frame to canvas
+      const canvas = document.createElement('canvas');
       canvas.width = w;
       canvas.height = h;
-      canvas.getContext("2d").drawImage(videoRef.current, 0, 0, w, h);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, w, h);
 
-      const blob = await new Promise((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.85)
-      );
+      // optional debug draw
+      if (debugCanvasRef.current) {
+        const dbg = debugCanvasRef.current.getContext('2d');
+        dbg.clearRect(0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
+        dbg.drawImage(canvas, 0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
+      }
 
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
       if (!blob) return;
 
-      const formData = new FormData();
-      formData.append("image", blob, "frame.jpg");
+      const fd = new FormData();
+      fd.append('image', blob, 'frame.jpg');
 
-      const faceUrl = FACE_URL.replace(/\/$/, "");
-      const resp = await axios.post(`${faceUrl}/recognize`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-        timeout: 10000,
-      });
+      // Face recognition request with retries - this is where you saw timeouts
+      const callFaceService = async () => {
+        // 15s per attempt
+        return axios.post(`${FACE_URL}/recognize`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 15000
+        });
+      };
 
-      const matches = Array.isArray(resp.data) ? resp.data : [];
-
-      if (matches.length === 0) {
-        setScanStatus("No Face Detected");
-        setScanColor("#dc3545");
+      // Try up to 3 attempts with exponential-ish backoff
+      let resp;
+      try {
+        setBanner('🟡 Contacting face service...', '#ffc107');
+        resp = await retry(callFaceService, 3, 800);
+      } catch (err) {
+        console.error('Face service unreachable after retries', err?.message || err);
+        setBanner('⚠️ Face service timeout', '#6c757d');
         return;
       }
 
-      const match = matches[0];
-      const key = `${match.student_id}-${sessionDate}`;
+      console.debug('Face service response:', resp?.data);
 
-      setScanStatus(`Match: ${match.student_id}`);
-      setScanColor("#28a745");
-      setLastRecognition(match);
-
-      if (!recognizedSet.current.has(key)) {
-        recognizedSet.current.add(key);
-        await recordAttendance(match);
-        showSuccessNotification(match);
-        onRecognized?.(match);
+      const matches = Array.isArray(resp.data) ? resp.data : [];
+      if (!matches.length) {
+        setBanner('❌ No face detected', '#dc3545');
+        return;
       }
-    } catch (err) {
-      console.error("Recognition error:", err);
-      setScanStatus("Service Down");
-      setScanColor("#6c757d");
-      onError?.(err.message);
-    }
-  }
 
-  // -------------------------------------------------------------------
-  // 📝 Record Attendance
-  // -------------------------------------------------------------------
-  async function recordAttendance(match) {
+      const best = matches[0];
+
+      // normalize confidence (support 0..1 or 0..100)
+      let rawConfidence = typeof best.confidence === 'number' ? best.confidence : parseFloat(best.confidence);
+      if (Number.isNaN(rawConfidence)) rawConfidence = 0;
+      const confidencePercent = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
+      const roundedPct = Math.round(confidencePercent);
+
+      const key = `${best.student_id}-${sessionDate}`;
+
+      console.debug('Best match:', { student_id: best.student_id, rawConfidence, confidencePercent });
+
+      // THRESHOLD: strictly greater than 60%
+      if (!(confidencePercent > 60)) {
+        setBanner(`❌ Low confidence (${roundedPct}%)`, '#dc3545');
+        return;
+      }
+
+      setBanner(`✅ Match: ${best.student_id} (${roundedPct}%)`, '#28a745');
+
+      // only record once per student/session
+      if (!recognizedRef.current.has(key)) {
+        // show interim banner while posting
+        setBanner('🟢 Recording attendance...', '#28a745');
+
+        const ok = await recordAttendance(best, rawConfidence, confidencePercent);
+        if (ok) {
+          recognizedRef.current.add(key);
+          showSuccessNotification(best.student_id, confidencePercent);
+          if (onRecognized) onRecognized({ ...best, confidence_percent: confidencePercent });
+          setBanner(`✅ Recorded: ${best.student_id} (${roundedPct}%)`, '#28a745');
+        } else {
+          setBanner('⚠️ Could not record attendance', '#6c757d');
+        }
+      } else {
+        console.debug('Already recorded for this session:', key);
+      }
+
+    } catch (err) {
+      console.error('Recognition error', err);
+      setBanner('⚠️ Recognition unavailable', '#6c757d');
+      if (onError) onError(err);
+    }
+  }, [FACE_URL, cameraStatus, isScanning, recordAttendance, sessionDate, setBanner, showSuccessNotification, onRecognized, onError]);
+
+  const startCamera = useCallback(async () => {
     try {
-      const cleanUrl = API_URL.replace(/\/$/, "");
-      await axios.post(`${cleanUrl}/api/attendance/record`, {
-        class_id: Number(classId),
-        student_id: match.student_id,
-        session_date: sessionDate,
-        method: "face",
-        confidence: match.confidence,
+      setCameraStatus('requesting');
+      setPermissionError('');
+      recognizedRef.current = new Set();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false
+      });
+      streamRef.current = stream;
+
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+
+      await new Promise((resolve) => {
+        const check = () => {
+          if (videoRef.current && videoRef.current.videoWidth) resolve();
+          else setTimeout(check, 100);
+        };
+        check();
       });
 
-      console.log("Attendance saved:", match.student_id);
+      setCameraStatus('active');
+      setBanner('🔵 Camera active', '#17a2b8');
     } catch (err) {
-      console.error("Failed attendance:", err.message);
-      onError?.("Failed to record attendance");
+      console.error('Camera start failed', err);
+      setCameraStatus('error');
+      setPermissionError('Please allow camera access');
+      if (onError) onError(err);
     }
-  }
+  }, [setBanner, onError]);
 
-  // -------------------------------------------------------------------
-  // 🔔 Success Popup
-  // -------------------------------------------------------------------
-  function showSuccessNotification(match) {
-    const div = document.createElement("div");
-    div.style.cssText = `
-      position: fixed; top: 20px; right: 20px;
-      background: #28a745; color: white;
-      padding: 12px 20px; border-radius: 8px;
-      font-weight: 600; z-index: 99999;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    `;
-    div.innerHTML = `✅ ${match.student_id} (${Math.round(
-      match.confidence * 100
-    )}%)`;
+  useEffect(() => {
+    if (cameraStatus === 'active' && isScanning) {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = setInterval(() => {
+        captureAndRecognize();
+      }, 3000);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [cameraStatus, isScanning, captureAndRecognize]);
 
-    document.body.appendChild(div);
-    setTimeout(() => div.remove(), 3500);
-  }
+  const stopCamera = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
 
-  // -------------------------------------------------------------------
-  // UI
-  // -------------------------------------------------------------------
+    setCameraStatus('stopped');
+    setBanner('Stopped', '#6c757d');
+    setIsScanning(false);
+  }, [setBanner]);
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, [stopCamera]);
+
+  const handleStartClick = async () => {
+    setIsScanning(true);
+    await startCamera();
+  };
+
+  const handleStopClick = () => {
+    stopCamera();
+  };
+
   return (
-    <div style={{ textAlign: "center" }}>
-      <div style={{ position: "relative", display: "inline-block" }}>
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ position: 'relative', display: 'inline-block' }}>
         <video
           ref={videoRef}
           style={{
-            width: "100%",
+            width: '100%',
             maxWidth: 640,
-            border: "3px solid #28a745",
             borderRadius: 10,
-            backgroundColor: "#000",
+            border: `4px solid ${cameraStatus === 'active' ? '#28a745' : '#ccc'}`
           }}
           muted
           playsInline
         />
-
-        <div
-          style={{
-            position: "absolute",
-            top: 10,
-            left: "50%",
-            transform: "translateX(-50%)",
-            backgroundColor: scanColor,
-            color: "white",
-            padding: "8px 16px",
-            borderRadius: 20,
-            fontWeight: "bold",
-            boxShadow: "0px 3px 8px rgba(0,0,0,0.3)",
-          }}
-        >
+        <div style={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+          backgroundColor: scanColor, color: 'white',
+          padding: '8px 14px', borderRadius: 20, fontWeight: 700
+        }}>
           {scanStatus}
         </div>
       </div>
 
-      {permissionError && (
-        <div style={{ color: "#721c24", marginTop: 10 }}>
-          <strong>Camera Error:</strong> {permissionError}
-        </div>
-      )}
+      {/* Debug canvas hidden by default */}
+      <div style={{ height: 0, overflow: 'hidden' }}>
+        <canvas ref={debugCanvasRef} width={320} height={240} />
+      </div>
 
-      <div style={{ marginTop: 15, fontSize: 13, color: "#004085" }}>
-        Scans: {scanCount}
-        {lastRecognition && (
-          <div>
-            Last Match: {lastRecognition.student_id} —{" "}
-            {Math.round(lastRecognition.confidence * 100)}%
+      <div style={{ marginTop: 12 }}>
+        {permissionError && (
+          <div style={{ color: '#dc3545', fontWeight: 700, marginBottom: 12 }}>
+            {permissionError}
           </div>
         )}
+        {cameraStatus !== 'active' ? (
+          <button onClick={handleStartClick} style={{ padding: '10px 14px', background: '#17a2b8', color: '#fff', borderRadius: 6 }}>
+            ▶ Start Scanning
+          </button>
+        ) : (
+          <button onClick={handleStopClick} style={{ padding: '10px 14px', background: '#dc3545', color: '#fff', borderRadius: 6 }}>
+            ■ Stop
+          </button>
+        )}
+        <span style={{ marginLeft: 12, fontWeight: 700 }}>Scans: {scanCount}</span>
       </div>
     </div>
   );
