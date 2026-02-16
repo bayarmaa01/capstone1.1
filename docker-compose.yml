@@ -67,8 +67,8 @@ services:
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
-      - REACT_APP_API_URL=https://attendance-ml.duckdns.org/api
-      - REACT_APP_FACE_SERVICE_URL=https://attendance-ml.duckdns.org/face
+      - REACT_APP_API_URL=/api
+      - REACT_APP_FACE_SERVICE_URL=/face
 
       - WDS_SOCKET_PORT=3000
     volumes:
