@@ -1,12 +1,18 @@
 -- Create tables for attendance system
 
--- Users table (teachers/admins)
+-- Users table (teachers/admins/students from LMS)
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  username TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'teacher',
-  created_at TIMESTAMP DEFAULT now()
+  lms_id INTEGER UNIQUE,
+  username TEXT UNIQUE,
+  email TEXT,
+  name TEXT,
+  role TEXT NOT NULL DEFAULT 'student' CHECK (role IN ('student', 'teacher', 'admin')),
+  password_hash TEXT, -- For admin users only
+  lms_token TEXT, -- OAuth access token
+  lms_refresh_token TEXT, -- OAuth refresh token
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 
 -- Students table
@@ -16,6 +22,7 @@ CREATE TABLE IF NOT EXISTS students (
   name TEXT NOT NULL,
   email TEXT,
   photo_url TEXT,
+  lms_user_id INTEGER UNIQUE,
   created_at TIMESTAMP DEFAULT now()
 );
 
@@ -25,7 +32,9 @@ CREATE TABLE IF NOT EXISTS classes (
   code TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   instructor_id INT REFERENCES users(id) ON DELETE SET NULL,
-  created_at TIMESTAMP DEFAULT now()
+  lms_course_id INTEGER UNIQUE,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 
 -- Enrollments (which students are in which classes)

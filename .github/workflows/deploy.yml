@@ -1,4 +1,4 @@
-name: 🚀 Full CI/CD Pipeline (Backend → Docker Hub | Frontend → GitHub Pages)
+name: 🚀 Azure CI/CD Pipeline - AI Attendance System
 
 on:
   push:
@@ -8,56 +8,18 @@ on:
 
 permissions:
   contents: read
-  pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-
 env:
-  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # ---------------------------------------------------
-  # 🧱 Backend & Face Service Build + Push to Docker Hub
+  # 🧪 Test and Build Backend
   # ---------------------------------------------------
-  build-backend:
+  test-backend:
     runs-on: ubuntu-latest
-    steps:
-      - name: 🧾 Checkout repository
-        uses: actions/checkout@v4
-
-      - name: 🔧 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: 🔐 Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKERHUB_USER }}
-          password: ${{ env.DOCKERHUB_TOKEN }}
-
-      - name: 🏗️ Build & Push Backend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ env.DOCKERHUB_USER }}/attendance-backend:latest
-
-      - name: 🧠 Build & Push Face Service
-        uses: docker/build-push-action@v5
-        with:
-          context: ./face-service
-          push: true
-          tags: ${{ env.DOCKERHUB_USER }}/attendance-face-service:latest
-
-  # ---------------------------------------------------
-  # 💻 Frontend Build + Upload Artifact
-  # ---------------------------------------------------
-  deploy-frontend:
-    runs-on: ubuntu-latest
-    needs: build-backend
     steps:
       - name: 🧾 Checkout repository
         uses: actions/checkout@v4
@@ -69,35 +31,186 @@ jobs:
 
       - name: 📦 Install dependencies
         run: |
-          cd frontend
+          cd backend
           npm ci
 
-      - name: 🏗️ Build React App
+      - name: 🧪 Run tests
         run: |
-          cd frontend
-          CI=false npm run build
-
-      - name: 📤 Upload production build
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend/build
+          cd backend
+          npm test
 
   # ---------------------------------------------------
-  # 🚀 Deploy Frontend to GitHub Pages
+  # 🐳 Build and Push Docker Images
   # ---------------------------------------------------
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-    needs: deploy-frontend
-    environment:
-      name: github-pages
-      url: https://bayarmaa01.github.io/capstone1.1/
+    needs: test-backend
+    outputs:
+      backend-image: ${{ steps.meta-backend.outputs.tags }}
+      frontend-image: ${{ steps.meta-frontend.outputs.tags }}
     steps:
-      - name: 🚀 Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
 
-      - name: 🌐 Deployment Info
+      - name: � Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Extract metadata for backend
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+
+      - name: 🏗️ Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta-backend.outputs.tags }}
+          labels: ${{ steps.meta-backend.outputs.labels }}
+
+      - name: 🏷️ Extract metadata for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+
+      - name: 🏗️ Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+
+  # ---------------------------------------------------
+  # � Deploy to Azure Infrastructure
+  # ---------------------------------------------------
+  deploy-azure:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment: production
+    steps:
+      - name: 🧾 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔐 Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: 🏗️ Deploy Terraform Infrastructure
         run: |
-          echo "✅ Deployed successfully!"
-          echo "🌍 Visit your site: https://bayarmaa01.github.io/capstone1.1"
-          echo "🔗 Backend API: https://capstone1-1-3vnu.onrender.com"
+          cd terraform
+          terraform init
+          terraform fmt -check
+          terraform validate
+          terraform plan -out=tfplan
+          terraform apply -auto-approve tfplan
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: 🚀 Deploy to Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: attendance-ml-backend
+          images: ${{ needs.build-and-push.outputs.backend-image }}
+          package: .
+
+      - name: � Deploy Frontend to Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: attendance-ml-frontend
+          images: ${{ needs.build-and-push.outputs.frontend-image }}
+          package: .
+
+      - name: 📊 Update Application Settings
+        run: |
+          az webapp config appsettings set \
+            --resource-group attendance-ml-rg \
+            --name attendance-ml-backend \
+            --settings \
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            MOODLE_CLIENT_ID="${{ secrets.MOODLE_CLIENT_ID }}" \
+            MOODLE_CLIENT_SECRET="${{ secrets.MOODLE_CLIENT_SECRET }}" \
+            MOODLE_URL="${{ secrets.MOODLE_URL }}"
+
+      - name: 🌐 Configure Custom Domain
+        run: |
+          az webapp config hostname add \
+            --webapp-name attendance-ml-frontend \
+            --resource-group attendance-ml-rg \
+            --hostname attendance-ml.duckdns.org
+
+      - name: ✅ Deployment Summary
+        run: |
+          echo "🎉 Deployment completed successfully!"
+          echo "🌐 Frontend URL: https://attendance-ml.duckdns.org"
+          echo "🔧 Backend API: https://attendance-ml-backend.azurewebsites.net"
+          echo "📊 Monitoring: https://portal.azure.com"
+
+  # ---------------------------------------------------
+  # � Health Check
+  # ---------------------------------------------------
+  health-check:
+    runs-on: ubuntu-latest
+    needs: deploy-azure
+    steps:
+      - name: 🏥 Check Backend Health
+        run: |
+          sleep 30
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://attendance-ml-backend.azurewebsites.net/health)
+          if [ $response -eq 200 ]; then
+            echo "✅ Backend health check passed"
+          else
+            echo "❌ Backend health check failed with status $response"
+            exit 1
+          fi
+
+      - name: 🏥 Check Frontend Health
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://attendance-ml.duckdns.org)
+          if [ $response -eq 200 ]; then
+            echo "✅ Frontend health check passed"
+          else
+            echo "❌ Frontend health check failed with status $response"
+            exit 1
+          fi
+
+  # ---------------------------------------------------
+  # 📧 Notification (Optional)
+  # ---------------------------------------------------
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy-azure, health-check]
+    if: always()
+    steps:
+      - name: 📧 Send Deployment Notification
+        if: needs.deploy-azure.result == 'success' && needs.health-check.result == 'success'
+        run: |
+          echo "🎉 AI Attendance System deployed successfully!"
+          echo "� Production URL: https://attendance-ml.duckdns.org"
+          echo "� All systems operational"
+
+      - name: 🚨 Send Failure Notification
+        if: needs.deploy-azure.result == 'failure' || needs.health-check.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          echo "🔧 Check GitHub Actions logs for details"
+          exit 1

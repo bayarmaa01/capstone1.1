@@ -1,0 +1,18 @@
+# Azure Configuration
+tenant_id = "your-azure-tenant-id"
+object_id = "your-azure-ad-object-id"
+
+# Database Configuration
+db_admin_password = "your-secure-database-password"
+database_url = "postgresql://attendanceadmin:password@server:5432/attendance"
+
+# Security Configuration
+jwt_secret = "your-super-secure-jwt-secret-key"
+
+# Moodle OAuth Configuration
+moodle_client_id = "your-moodle-oauth-client-id"
+moodle_client_secret = "your-moodle-oauth-client-secret"
+moodle_url = "https://your-university-moodle-instance.com"
+
+# Domain Configuration
+domain_name = "attendance-ml.duckdns.org"

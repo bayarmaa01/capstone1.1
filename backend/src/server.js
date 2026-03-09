@@ -7,16 +7,58 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const app = express();
 const { startAutoAbsentJob } = require('./autoAbsentJob');
+const lmsSyncService = require('./services/lms_sync');
+const azureStorageService = require('./services/azure_storage');
+
+// Initialize Azure Storage
+azureStorageService.initializeContainer().catch(console.error);
+
+// Start background jobs
 startAutoAbsentJob();
+lmsSyncService.startScheduledSync();
 // =======================================
 // Middleware Setup
 // =======================================
 
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", "https://attendance-ml.duckdns.org"],
+    },
+  },
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+});
+app.use('/api/', limiter);
+
+// Stricter rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 auth requests per windowMs
+  message: 'Too many authentication attempts, please try again later.',
+});
+app.use('/api/auth', authLimiter);
+
 app.use(cors({
-  origin: '*', // or ["http://localhost:3000"] for strict CORS
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: ['https://attendance-ml.duckdns.org', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -51,6 +93,9 @@ try {
   app.use('/api/classes', require('./routes/classes'));
   app.use('/api/attendance', require('./routes/attendance'));
   app.use('/api/schedule', require('./routes/schedule'));
+  app.use('/api/analytics', require('./routes/analytics'));
+  app.use('/api/ai', require('./routes/ai'));
+  app.use('/api/storage', require('./routes/storage'));
   console.log('✅ Routes loaded successfully');
 } catch (err) {
   console.error('❌ Error loading routes:', err);
