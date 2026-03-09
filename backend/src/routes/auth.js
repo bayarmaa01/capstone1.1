@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const oauthService = require('../services/oauth');
 
 // Register new teacher/admin
 router.post('/register', async (req, res) => {
@@ -89,6 +90,101 @@ router.get('/verify', async (req, res) => {
     res.json({ valid: true, user: decoded });
   } catch (error) {
     res.status(401).json({ valid: false, error: 'Invalid token' });
+  }
+});
+
+// OAuth2 Login - Redirect to Moodle
+router.get('/oauth/login', (req, res) => {
+  try {
+    const authUrl = oauthService.getAuthorizationUrl();
+    res.redirect(authUrl);
+  } catch (error) {
+    console.error('OAuth login error:', error);
+    res.status(500).json({ error: 'Failed to initiate OAuth login' });
+  }
+});
+
+// OAuth2 Callback - Handle Moodle response
+router.get('/oauth/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code not provided' });
+    }
+
+    // Exchange code for tokens
+    const tokens = await oauthService.exchangeCodeForToken(code, state);
+    
+    // Get user information from Moodle
+    const userInfo = await oauthService.getUserInfo(tokens.access_token);
+    
+    // Get user courses to determine role
+    const courses = await oauthService.getUserCourses(tokens.access_token);
+    
+    // Determine user role (default to student, check if teacher in any course)
+    let userRole = 'student';
+    if (courses && courses.length > 0) {
+      // Check first course for role (could be enhanced to check all courses)
+      userRole = await oauthService.getUserRole(tokens.access_token, courses[0].id);
+    }
+    
+    // Create or update user in database
+    const user = await oauthService.createOrUpdateUser(userInfo, tokens);
+    
+    // Update user role if determined from courses
+    if (userRole !== user.role) {
+      await db.query(
+        'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
+        [userRole, user.id]
+      );
+      user.role = userRole;
+    }
+    
+    // Generate JWT token
+    const jwtToken = oauthService.generateJWT(user);
+    
+    // Redirect to frontend with token
+    const frontendUrl = process.env.FRONTEND_URL || 'https://attendance-ml.duckdns.org';
+    res.redirect(`${frontendUrl}/auth/callback?token=${jwtToken}&user=${encodeURIComponent(JSON.stringify({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    }))}`);
+    
+  } catch (error) {
+    console.error('OAuth callback error:', error);
+    const frontendUrl = process.env.FRONTEND_URL || 'https://attendance-ml.duckdns.org';
+    res.redirect(`${frontendUrl}/auth/error?message=${encodeURIComponent(error.message)}`);
+  }
+});
+
+// Get current user info
+router.get('/me', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret_change_this');
+    
+    // Get fresh user data from database
+    const result = await db.query(
+      'SELECT id, lms_id, username, email, name, role, created_at FROM users WHERE id = $1',
+      [decoded.id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    console.error('Get user info error:', error);
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
