@@ -369,7 +369,7 @@ export default function AttendancePage() {
                 <div style={styles.studentInfo}>
                   {student.photo_url ? (
                     <img 
-                      src={`${apiUrl}/uploads/${student.photo_url}`} 
+                      src={`/uploads/${student.photo_url}`} 
                       alt={student.name}
                       style={styles.photo}
                       onError={(e) => {
