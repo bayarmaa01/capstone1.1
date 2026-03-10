@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 const DAYS = [
   { value: 0, label: 'Sunday' },
@@ -18,7 +18,6 @@ export default function AddScheduleForm({ classId, onClose, onAdded }) {
   const [room, setRoom] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,7 +31,7 @@ export default function AddScheduleForm({ classId, onClose, onAdded }) {
         return;
       }
 
-      await axios.post(`${apiUrl}/api/schedule`, {
+      await api.post('/schedule', {
         class_id: classId,
         day_of_week: parseInt(day),
         start_time: start,

@@ -1,14 +1,13 @@
 // frontend/src/components/ScheduleCalendar.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import moment from 'moment';
-import axios from 'axios';
+import api from '../services/api';
 
 const localizer = momentLocalizer(moment);
 
 export default function ScheduleCalendar({ classId }) {
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
   const [events, setEvents] = useState([]);
 
   useEffect(() => {
@@ -17,7 +16,7 @@ export default function ScheduleCalendar({ classId }) {
 
   const fetchSchedules = async () => {
     try {
-      const res = await axios.get(`${apiUrl}/api/schedule/class/${classId}`);
+      const res = await api.get(`/schedule/class/${classId}`);
       const today = new Date();
 
       const formatted = res.data.map((s) => {
