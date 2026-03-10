@@ -1,7 +1,6 @@
 import os
 import pickle
 import numpy as np
-import cv2
 import requests
 import json
 import logging
