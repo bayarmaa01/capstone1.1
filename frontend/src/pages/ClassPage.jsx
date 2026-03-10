@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
 import AttendanceChart from '../components/AttendanceChart';
 import ClassSchedule from '../components/ClassSchedule';
@@ -15,7 +15,6 @@ export default function ClassPage() {
   const [dates, setDates] = useState([]);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     fetchAllData();
@@ -35,7 +34,7 @@ export default function ClassPage() {
 
   const fetchClassInfo = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/classes/${classId}`);
+      const response = await api.get(`/classes/${classId}`);
       setClassInfo(response.data);
     } catch (error) {
       console.error('Error fetching class:', error);
@@ -44,7 +43,7 @@ export default function ClassPage() {
 
   const fetchStudents = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/classes/${classId}/students`);
+      const response = await api.get(`/classes/${classId}/students`);
       setStudents(response.data);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -53,7 +52,7 @@ export default function ClassPage() {
 
   const fetchAllStudents = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/students`);
+      const response = await api.get('/students');
       setAllStudents(response.data);
     } catch (error) {
       console.error('Error fetching all students:', error);
@@ -62,7 +61,7 @@ export default function ClassPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/attendance/class/${classId}/stats`);
+      const response = await api.get(`/attendance/class/${classId}/stats`);
       setStats(response.data);
       console.log('📊 Stats loaded:', response.data.length, 'students');
     } catch (error) {
@@ -72,7 +71,7 @@ export default function ClassPage() {
 
   const fetchDates = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/attendance/class/${classId}/dates`);
+      const response = await api.get(`/attendance/class/${classId}/dates`);
       setDates(response.data);
       console.log('📅 Dates loaded:', response.data.length, 'sessions');
     } catch (error) {
@@ -90,7 +89,7 @@ export default function ClassPage() {
 
   const handleEnrollStudent = async (studentId) => {
     try {
-      await axios.post(`${apiUrl}/api/classes/${classId}/enroll`, {
+      await api.post(`/classes/${classId}/enroll`, {
         student_id: studentId
       });
       await fetchStudents();
@@ -164,7 +163,7 @@ export default function ClassPage() {
                       <div style={styles.studentInfoRow}>
                         {student.photo_url && (
                           <img 
-                            src={`${apiUrl}/uploads/${student.photo_url}`}
+                            src={`/uploads/${student.photo_url}`}
                             alt={student.name}
                             style={styles.smallPhoto}
                             onError={(e) => e.target.style.display = 'none'}
@@ -239,7 +238,7 @@ export default function ClassPage() {
               <div key={student.id} style={styles.enrolledCard}>
                 {student.photo_url && (
                   <img 
-                    src={`${apiUrl}/uploads/${student.photo_url}`}
+                    src={`/uploads/${student.photo_url}`}
                     alt={student.name}
                     style={styles.enrolledPhoto}
                     onError={(e) => e.target.style.display = 'none'}

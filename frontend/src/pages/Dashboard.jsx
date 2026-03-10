@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -11,8 +11,6 @@ export default function Dashboard({ user, onLogout }) {
   const [showQRCodes, setShowQRCodes] = useState(false);
   const navigate = useNavigate();
 
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-
   useEffect(() => {
     fetchClasses();
     fetchStudents();
@@ -20,7 +18,7 @@ export default function Dashboard({ user, onLogout }) {
 
   const fetchClasses = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/classes`);
+      const response = await api.get('/classes');
       setClasses(response.data);
     } catch (error) {
       console.error('Error fetching classes:', error);
@@ -29,7 +27,7 @@ export default function Dashboard({ user, onLogout }) {
 
   const fetchStudents = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/students`);
+      const response = await api.get('/students');
       setStudents(response.data);
     } catch (error) {
       console.error('Error fetching students:', error);
@@ -40,7 +38,7 @@ export default function Dashboard({ user, onLogout }) {
     e.preventDefault();
     const formData = new FormData(e.target);
     try {
-      await axios.post(`${apiUrl}/api/classes`, {
+      await api.post('/classes', {
         code: formData.get('code'),
         name: formData.get('name'),
         instructor_id: user.id
@@ -58,7 +56,7 @@ export default function Dashboard({ user, onLogout }) {
     e.preventDefault();
     const formData = new FormData(e.target);
     try {
-      const response = await axios.post(`${apiUrl}/api/students`, formData, {
+      const response = await api.post('/students', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setShowAddStudent(false);
@@ -81,7 +79,7 @@ export default function Dashboard({ user, onLogout }) {
     }
     
     try {
-      await axios.delete(`${apiUrl}/api/students/${studentId}`);
+      await api.delete(`/students/${studentId}`);
       fetchStudents();
       alert('✓ Student deleted successfully!');
     } catch (error) {
@@ -263,7 +261,7 @@ export default function Dashboard({ user, onLogout }) {
                 <div key={student.id} style={styles.studentCard}>
                   {student.photo_url && (
                     <img 
-                      src={`${apiUrl}/uploads/${student.photo_url}`} 
+                      src={`/uploads/${student.photo_url}`} 
                       alt={student.name}
                       style={styles.photo}
                       onError={(e) => e.target.style.display = 'none'}
