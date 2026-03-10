@@ -84,6 +84,15 @@ app.get('/health', (req, res) => {
   });
 });
 
+// API Health Check Endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'attendance-backend',
+    timestamp: new Date(),
+  });
+});
+
 // =======================================
 // API Routes
 // =======================================
