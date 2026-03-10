@@ -156,6 +156,16 @@ def health():
         "moodle_url": MOODLE_URL
     })
 
+@app.route('/face/health', methods=['GET'])
+def face_health():
+    """Health check endpoint for nginx compatibility"""
+    return jsonify({
+        "status": "ok", 
+        "service": "ai-smart-attendance", 
+        "enrolled": len(encodings),
+        "students": list(encodings.keys()),
+    })
+
 @app.route('/enroll', methods=['POST'])
 def enroll():
     """Enroll a new student's face"""
