@@ -1,6 +1,6 @@
 // src/components/CameraCapture.jsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { faceApi } from '../services/api';
+import { faceApi, api } from '../services/api';
 
 export default function CameraCapture({ classId, sessionDate, onRecognized, onError }) {
   const videoRef = useRef(null);
