@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 export default function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -13,8 +13,7 @@ export default function Login({ onLogin }) {
     setIsLoading(true);
 
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
-      const response = await axios.post(`${apiUrl}/api/auth/login`, {
+      const response = await api.post('/auth/login', {
         username,
         password
       });

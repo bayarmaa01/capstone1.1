@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
 import QRScanner from '../components/QRScanner';
 import CameraCapture from '../components/CameraCapture';
@@ -14,7 +14,6 @@ export default function AttendancePage() {
   const [recognizedIds, setRecognizedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     fetchClassInfo();
@@ -23,7 +22,7 @@ export default function AttendancePage() {
 
   const fetchClassInfo = async () => {
     try {
-      const response = await axios.get(`${apiUrl}/api/classes/${classId}`);
+      const response = await api.get(`/classes/${classId}`);
       setClassInfo(response.data);
     } catch (error) {
       console.error('Error fetching class:', error);
@@ -34,8 +33,8 @@ export default function AttendancePage() {
   const fetchTodayAttendance = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(
-        `${apiUrl}/api/attendance/class/${classId}/date/${sessionDate}`
+      const response = await api.get(
+        `/attendance/class/${classId}/date/${sessionDate}`
       );
       setAttendance(response.data);
       
@@ -101,7 +100,7 @@ export default function AttendancePage() {
       console.log('✓ Found student:', student.name, '(DB ID:', student.id, ')');
 
       // Record attendance with student's database ID
-      await axios.post(`${apiUrl}/api/attendance/record`, {
+      await api.post('/attendance/record', {
         class_id: parseInt(classId),
         student_id: student.id,  // Use database ID from the student record
         session_date: sessionDate,
@@ -149,7 +148,7 @@ export default function AttendancePage() {
       console.log('✓ Recording attendance for:', student.name, '(DB ID:', student.id, ')');
       
       // Record attendance with student's database ID
-      await axios.post(`${apiUrl}/api/attendance/record`, {
+      await api.post('/attendance/record', {
         class_id: parseInt(classId),
         student_id: student.id,  // Use database ID from the student record
         session_date: sessionDate,
@@ -193,7 +192,7 @@ export default function AttendancePage() {
       console.log('💾 Recording manual attendance - Student DB ID:', student.id, 'Class ID:', classId);
       
       // Record attendance using the database ID
-      await axios.post(`${apiUrl}/api/attendance/record`, {
+      await api.post('/attendance/record', {
         class_id: parseInt(classId),
         student_id: student.id,  // IMPORTANT: Use database ID (integer), not student_id string
         session_date: sessionDate,

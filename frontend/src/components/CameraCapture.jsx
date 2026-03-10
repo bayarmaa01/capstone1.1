@@ -1,6 +1,6 @@
 // src/components/CameraCapture.jsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import axios from 'axios';
+import { faceApi } from '../services/api';
 
 export default function CameraCapture({ classId, sessionDate, onRecognized, onError }) {
   const videoRef = useRef(null);
@@ -17,7 +17,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
   const [scanCount, setScanCount] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
 
-  const BACKEND_URL = (process.env.REACT_APP_API_URL || 'http://localhost:4000').replace(/\/$/, '');
+  const BACKEND_URL = process.env.REACT_APP_FACE_SERVICE_URL || '/face';
   const FACE_URL = (process.env.REACT_APP_FACE_SERVICE_URL || 'http://localhost:5001').replace(/\/$/, '');
 
   const setBanner = useCallback((text, color) => {
@@ -70,7 +70,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
       // retry posting attendance up to 2 times (2 attempts)
       const fn = async () => {
         // 10s timeout per attempt
-        const resp = await axios.post(`${BACKEND_URL}/api/attendance/record`, payload, { timeout: 10000 });
+        const resp = await api.post('/attendance/record', payload, { timeout: 10000 });
         return resp;
       };
       const resp = await retry(fn, 2, 500);
@@ -118,7 +118,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
       // Face recognition request with retries - this is where you saw timeouts
       const callFaceService = async () => {
         // 15s per attempt
-        return axios.post(`${FACE_URL}/recognize`, fd, {
+        return faceApi.post('/recognize', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 15000
         });

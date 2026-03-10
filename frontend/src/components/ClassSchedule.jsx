@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import AddScheduleForm from './AddScheduleForm';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -8,7 +8,6 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
   useEffect(() => {
     fetchSchedules();
@@ -17,7 +16,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
   const fetchSchedules = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${apiUrl}/api/schedule/class/${classId}`);
+      const res = await api.get(`/schedule/class/${classId}`);
       setSchedules(res.data);
       if (onScheduleUpdated) onScheduleUpdated(res.data);
     } catch (err) {
@@ -29,7 +28,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this schedule?')) return;
-    await axios.delete(`${apiUrl}/api/schedule/${id}`);
+    await api.delete(`/schedule/${id}`);
     fetchSchedules();
   };
 
@@ -38,7 +37,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
     const start = prompt('Start Time (HH:mm):', schedule.start_time);
     const end = prompt('End Time (HH:mm):', schedule.end_time);
     const room = prompt('Room:', schedule.room_number);
-    await axios.put(`${apiUrl}/api/schedule/${schedule.id}`, {
+    await api.put(`/schedule/${schedule.id}`, {
       day_of_week: parseInt(day),
       start_time: start,
       end_time: end,
