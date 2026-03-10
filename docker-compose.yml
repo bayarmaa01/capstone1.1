@@ -1,89 +1,103 @@
+version: "3.9"
+
 services:
-  # 🗄️ PostgreSQL Database
-  db:
-    image: postgres:14-alpine
-    container_name: attendance-db
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: attendance
-    volumes:
-      - dbdata:/var/lib/postgresql/data
-      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # 🌐 Reverse Proxy
+  nginx:
+    image: nginx:latest
+    container_name: attendance-nginx
     ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d attendance"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/certs:/etc/letsencrypt
+    depends_on:
+      - frontend
+      - backend
+      - moodle
     restart: unless-stopped
 
-  # ⚙️ Backend (Node.js + Express)
+  # 💻 React Frontend
+  frontend:
+    build: ./frontend
+    container_name: attendance-frontend
+    environment:
+      - REACT_APP_API_URL=/api
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  # ⚙️ Node Backend
   backend:
     build: ./backend
     container_name: attendance-backend
     environment:
       DATABASE_URL: postgresql://app:secret@db:5432/attendance
       FACE_SERVICE_URL: http://face-service:5001
-      PORT: 4000
-      JWT_SECRET: aB3$xK9#mN7@qL2!pR5&wT8*vD4%zF6^hJ1-cG0+yU
-      NODE_ENV: development
-      MOODLE_URL: http://moodle
+      MOODLE_URL: http://moodle/webservice/rest/server.php
       MOODLE_TOKEN: 5d2f63b3c1f56fcb8ef11a723ea3e67d
-    ports:
-      - "4000:4000"
-    volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/src:/app/src
-      - /app/node_modules
+      JWT_SECRET: supersecretkey
+    expose:
+      - "4000"
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     restart: unless-stopped
 
-  # 🤖 Face Recognition Service (Python + Flask)
+  # 🗄️ Attendance Database
+  db:
+    image: postgres:14
+    container_name: attendance-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: attendance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # 🤖 Face Recognition Service
   face-service:
-    build:
-      context: ./face-service
-      target: development
+    build: ./face-service
     container_name: attendance-face-service
-    ports:
-      - "5001:5001"
+    expose:
+      - "5001"
     volumes:
       - ./face-service/encodings:/app/encodings
-      - ./face-service/app.py:/app/app.py
-    environment:
-      - FLASK_ENV=development
-      - FLASK_DEBUG=1
     restart: unless-stopped
 
-  # 💻 Frontend (React)
-  frontend:
-    build:
-      context: ./frontend
-      target: development
-    container_name: attendance-frontend
-    ports:
-      - "3000:3000"
+  # 🎓 Moodle LMS
+  moodle:
+    image: moodlehq/moodle-php-apache:8.2
+    container_name: moodle
     environment:
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
-      - REACT_APP_API_URL=/api
-      - REACT_APP_FACE_SERVICE_URL=/face
-
-      - WDS_SOCKET_PORT=3000
+      MOODLE_DATABASE_TYPE: mysqli
+      MOODLE_DATABASE_HOST: moodle-db
+      MOODLE_DATABASE_USER: moodle
+      MOODLE_DATABASE_PASSWORD: moodlepass
+      MOODLE_DATABASE_NAME: moodle
     volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      - /app/node_modules
+      - moodledata:/var/www/moodledata
     depends_on:
-      - backend
-      - face-service
-    stdin_open: true
-    tty: true
+      - moodle-db
+    expose:
+      - "80"
     restart: unless-stopped
 
-# 💾 Persistent volume for PostgreSQL data
+  # 🗄️ Moodle Database
+  moodle-db:
+    image: mariadb:10.6
+    container_name: moodle-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: moodle
+      MYSQL_USER: moodle
+      MYSQL_PASSWORD: moodlepass
+    volumes:
+      - moodledb:/var/lib/mysql
+    restart: unless-stopped
+
 volumes:
-  dbdata:
+  postgres_data:
+  moodledb:
+  moodledata:
