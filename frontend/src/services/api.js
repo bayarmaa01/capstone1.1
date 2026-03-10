@@ -44,4 +44,5 @@ export const faceApi = axios.create({
   },
 });
 
+export { api };
 export default api;
