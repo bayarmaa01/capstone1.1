@@ -2,7 +2,6 @@ version: "3.9"
 
 services:
 
-  # 🌐 Reverse Proxy
   nginx:
     image: nginx:latest
     container_name: attendance-nginx
@@ -11,41 +10,61 @@ services:
       - "443:443"
     volumes:
       - ./nginx/conf:/etc/nginx/conf.d
-      - ./nginx/certs:/etc/letsencrypt
+      - /etc/letsencrypt:/etc/letsencrypt
     depends_on:
       - frontend
       - backend
-      - moodle
+    networks:
+      - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # 💻 React Frontend
+
   frontend:
     build: ./frontend
-    container_name: attendance-frontend
     environment:
       - REACT_APP_API_URL=/api
+      - REACT_APP_FACE_SERVICE_URL=/face
     expose:
-      - "3000"
+      - "80"
+    networks:
+      - attendance-net
     restart: unless-stopped
+    deploy:
+      replicas: 2
 
-  # ⚙️ Node Backend
+
   backend:
     build: ./backend
-    container_name: attendance-backend
     environment:
-      DATABASE_URL: postgresql://app:secret@db:5432/attendance
+      DATABASE_URL: postgresql://app:secret@attendance-db:5432/attendance
       FACE_SERVICE_URL: http://face-service:5001
       MOODLE_URL: http://moodle/webservice/rest/server.php
-      MOODLE_TOKEN: 5d2f63b3c1f56fcb8ef11a723ea3e67d
-      JWT_SECRET: supersecretkey
+      MOODLE_TOKEN: ${MOODLE_TOKEN}
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: production
+      PORT: 4000
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING}
     expose:
       - "4000"
     depends_on:
-      - db
+      - attendance-db
+      - face-service
+    networks:
+      - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # 🗄️ Attendance Database
-  db:
+
+  attendance-db:
     image: postgres:14
     container_name: attendance-db
     environment:
@@ -54,9 +73,11 @@ services:
       POSTGRES_DB: attendance
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - attendance-net
     restart: unless-stopped
 
-  # 🤖 Face Recognition Service
+
   face-service:
     build: ./face-service
     container_name: attendance-face-service
@@ -64,9 +85,11 @@ services:
       - "5001"
     volumes:
       - ./face-service/encodings:/app/encodings
+    networks:
+      - attendance-net
     restart: unless-stopped
 
-  # 🎓 Moodle LMS
+
   moodle:
     image: moodlehq/moodle-php-apache:8.2
     container_name: moodle
@@ -82,9 +105,11 @@ services:
       - moodle-db
     expose:
       - "80"
+    networks:
+      - attendance-net
     restart: unless-stopped
 
-  # 🗄️ Moodle Database
+
   moodle-db:
     image: mariadb:10.6
     container_name: moodle-db
@@ -95,9 +120,17 @@ services:
       MYSQL_PASSWORD: moodlepass
     volumes:
       - moodledb:/var/lib/mysql
+    networks:
+      - attendance-net
     restart: unless-stopped
+
 
 volumes:
   postgres_data:
   moodledb:
   moodledata:
+
+
+networks:
+  attendance-net:
+    driver: bridge
