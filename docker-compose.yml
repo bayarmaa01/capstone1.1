@@ -79,7 +79,7 @@ services:
 
 
   moodle:
-    image: docker.io/bitnami/moodle
+    image: moodlehq/moodle-php-apache:8.2
     container_name: moodle
     environment:
       - MOODLE_DATABASE_TYPE=mariadb
