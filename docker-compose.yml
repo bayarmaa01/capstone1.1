@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
 
   nginx:
@@ -12,14 +14,10 @@ services:
     depends_on:
       - frontend
       - backend
+      - moodle
     networks:
       - attendance-net
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 
   frontend:
@@ -41,7 +39,7 @@ services:
     environment:
       DATABASE_URL: postgresql://app:secret@attendance-db:5432/attendance
       FACE_SERVICE_URL: http://face-service:5001
-      MOODLE_URL: http://moodle/webservice/rest/server.php
+      MOODLE_URL: http://moodle:8080/webservice/rest/server.php
       NODE_ENV: production
       PORT: 4000
     expose:
@@ -49,14 +47,10 @@ services:
     depends_on:
       - attendance-db
       - face-service
+      - moodle
     networks:
       - attendance-net
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
 
   attendance-db:
@@ -87,20 +81,23 @@ services:
 
 
   moodle:
-    image: moodlehq/moodle-php-apache:8.2
+    image: bitnami/moodle:latest
     container_name: moodle
     environment:
-      MOODLE_DATABASE_TYPE: mysqli
-      MOODLE_DATABASE_HOST: moodle-db
-      MOODLE_DATABASE_USER: moodle
-      MOODLE_DATABASE_PASSWORD: moodlepass
-      MOODLE_DATABASE_NAME: moodle
+      - MOODLE_DATABASE_TYPE=mariadb
+      - MOODLE_DATABASE_HOST=moodle-db
+      - MOODLE_DATABASE_PORT_NUMBER=3306
+      - MOODLE_DATABASE_USER=moodle
+      - MOODLE_DATABASE_PASSWORD=moodlepass
+      - MOODLE_DATABASE_NAME=moodle
+      - ALLOW_EMPTY_PASSWORD=yes
     volumes:
-      - moodledata:/var/www/moodledata
+      - moodledata:/bitnami/moodle
+      - moodledata:/bitnami/moodledata
+    expose:
+      - "8080"
     depends_on:
       - moodle-db
-    expose:
-      - "80"
     networks:
       - attendance-net
     restart: unless-stopped
@@ -115,7 +112,7 @@ services:
       MYSQL_USER: moodle
       MYSQL_PASSWORD: moodlepass
     volumes:
-      - moodledb:/var/lib/mysql
+      - moodledb:/bitnami/mariadb
     networks:
       - attendance-net
     restart: unless-stopped
