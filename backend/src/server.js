@@ -9,13 +9,21 @@ const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+
+// Trust proxy for nginx reverse proxy
 const app = express();
+app.set('trust proxy', true);
+
 const { startAutoAbsentJob } = require('./autoAbsentJob');
 const lmsSyncService = require('./services/lms_sync');
 const azureStorageService = require('./services/azure_storage');
 
-// Initialize Azure Storage
-azureStorageService.initializeContainer().catch(console.error);
+// Initialize Azure Storage (only if connection string is provided)
+if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
+  azureStorageService.initializeContainer().catch(console.error);
+} else {
+  console.log('⚠️ Azure Storage connection string not provided - skipping Azure initialization');
+}
 
 // Start background jobs
 startAutoAbsentJob();
