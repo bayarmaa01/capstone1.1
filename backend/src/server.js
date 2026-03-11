@@ -135,3 +135,13 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend server running at: http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
 });
+ 
+// API Health Check Endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'attendance-backend',
+    timestamp: new Date(),
+  });
+});
+ 
