@@ -6,14 +6,17 @@ import { QRCodeSVG } from 'qrcode.react';
 export default function Dashboard({ user, onLogout }) {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [moodleConnected, setMoodleConnected] = useState(false);
   const [showAddClass, setShowAddClass] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showQRCodes, setShowQRCodes] = useState(false);
+  const [syncingMoodle, setSyncingMoodle] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchClasses();
     fetchStudents();
+    checkMoodleConnection();
   }, []);
 
   const fetchClasses = async () => {
@@ -31,6 +34,33 @@ export default function Dashboard({ user, onLogout }) {
       setStudents(response.data);
     } catch (error) {
       console.error('Error fetching students:', error);
+    }
+  };
+
+  const checkMoodleConnection = async () => {
+    try {
+      const response = await api.get('/moodle/test');
+      setMoodleConnected(response.data.connected);
+    } catch (error) {
+      console.error('Moodle connection check failed:', error);
+      setMoodleConnected(false);
+    }
+  };
+
+  const syncMoodleData = async () => {
+    setSyncingMoodle(true);
+    try {
+      const response = await api.post('/moodle/sync');
+      if (response.data.success) {
+        await fetchClasses();
+        await fetchStudents();
+        alert(`✅ Synced ${response.data.synced_courses} courses from Moodle!`);
+      }
+    } catch (error) {
+      console.error('Moodle sync failed:', error);
+      alert('❌ Failed to sync Moodle data');
+    } finally {
+      setSyncingMoodle(false);
     }
   };
 
@@ -118,9 +148,38 @@ export default function Dashboard({ user, onLogout }) {
         <h1>📚 Attendance Dashboard</h1>
         <div>
           <span style={styles.username}>Welcome, {user.username}!</span>
+          <button 
+            onClick={syncMoodleData} 
+            disabled={syncingMoodle}
+            style={{
+              ...styles.logoutBtn,
+              backgroundColor: moodleConnected ? '#28a745' : '#dc3545',
+              marginRight: '10px'
+            }}
+          >
+            {syncingMoodle ? '🔄 Syncing...' : moodleConnected ? '🔄 Sync Moodle' : '🔗 Connect Moodle'}
+          </button>
           <button onClick={onLogout} style={styles.logoutBtn}>Logout</button>
         </div>
       </header>
+
+      {/* Moodle Status */}
+      <div style={{
+        backgroundColor: moodleConnected ? '#d4edda' : '#f8d7da',
+        padding: '10px',
+        borderRadius: '5px',
+        marginBottom: '20px',
+        border: `1px solid ${moodleConnected ? '#c3e6cb' : '#f5c6cb'}`
+      }}>
+        <strong>
+          {moodleConnected ? '✅ Moodle Connected' : '❌ Moodle Not Connected'}
+        </strong>
+        {!moodleConnected && (
+          <div style={{ marginTop: '5px', fontSize: '14px' }}>
+            Configure Moodle Web Services and add MOODLE_TOKEN to environment variables
+          </div>
+        )}
+      </div>
 
       <div style={styles.grid}>
         {/* Classes Section */}
