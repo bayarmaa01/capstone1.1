@@ -1,65 +1,228 @@
-name: 🚀 AI Attendance Auto Deploy
+name: 🚀 AI Attendance System CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
 
 # -----------------------------
-# 🧪 Backend Test
+# 🧪 Comprehensive Testing
 # -----------------------------
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x]
+        python-version: [3.9]
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_attendance
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install dependencies
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: face-service/requirements.txt
+
+      - name: Install backend dependencies
         run: |
           cd backend
-          npm install
+          npm ci
 
-      - name: Run tests
+      - name: Install Python dependencies
+        run: |
+          cd face-service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run backend unit tests
         run: |
           cd backend
-          npm test
+          npm run test:unit
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
+          NODE_ENV: test
+
+      - name: Run backend integration tests
+        run: |
+          cd backend
+          npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
+
+      - name: Run Python tests
+        run: |
+          cd face-service
+          python -m pytest tests/ --cov=. --cov-report=xml
+
+      - name: Run frontend tests
+        run: |
+          cd frontend
+          npm run test:ci
+        env:
+          CI: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage/lcov.info,./face-service/coverage.xml
+          flags: unittests
+          name: codecov-umbrella
 
 # -----------------------------
-# 🐳 Build Docker Images
+# 🔒 Security Scanning
 # -----------------------------
-  build:
+  security-scan:
     runs-on: ubuntu-latest
     needs: test
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          languages: javascript, python
+
+      - name: Dependency Check
+        run: |
+          cd backend && npm audit --audit-level moderate
+          cd face-service && pip-audit
+
+# -----------------------------
+# 🐳 Build and Push Docker Images
+# -----------------------------
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.event_name == 'push'
+    outputs:
+      backend-image: ${{ steps.backend.outputs.image }}
+      frontend-image: ${{ steps.frontend.outputs.image }}
+      face-service-image: ${{ steps.face-service.outputs.image }}
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build backend image
-        run: |
-          docker build -t attendance-backend ./backend
+      - name: Generate build metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build frontend image
-        run: |
-          docker build -t attendance-frontend ./frontend
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        id: backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.meta.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push frontend image
+        id: frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.meta.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push face-service image
+        id: face-service
+        uses: docker/build-push-action@v4
+        with:
+          context: ./face-service
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ steps.meta.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
 # -----------------------------
 # 🚀 Deploy to Azure VM
 # -----------------------------
   deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ needs.build-and-push.outputs.version }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -68,41 +231,86 @@ jobs:
           username: azureuser
           key: ${{ secrets.EC2_KEY }}
           script: |
-
             echo "📦 Updating project"
-
             cd ~/capstone1.1
-
             git pull origin main
 
-            echo "🐳 Restarting Docker"
+            echo "🐳 Updating docker-compose with new images"
+            sed -i "s|image: .*-backend:.*|image: ${{ needs.build-and-push.outputs.backend-image }}|g" docker-compose.yml
+            sed -i "s|image: .*-frontend:.*|image: ${{ needs.build-and-push.outputs.frontend-image }}|g" docker-compose.yml
+            sed -i "s|image: .*-face-service:.*|image: ${{ needs.build-and-push.outputs.face-service-image }}|g" docker-compose.yml
 
+            echo "🚀 Pulling new images and restarting services"
+            docker compose pull
             docker compose down
-            docker compose up -d --build
+            docker compose up -d
 
             echo "🧹 Cleaning old images"
-
             docker image prune -f
 
+            echo "⏱️ Waiting for services to start"
+            sleep 30
+
 # -----------------------------
-# 🏥 Health Check
+# 🏥 Health Check & Validation
 # -----------------------------
   health-check:
     runs-on: ubuntu-latest
     needs: deploy
+    if: github.ref == 'refs/heads/main'
 
     steps:
+      - name: Wait for services
+        run: sleep 30
 
-      - name: Wait for service
-        run: sleep 20
-
-      - name: Check production site
+      - name: Check backend health
         run: |
-          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }})
-
+          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/api/health)
           if [ "$status" = "200" ]; then
-            echo "✅ Deployment successful"
+            echo "✅ Backend healthy"
           else
-            echo "❌ Deployment failed"
+            echo "❌ Backend unhealthy: $status"
             exit 1
           fi
+
+      - name: Check face-service health
+        run: |
+          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/face/health)
+          if [ "$status" = "200" ]; then
+            echo "✅ Face service healthy"
+          else
+            echo "❌ Face service unhealthy: $status"
+            exit 1
+          fi
+
+      - name: Check frontend
+        run: |
+          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }})
+          if [ "$status" = "200" ]; then
+            echo "✅ Frontend healthy"
+          else
+            echo "❌ Frontend unhealthy: $status"
+            exit 1
+          fi
+
+      - name: Run smoke tests
+        run: |
+          echo "🧪 Running smoke tests..."
+          
+          # Test OAuth2 endpoint
+          curl -f ${{ secrets.PRODUCTION_URL }}/api/auth/login || exit 1
+          
+          # Test analytics endpoint
+          curl -f ${{ secrets.PRODUCTION_URL }}/api/analytics/health || exit 1
+          
+          # Test LMS sync endpoint
+          curl -f ${{ secrets.PRODUCTION_URL }}/api/moodle/health || exit 1
+          
+          echo "✅ All smoke tests passed"
+
+      - name: Notify deployment success
+        if: success()
+        run: |
+          echo "🎉 Deployment completed successfully!"
+          echo "📊 Version: ${{ needs.deploy.outputs.version }}"
+          echo "🔗 URL: ${{ secrets.PRODUCTION_URL }}"

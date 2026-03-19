@@ -26,3 +26,9 @@ npm-debug.log*
 # IDE
 .vscode/
 .idea/
+# SSL (very important)
+nginx/ssl/
+
+# Moodle (nested repo / unnecessary)
+moodle/
+

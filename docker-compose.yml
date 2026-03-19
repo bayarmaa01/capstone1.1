@@ -79,19 +79,19 @@ services:
 
 
   moodle:
-    image: moodlehq/moodle-php-apache:8.2
+    image: bitnami/moodle:latest
     container_name: moodle
+    ports:
+      - "8080:8080"
     environment:
       - MOODLE_DATABASE_TYPE=mysqli
       - MOODLE_DATABASE_HOST=moodle-db
+      - MOODLE_DATABASE_PORT_NUMBER=3306
       - MOODLE_DATABASE_USER=moodle
       - MOODLE_DATABASE_PASSWORD=moodlepass
       - MOODLE_DATABASE_NAME=moodle
     volumes:
-      - ./moodle:/var/www/html
-      - moodledata:/var/www/moodledata
-    expose:
-      - "80"
+      - moodledata:/bitnami/moodle
     depends_on:
       - moodle-db
     networks:

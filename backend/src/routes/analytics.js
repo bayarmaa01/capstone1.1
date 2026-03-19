@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const analyticsService = require('../services/analytics');
+const riskModel = require('../ai/riskModel');
 const { requireAuth } = require('../middleware/auth');
 const db = require('../db');
 
@@ -164,6 +165,104 @@ router.get('/dashboard/:classId', requireAuth, async (req, res) => {
     console.error('Dashboard overview error:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// AI Risk Analysis Routes
+// ======================
+
+// Get risk analysis for a specific student
+router.get('/risk/student/:studentId', requireAuth, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { classId, days = 30 } = req.query;
+    
+    const riskAnalysis = await riskModel.calculateStudentRisk(
+      parseInt(studentId), 
+      classId ? parseInt(classId) : null, 
+      parseInt(days)
+    );
+    
+    res.json({ success: true, data: riskAnalysis });
+  } catch (error) {
+    console.error('Student risk analysis error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get class-wide risk analysis
+router.get('/risk/class/:classId', requireAuth, async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { days = 30 } = req.query;
+    
+    const classRiskAnalysis = await riskModel.getClassRiskAnalysis(
+      parseInt(classId), 
+      parseInt(days)
+    );
+    
+    res.json({ success: true, data: classRiskAnalysis });
+  } catch (error) {
+    console.error('Class risk analysis error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get risk trends over time for a student
+router.get('/risk/trends/:studentId', requireAuth, async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { classId, weeks = 4 } = req.query;
+    
+    const riskTrends = await riskModel.getRiskTrends(
+      parseInt(studentId), 
+      classId ? parseInt(classId) : null, 
+      parseInt(weeks)
+    );
+    
+    res.json({ success: true, data: riskTrends });
+  } catch (error) {
+    console.error('Risk trends error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get high-risk students alert
+router.get('/risk/alerts/:classId', requireAuth, async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { threshold = 0.7 } = req.query;
+    
+    const classRiskAnalysis = await riskModel.getClassRiskAnalysis(parseInt(classId));
+    
+    const highRiskStudents = classRiskAnalysis.studentRisks.filter(
+      student => student.riskScore >= parseFloat(threshold)
+    );
+    
+    res.json({ 
+      success: true, 
+      data: {
+        classId: parseInt(classId),
+        threshold: parseFloat(threshold),
+        highRiskCount: highRiskStudents.length,
+        totalStudents: classRiskAnalysis.totalStudents,
+        students: highRiskStudents,
+        alertDate: new Date()
+      }
+    });
+  } catch (error) {
+    console.error('Risk alerts error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Health check for analytics service
+router.get('/health', (req, res) => {
+  res.json({ 
+    success: true, 
+    service: 'analytics',
+    status: 'healthy',
+    timestamp: new Date()
+  });
 });
 
 module.exports = router;
