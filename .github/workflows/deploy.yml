@@ -216,7 +216,6 @@ jobs:
     if: github.ref == 'refs/heads/main' && success()
     environment:
       name: production
-      url: ${{ secrets.PRODUCTION_URL }}
     
     steps:
       - name: Checkout code
