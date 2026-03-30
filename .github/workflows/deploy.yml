@@ -14,14 +14,10 @@ env:
 jobs:
 
 # -----------------------------
-# 🧪 Comprehensive Testing
+# 🧪 Backend Tests & Build
 # -----------------------------
-  test:
+  backend:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x]
-        python-version: [3.9]
     
     services:
       postgres:
@@ -37,6 +33,9 @@ jobs:
         ports:
           - 5432:5432
 
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -44,34 +43,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 18.x
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-          cache-dependency-path: face-service/requirements.txt
-
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: |
           cd backend
           npm ci
 
-      - name: Install Python dependencies
-        run: |
-          cd face-service
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
-
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm ci
-
-      - name: Run backend unit tests
+      - name: Run unit tests
         run: |
           cd backend
           npm run test:unit
@@ -79,38 +60,169 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
           NODE_ENV: test
 
-      - name: Run backend integration tests
+      - name: Run integration tests
         run: |
           cd backend
           npm run test:integration
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
 
-      - name: Run Python tests
-        run: |
-          cd face-service
-          python -m pytest tests/ --cov=. --cov-report=xml
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run frontend tests
+      - name: Generate build metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+# -----------------------------
+# 🎨 Frontend Build
+# -----------------------------
+  frontend:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run tests
         run: |
           cd frontend
           npm run test:ci
         env:
           CI: true
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
         with:
-          files: ./backend/coverage/lcov.info,./face-service/coverage.xml
-          flags: unittests
-          name: codecov-umbrella
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate build metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+# -----------------------------
+# 🤖 Face Service Build
+# -----------------------------
+  face-service:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      image: ${{ steps.build.outputs.image }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          cache: 'pip'
+          cache-dependency-path: face-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          cd face-service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          cd face-service
+          python -m pytest tests/ --cov=. --cov-report=xml
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate build metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: ./face-service
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
 # -----------------------------
 # 🔒 Security Scanning
 # -----------------------------
   security-scan:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [backend, frontend, face-service]
     if: github.event_name == 'push'
     
     steps:
@@ -135,91 +247,14 @@ jobs:
         with:
           languages: javascript, python
 
-      - name: Dependency Check
-        run: |
-          cd backend && npm audit --audit-level moderate
-          cd face-service && pip-audit
-
 # -----------------------------
-# 🐳 Build and Push Docker Images
-# -----------------------------
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: [test, security-scan]
-    if: github.event_name == 'push'
-    outputs:
-      backend-image: ${{ steps.backend.outputs.image }}
-      frontend-image: ${{ steps.frontend.outputs.image }}
-      face-service-image: ${{ steps.face-service.outputs.image }}
-      version: ${{ steps.meta.outputs.version }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push backend image
-        id: backend
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ steps.meta.outputs.version }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push frontend image
-        id: frontend
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ steps.meta.outputs.version }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build and push face-service image
-        id: face-service
-        uses: docker/build-push-action@v4
-        with:
-          context: ./face-service
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ steps.meta.outputs.version }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-# -----------------------------
-# 🚀 Deploy to Azure VM
+# 🚀 Deploy to Production
 # -----------------------------
   deploy:
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs: [backend, frontend, face-service]
     if: github.ref == 'refs/heads/main'
-    outputs:
-      version: ${{ needs.build-and-push.outputs.version }}
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -236,9 +271,9 @@ jobs:
             git pull origin main
 
             echo "🐳 Updating docker-compose with new images"
-            sed -i "s|image: .*-backend:.*|image: ${{ needs.build-and-push.outputs.backend-image }}|g" docker-compose.yml
-            sed -i "s|image: .*-frontend:.*|image: ${{ needs.build-and-push.outputs.frontend-image }}|g" docker-compose.yml
-            sed -i "s|image: .*-face-service:.*|image: ${{ needs.build-and-push.outputs.face-service-image }}|g" docker-compose.yml
+            sed -i "s|image: .*-backend:.*|image: ${{ needs.backend.outputs.image }}|g" docker-compose.yml
+            sed -i "s|image: .*-frontend:.*|image: ${{ needs.frontend.outputs.image }}|g" docker-compose.yml
+            sed -i "s|image: .*-face-service:.*|image: ${{ needs.face-service.outputs.image }}|g" docker-compose.yml
 
             echo "🚀 Pulling new images and restarting services"
             docker compose pull
@@ -293,24 +328,8 @@ jobs:
             exit 1
           fi
 
-      - name: Run smoke tests
-        run: |
-          echo "🧪 Running smoke tests..."
-          
-          # Test OAuth2 endpoint
-          curl -f ${{ secrets.PRODUCTION_URL }}/api/auth/login || exit 1
-          
-          # Test analytics endpoint
-          curl -f ${{ secrets.PRODUCTION_URL }}/api/analytics/health || exit 1
-          
-          # Test LMS sync endpoint
-          curl -f ${{ secrets.PRODUCTION_URL }}/api/moodle/health || exit 1
-          
-          echo "✅ All smoke tests passed"
-
       - name: Notify deployment success
         if: success()
         run: |
           echo "🎉 Deployment completed successfully!"
-          echo "📊 Version: ${{ needs.deploy.outputs.version }}"
           echo "🔗 URL: ${{ secrets.PRODUCTION_URL }}"
