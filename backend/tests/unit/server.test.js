@@ -9,16 +9,25 @@ jest.mock('../../src/services/azure_storage', () => ({
 }));
 
 describe('Server Health Check', () => {
-  beforeAll(() => {
+  let app;
+
+  beforeAll(async () => {
     // Set test environment variables
     process.env.NODE_ENV = 'test';
     process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
+    
+    // Import app after mocking and env setup
+    app = require('../../src/server');
+  });
+
+  afterAll(async () => {
+    // Clean up - close server if it exists
+    if (app && app.close) {
+      await app.close();
+    }
   });
 
   test('GET /api/health should return 200', async () => {
-    // Import app after mocking
-    const app = require('../../src/server');
-    
     const response = await request(app)
       .get('/api/health')
       .expect(200);
