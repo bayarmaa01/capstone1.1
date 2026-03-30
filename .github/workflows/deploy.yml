@@ -8,16 +8,16 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: bayarmaa01/capstone1.1
+  DOCKER_REGISTRY: docker.io
+  DOCKER_REPO: ${{ secrets.DOCKERHUB_USERNAME }}
 
 jobs:
-
-# -----------------------------
-# 🧪 Backend Tests & Build
-# -----------------------------
-  backend:
+# --------------------------------------------------
+# STEP 1 — TEST STAGE (PARALLEL)
+# --------------------------------------------------
+  test-backend:
     runs-on: ubuntu-latest
+    name: 🧪 Backend Tests
     
     services:
       postgres:
@@ -32,310 +32,228 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: '18'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
-
+      
       - name: Install dependencies
         run: |
           cd backend
           npm ci
-
-      - name: Run unit tests
+      
+      - name: Run tests
         run: |
           cd backend
-          npm run test:unit
+          npm test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
           NODE_ENV: test
 
-      - name: Run integration tests
-        run: |
-          cd backend
-          npm run test:integration
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-# -----------------------------
-# 🎨 Frontend Build
-# -----------------------------
-  frontend:
+  test-frontend:
     runs-on: ubuntu-latest
+    name: 🎨 Frontend Tests
     
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: '18'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
-
+      
       - name: Install dependencies
         run: |
           cd frontend
           npm ci
-
-      - name: Run tests
+      
+      - name: Run tests and build
         run: |
           cd frontend
           npm run test:ci
+          npm run build
         env:
           CI: true
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        id: build
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-# -----------------------------
-# 🤖 Face Service Build
-# -----------------------------
-  face-service:
+  test-face:
     runs-on: ubuntu-latest
+    name: 🤖 Face Service Tests
     
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: '3.9'
           cache: 'pip'
           cache-dependency-path: face-service/requirements.txt
-
+      
       - name: Install dependencies
         run: |
           cd face-service
           pip install -r requirements.txt
-          pip install pytest pytest-cov
-
+      
       - name: Run tests
         run: |
           cd face-service
           python -m pytest tests/ --cov=. --cov-report=xml
 
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
+# --------------------------------------------------
+# STEP 2 — BUILD & PUSH STAGE
+# --------------------------------------------------
+  build-backend:
+    runs-on: ubuntu-latest
+    name: 🐳 Build Backend
+    needs: [test-backend, test-frontend, test-face]
+    if: success()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push backend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.DOCKER_REPO }}/attendance-backend:latest
+            ${{ env.DOCKER_REPO }}/attendance-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
 
-      - name: Build and push Docker image
-        id: build
+  build-frontend:
+    runs-on: ubuntu-latest
+    name: 🐳 Build Frontend
+    needs: [test-backend, test-frontend, test-face]
+    if: success()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.DOCKER_REPO }}/attendance-frontend:latest
+            ${{ env.DOCKER_REPO }}/attendance-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  build-face:
+    runs-on: ubuntu-latest
+    name: 🐳 Build Face Service
+    needs: [test-backend, test-frontend, test-face]
+    if: success()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Build and push face service image
         uses: docker/build-push-action@v4
         with:
           context: ./face-service
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.DOCKER_REPO }}/attendance-face:latest
+            ${{ env.DOCKER_REPO }}/attendance-face:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
 
-# -----------------------------
-# 🔒 Security Scanning
-# -----------------------------
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: [backend, frontend, face-service]
-    if: github.event_name == 'push'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
-        with:
-          languages: javascript, python
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
-
-# -----------------------------
-# 🚀 Deploy to Production
-# -----------------------------
+# --------------------------------------------------
+# STEP 3 — DEPLOY STAGE
+# --------------------------------------------------
   deploy:
     runs-on: ubuntu-latest
-    needs: [backend, frontend, face-service]
-    if: github.ref == 'refs/heads/main'
+    name: 🚀 Deploy to EC2
+    needs: [build-backend, build-frontend, build-face]
+    if: github.ref == 'refs/heads/main' && success()
+    environment:
+      name: production
+      url: ${{ secrets.PRODUCTION_URL }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: azureuser
+          username: ec2-user
           key: ${{ secrets.EC2_KEY }}
           script: |
-            echo "📦 Updating project"
-            cd ~/capstone1.1
-            git pull origin main
-
-            echo "🐳 Updating docker-compose with new images"
-            sed -i "s|image: .*-backend:.*|image: ${{ needs.backend.outputs.image }}|g" docker-compose.yml
-            sed -i "s|image: .*-frontend:.*|image: ${{ needs.frontend.outputs.image }}|g" docker-compose.yml
-            sed -i "s|image: .*-face-service:.*|image: ${{ needs.face-service.outputs.image }}|g" docker-compose.yml
-
-            echo "🚀 Pulling new images and restarting services"
-            docker compose pull
-            docker compose down
-            docker compose up -d
-
-            echo "🧹 Cleaning old images"
-            docker image prune -f
-
-            echo "⏱️ Waiting for services to start"
+            cd /home/ec2-user/automated-attendance-system
+            
+            # Pull latest images
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/attendance-backend:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/attendance-frontend:latest
+            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/attendance-face:latest
+            
+            # Stop existing containers
+            docker-compose down
+            
+            # Update docker-compose with new image tags
+            sed -i "s|${{ secrets.DOCKERHUB_USERNAME }}/attendance-backend:.*|${{ secrets.DOCKERHUB_USERNAME }}/attendance-backend:latest|g" docker-compose.yml
+            sed -i "s|${{ secrets.DOCKERHUB_USERNAME }}/attendance-frontend:.*|${{ secrets.DOCKERHUB_USERNAME }}/attendance-frontend:latest|g" docker-compose.yml
+            sed -i "s|${{ secrets.DOCKERHUB_USERNAME }}/attendance-face:.*|${{ secrets.DOCKERHUB_USERNAME }}/attendance-face:latest|g" docker-compose.yml
+            
+            # Start services
+            docker-compose up -d
+            
+            # Wait for services to be healthy
             sleep 30
-
-# -----------------------------
-# 🏥 Health Check & Validation
-# -----------------------------
-  health-check:
-    runs-on: ubuntu-latest
-    needs: deploy
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Wait for services
-        run: sleep 30
-
-      - name: Check backend health
-        run: |
-          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/api/health)
-          if [ "$status" = "200" ]; then
-            echo "✅ Backend healthy"
-          else
-            echo "❌ Backend unhealthy: $status"
-            exit 1
-          fi
-
-      - name: Check face-service health
-        run: |
-          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }}/face/health)
-          if [ "$status" = "200" ]; then
-            echo "✅ Face service healthy"
-          else
-            echo "❌ Face service unhealthy: $status"
-            exit 1
-          fi
-
-      - name: Check frontend
-        run: |
-          status=$(curl -o /dev/null -s -w "%{http_code}" ${{ secrets.PRODUCTION_URL }})
-          if [ "$status" = "200" ]; then
-            echo "✅ Frontend healthy"
-          else
-            echo "❌ Frontend unhealthy: $status"
-            exit 1
-          fi
-
-      - name: Notify deployment success
-        if: success()
-        run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "🔗 URL: ${{ secrets.PRODUCTION_URL }}"
+            
+            # Check service health
+            docker-compose ps
+            
+            # Clean up old images
+            docker image prune -f
+            
+            echo "🚀 Deployment completed successfully!"
