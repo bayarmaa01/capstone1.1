@@ -140,8 +140,12 @@ app.use((err, req, res, next) => {
 
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Backend server running at: http://localhost:${PORT}`);
-  console.log(`📋 Health check: http://localhost:${PORT}/health`);
-});
+
+// Only start server if not disabled (for testing)
+if (process.env.DISABLE_SERVER_START !== 'true') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Backend server running at: http://localhost:${PORT}`);
+    console.log(`📋 Health check: http://localhost:${PORT}/health`);
+  });
+}
  
