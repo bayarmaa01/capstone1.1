@@ -14,9 +14,9 @@ env:
 jobs:
 
 # -----------------------------
-# 🧪 TEST STAGE (PARALLEL)
+# 🧪 Backend Tests & Build
 # -----------------------------
-  test-backend:
+  backend:
     runs-on: ubuntu-latest
     
     services:
@@ -32,6 +32,9 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout code
@@ -64,8 +67,44 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_attendance
 
-  test-frontend:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate build metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+# -----------------------------
+# 🎨 Frontend Build
+# -----------------------------
+  frontend:
     runs-on: ubuntu-latest
+    
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout code
@@ -90,8 +129,44 @@ jobs:
         env:
           CI: true
 
-  test-face-service:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate build metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+# -----------------------------
+# 🤖 Face Service Build
+# -----------------------------
+  face-service:
     runs-on: ubuntu-latest
+    
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout code
@@ -115,100 +190,6 @@ jobs:
           cd face-service
           python -m pytest tests/ --cov=. --cov-report=xml
 
-# -----------------------------
-# 🐳 BUILD STAGE (AFTER TESTS)
-# -----------------------------
-  build-backend:
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service]
-    
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  build-frontend:
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service]
-    
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v2
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  build-face-service:
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service]
-    
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Log in to Container Registry
         uses: docker/login-action@v2
         with:
@@ -231,6 +212,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v4
         with:
           context: ./face-service
@@ -243,7 +225,7 @@ jobs:
 # -----------------------------
   security-scan:
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend, build-face-service]
+    needs: [backend, frontend, face-service]
     if: github.event_name == 'push'
     
     steps:
@@ -276,7 +258,7 @@ jobs:
 # -----------------------------
   deploy:
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend, build-face-service]
+    needs: [backend, frontend, face-service]
     if: github.ref == 'refs/heads/main'
     
     steps:
@@ -295,9 +277,9 @@ jobs:
             git pull origin main
 
             echo "🐳 Updating docker-compose with new images"
-            sed -i "s|image: .*-backend:.*|image: ${{ needs.build-backend.outputs.image }}|g" docker-compose.yml
-            sed -i "s|image: .*-frontend:.*|image: ${{ needs.build-frontend.outputs.image }}|g" docker-compose.yml
-            sed -i "s|image: .*-face-service:.*|image: ${{ needs.build-face-service.outputs.image }}|g" docker-compose.yml
+            sed -i "s|image: .*-backend:.*|image: ${{ needs.backend.outputs.image }}|g" docker-compose.yml
+            sed -i "s|image: .*-frontend:.*|image: ${{ needs.frontend.outputs.image }}|g" docker-compose.yml
+            sed -i "s|image: .*-face-service:.*|image: ${{ needs.face-service.outputs.image }}|g" docker-compose.yml
 
             echo "🚀 Pulling new images and restarting services"
             docker compose pull
