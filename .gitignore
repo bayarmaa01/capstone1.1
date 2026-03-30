@@ -32,3 +32,9 @@ nginx/ssl/
 # Moodle (nested repo / unnecessary)
 moodle/
 
+# Moodle data (runtime files)
+moodledata/
+postgres_data/
+*.log
+node_modules/
+.env

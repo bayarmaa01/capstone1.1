@@ -1,0 +1,117 @@
+version: "3.9"
+
+services:
+
+  nginx:
+    image: nginx:latest
+    container_name: attendance-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - /etc/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - frontend
+      - backend
+      - moodle
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      REACT_APP_API_URL: /api
+      REACT_APP_FACE_SERVICE_URL: /face
+    expose:
+      - "80"
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://app:secret@attendance-db:5432/attendance
+      FACE_SERVICE_URL: http://attendance-face-service:5001
+      MOODLE_URL: http://moodle/webservice/rest/server.php
+      NODE_ENV: production
+      PORT: 4000
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "4000"
+    depends_on:
+      - attendance-db
+      - moodle
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+  attendance-db:
+    image: postgres:14
+    container_name: attendance-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: attendance
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+  face-service:
+    build: ./face-service
+    container_name: attendance-face-service
+    expose:
+      - "5001"
+    volumes:
+      - ./face-service/encodings:/app/encodings
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+  # ✅ FIXED MOODLE
+  moodle:
+    build: ./moodle-app
+    container_name: moodle
+    ports:
+      - "8080:80"
+    volumes:
+      - moodledata:/var/www/moodledata
+    depends_on:
+      - moodle-db
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+  moodle-db:
+    image: mariadb:10.6
+    container_name: moodle-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: moodle
+      MYSQL_USER: moodle
+      MYSQL_PASSWORD: moodlepass
+    volumes:
+      - moodledb:/var/lib/mysql
+    networks:
+      - attendance-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  moodledb:
+  moodledata:
+  moodle_html:
+
+networks:
+  attendance-net:
+    driver: bridge
