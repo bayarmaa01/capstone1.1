@@ -1,7 +1,7 @@
 const request = require('supertest');
 
 // Mock Azure Storage to avoid connection issues
-jest.mock('../src/services/azure_storage', () => ({
+jest.mock('../../src/services/azure_storage', () => ({
   initializeContainer: jest.fn(),
   uploadBlob: jest.fn(),
   getBlobUrl: jest.fn(),
@@ -17,7 +17,7 @@ describe('Server Health Check', () => {
 
   test('GET /api/health should return 200', async () => {
     // Import app after mocking
-    const app = require('../src/server');
+    const app = require('../../src/server');
     
     const response = await request(app)
       .get('/api/health')

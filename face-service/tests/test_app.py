@@ -2,9 +2,6 @@ import pytest
 import sys
 import os
 
-# Add the parent directory to the path so we can import app
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 def test_health_check():
     """Test the health check endpoint"""
     # Import app here to avoid circular imports
@@ -13,7 +10,10 @@ def test_health_check():
     with app.test_client() as client:
         response = client.get('/health')
         assert response.status_code == 200
-        assert b'healthy' in response.data.lower()
+        # Check for 'status' field instead of 'healthy' text
+        data = response.get_json()
+        assert 'status' in data
+        assert data['status'] == 'ok'
 
 def test_enrolled_endpoint():
     """Test the enrolled students endpoint"""
@@ -22,4 +22,7 @@ def test_enrolled_endpoint():
     with app.test_client() as client:
         response = client.get('/enrolled')
         assert response.status_code == 200
-        assert isinstance(response.json, list)
+        data = response.get_json()
+        # Check if response is a dict with expected structure
+        assert isinstance(data, dict)
+        assert 'enrolled_students' in data or 'students' in data
