@@ -34,7 +34,7 @@ jobs:
           - 5432:5432
 
     outputs:
-      image: ${{ steps.build.outputs.image }}
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout code
@@ -95,8 +95,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-        outputs:
-          image: ${{ steps.meta.outputs.tags }}
 
 # -----------------------------
 # 🎨 Frontend Build
@@ -105,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     
     outputs:
-      image: ${{ steps.build.outputs.image }}
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout code
@@ -166,7 +164,7 @@ jobs:
     runs-on: ubuntu-latest
     
     outputs:
-      image: ${{ steps.build.outputs.image }}
+      image: ${{ steps.meta.outputs.tags }}
 
     steps:
       - name: Checkout code
