@@ -13,10 +13,10 @@
     "html5-qrcode": "^2.3.8",
     "moment": "^2.30.1",
     "qrcode.react": "^4.2.0",
-    "react": "^19.2.0",
+    "react": "^18.2.0",
     "react-big-calendar": "^1.19.4",
-    "react-dom": "^19.2.0",
-    "react-router-dom": "^7.9.4",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.1",
     "react-scripts": "5.0.1",
     "recharts": "^3.3.0",
     "web-vitals": "^2.1.4"
@@ -25,6 +25,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:ci": "react-scripts test --coverage --watchAll=false --ci",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
