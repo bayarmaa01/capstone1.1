@@ -2,7 +2,7 @@
 # ================================================
 
 # Core Framework
-Flask==3.0.0
+Flask==2.3.3
 Flask-CORS==4.0.0
 
 # Computer Vision & Face Recognition
@@ -19,7 +19,7 @@ scipy==1.11.4
 
 # Development & Testing
 pytest==7.4.3
-pytest-flask==1.2.0
+pytest-cov==4.1.0
 
 # Production Server
 gunicorn==21.2.0
