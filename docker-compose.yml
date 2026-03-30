@@ -1,58 +1,61 @@
-<<<<<<< HEAD
-=======
 version: "3.9"
 
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
 services:
 
   nginx:
-    image: nginx:latest
+    image: nginx:alpine
     container_name: attendance-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/conf:/etc/nginx/conf.d
-      - /etc/letsencrypt:/etc/letsencrypt
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
-      - frontend
-      - backend
-      - moodle
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      moodle:
+        condition: service_started
     networks:
       - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
+      target: production
     environment:
       REACT_APP_API_URL: /api
       REACT_APP_FACE_SERVICE_URL: /face
+      NODE_ENV: production
     expose:
       - "80"
     networks:
       - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      target: production
     env_file:
       - .env
     environment:
       DATABASE_URL: postgresql://app:secret@attendance-db:5432/attendance
-<<<<<<< HEAD
-      FACE_SERVICE_URL: http://face-service:5001
-      MOODLE_URL: http://moodle:8080/webservice/rest/server.php
-      NODE_ENV: production
-      PORT: 4000
-=======
       FACE_SERVICE_URL: http://attendance-face-service:5001
       MOODLE_URL: http://moodle/webservice/rest/server.php
       NODE_ENV: production
@@ -61,70 +64,67 @@ services:
       - "4000:4000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
     expose:
       - "4000"
     depends_on:
-      - attendance-db
-<<<<<<< HEAD
-      - face-service
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
-      - moodle
+      attendance-db:
+        condition: service_healthy
+      moodle:
+        condition: service_started
     networks:
       - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
   attendance-db:
-    image: postgres:14
+    image: postgres:14-alpine
     container_name: attendance-db
     environment:
       POSTGRES_USER: app
       POSTGRES_PASSWORD: secret
       POSTGRES_DB: attendance
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
       - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d attendance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
   face-service:
-    build: ./face-service
+    build: 
+      context: ./face-service
+      target: production
     container_name: attendance-face-service
+    environment:
+      MOODLE_URL: http://moodle:80
+      MOODLE_WS_TOKEN: ${MOODLE_WS_TOKEN:-}
     expose:
       - "5001"
     volumes:
       - ./face-service/encodings:/app/encodings
+      - ./face-service/logs:/app/logs
     networks:
       - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-<<<<<<< HEAD
-
-  moodle:
-    image: bitnami/moodle:latest
-    container_name: moodle
-    ports:
-      - "8080:8080"
-    environment:
-      - MOODLE_DATABASE_TYPE=mysqli
-      - MOODLE_DATABASE_HOST=moodle-db
-      - MOODLE_DATABASE_PORT_NUMBER=3306
-      - MOODLE_DATABASE_USER=moodle
-      - MOODLE_DATABASE_PASSWORD=moodlepass
-      - MOODLE_DATABASE_NAME=moodle
-    volumes:
-      - moodledata:/bitnami/moodle
-=======
   # ✅ FIXED MOODLE
   moodle:
     build: ./moodle-app
@@ -133,19 +133,14 @@ services:
       - "8080:80"
     volumes:
       - moodledata:/var/www/moodledata
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
     depends_on:
       - moodle-db
     networks:
       - attendance-net
     restart: unless-stopped
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
   moodle-db:
-    image: mariadb:10.6
+    image: mariadb:10.6-alpine
     container_name: moodle-db
     environment:
       MYSQL_ROOT_PASSWORD: rootpass
@@ -153,33 +148,23 @@ services:
       MYSQL_USER: moodle
       MYSQL_PASSWORD: moodlepass
     volumes:
-<<<<<<< HEAD
-      - moodledb:/bitnami/mariadb
-=======
       - moodledb:/var/lib/mysql
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
     networks:
       - attendance-net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38
 volumes:
   postgres_data:
   moodledb:
   moodledata:
-<<<<<<< HEAD
-
-
-networks:
-  attendance-net:
-    driver: bridge
-=======
   moodle_html:
 
 networks:
   attendance-net:
     driver: bridge
->>>>>>> 3f11b7a921c432002d4cf448a35a27bda2f48a38

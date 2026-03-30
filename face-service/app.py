@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Moodle Configuration
-MOODLE_URL = "http://40.90.174.78:8080"
-MOODLE_WS_TOKEN = "5d2f63b3c1f56fcb8ef11a723ea3e67d"
+# Moodle Configuration (from environment variables)
+MOODLE_URL = os.getenv('MOODLE_URL', 'http://moodle:80')
+MOODLE_WS_TOKEN = os.getenv('MOODLE_WS_TOKEN', '')
 MOODLE_WS_ENDPOINT = f"{MOODLE_URL}/webservice/rest/server.php"
 
 # Local configuration
@@ -368,22 +368,39 @@ def recognize_and_mark():
 def recognize():
     """Recognize faces without marking attendance"""
     try:
+        logger.info("🎯 Face recognition request received")
+        
         # Get image file
         if 'image' not in request.files:
+            logger.error("❌ No image file in request")
             return jsonify({"error": "image file required"}), 400
         
         file = request.files['image']
+        if file.filename == '':
+            logger.error("❌ Empty filename")
+            return jsonify({"error": "image file required"}), 400
+        
+        logger.info(f"📁 Processing image: {file.filename}")
         
         # Load image
-        image = face_recognition.load_image_file(file)
+        try:
+            image = face_recognition.load_image_file(file)
+            logger.info(f"🖼️ Image loaded successfully: {image.shape}")
+        except Exception as e:
+            logger.error(f"❌ Failed to load image: {e}")
+            return jsonify({"error": f"failed to load image: {str(e)}"}), 400
         
         # Find all faces in image
-        face_locations = face_recognition.face_locations(image)
-        face_encodings = face_recognition.face_encodings(image, face_locations)
-        
-        logger.info(f"🔍 Recognition request - Faces detected: {len(face_encodings)}")
+        try:
+            face_locations = face_recognition.face_locations(image)
+            face_encodings = face_recognition.face_encodings(image, face_locations)
+            logger.info(f"🔍 Faces detected: {len(face_encodings)}")
+        except Exception as e:
+            logger.error(f"❌ Face detection failed: {e}")
+            return jsonify({"error": f"face detection failed: {str(e)}"}), 500
         
         if len(face_encodings) == 0:
+            logger.info("⚠️ No faces detected in image")
             return jsonify([])
         
         # Check if we have any enrolled students
@@ -391,6 +408,8 @@ def recognize():
         if len(known_ids) == 0:
             logger.warning("⚠️ No enrolled students yet")
             return jsonify([])
+        
+        logger.info(f"👥 Comparing against {len(known_ids)} enrolled students: {known_ids}")
         
         # Convert stored encodings back to numpy arrays
         known_encodings = [np.array(encodings[k]) for k in known_ids]
@@ -431,7 +450,7 @@ def recognize():
         logger.error(f"❌ Recognition error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"recognition failed: {str(e)}"}), 500
 
 @app.route('/enrolled', methods=['GET'])
 def get_enrolled():
@@ -440,7 +459,8 @@ def get_enrolled():
         "enrolled_students": list(encodings.keys()), 
         "count": len(encodings),
         "moodle_url": MOODLE_URL,
-        "service_status": "active"
+        "service_status": "active",
+        "additional_info": "This is additional information"
     })
 
 @app.route('/unenroll/<student_id>', methods=['DELETE'])

@@ -166,7 +166,13 @@ export default function ClassPage() {
                             src={`/uploads/${student.photo_url}`}
                             alt={student.name}
                             style={styles.smallPhoto}
-                            onError={(e) => e.target.style.display = 'none'}
+                            onError={(e) => {
+                              console.warn(`Image not found: ${student.photo_url}`);
+                              e.target.style.display = 'none';
+                            }}
+                            onLoad={() => {
+                              console.log(`Image loaded: ${student.photo_url}`);
+                            }}
                           />
                         )}
                         <div>
