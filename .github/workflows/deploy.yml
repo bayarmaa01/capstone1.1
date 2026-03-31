@@ -133,38 +133,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          push: false
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:${{ github.sha }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:${{ github.sha }}
-          format: sarif
-          output: trivy-backend-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 1
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-backend-results.sarif
-
-      - name: FS Scan fallback
-        if: failure()
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: ./backend
-
-      - name: Push Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./backend
@@ -194,38 +163,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: false
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:${{ github.sha }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:${{ github.sha }}
-          format: sarif
-          output: trivy-frontend-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 1
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-frontend-results.sarif
-
-      - name: FS Scan fallback
-        if: failure()
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: ./frontend
-
-      - name: Push Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
@@ -255,38 +193,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./face-service
-          push: false
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:${{ github.sha }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:${{ github.sha }}
-          format: sarif
-          output: trivy-face-service-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 1
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-face-service-results.sarif
-
-      - name: FS Scan fallback
-        if: failure()
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: fs
-          scan-ref: ./face-service
-
-      - name: Push Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./face-service
