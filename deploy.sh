@@ -66,9 +66,9 @@ pull_images() {
     echo -e "${YELLOW}🐳 Pulling latest DockerHub images...${NC}"
     
     # Pull latest images
-    docker pull bayarmaa/capstone-backend:latest || true
-    docker pull bayarmaa/capstone-frontend:latest || true
-    docker pull bayarmaa/capstone-face:latest || true
+    docker pull bayarmaa01/capstone1.1-backend:latest || true
+    docker pull bayarmaa01/capstone1.1-frontend:latest || true
+    docker pull bayarmaa01/capstone1.1-face-service:latest || true
     
     echo -e "${GREEN}✅ Images pulled successfully${NC}"
 }
