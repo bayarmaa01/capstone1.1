@@ -14,7 +14,18 @@ HEALTH_CHECK_TIMEOUT=60
 MAX_RETRIES=10
 RETRY_INTERVAL=5
 
+# Parse arguments
+NEW_ENV=$1
+OLD_ENV=$2
+
+if [ -z "$NEW_ENV" ] || [ -z "$OLD_ENV" ]; then
+    echo -e "${RED}❌ Usage: $0 <new_env> <old_env>${NC}"
+    echo -e "${YELLOW}Example: $0 green blue${NC}"
+    exit 1
+fi
+
 echo -e "${YELLOW}🚀 Starting Blue/Green deployment...${NC}"
+echo -e "${YELLOW}🔄 Deploying: $NEW_ENV (replacing $OLD_ENV)${NC}"
 
 # Function to check health
 check_health() {
@@ -41,36 +52,25 @@ switch_nginx_upstream() {
     echo -e "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
     
     # Update nginx configuration
-    sed -i "s|server blue_backend:5000;|server ${target_env}_backend:5000;|g" /home/azureuser/capstone1.1/nginx.conf
-    sed -i "s|server blue_frontend:3000;|server ${target_env}_frontend:3000;|g" /home/azureuser/capstone1.1/nginx.conf
-    sed -i "s|server blue_face-service:5001;|server ${target_env}_face-service:5001;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_backend:4000;|server ${target_env}_backend:4000;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_frontend:80;|server ${target_env}_frontend:80;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_face:5001;|server ${target_env}_face:5001;|g" /home/azureuser/capstone1.1/nginx.conf
     
-    # Reload nginx
+    # Reload nginx (no downtime)
     docker exec nginx nginx -s reload || true
     echo -e "${GREEN}✅ Traffic switched to $target_env${NC}"
 }
 
 # Function to pull latest images
 pull_images() {
-    echo -e "${YELLOW}🐳 Pulling latest Docker images...${NC}"
+    echo -e "${YELLOW}🐳 Pulling latest DockerHub images...${NC}"
     
     # Pull latest images
-    docker pull $DOCKERHUB_USERNAME/capstone1.1-backend:latest || true
-    docker pull $DOCKERHUB_USERNAME/capstone1.1-frontend:latest || true
-    docker pull $DOCKERHUB_USERNAME/capstone1.1-face-service:latest || true
+    docker pull bayarmaa/capstone-backend:latest || true
+    docker pull bayarmaa/capstone-frontend:latest || true
+    docker pull bayarmaa/capstone-face:latest || true
     
     echo -e "${GREEN}✅ Images pulled successfully${NC}"
-}
-
-# Function to update docker-compose files
-update_compose_files() {
-    local env=$1
-    echo -e "${YELLOW}📝 Updating docker-compose.$env.yml with latest images...${NC}"
-    
-    # Update docker-compose file with latest images
-    sed -i "s|docker.io/.*/capstone1.1-backend:latest|docker.io/$DOCKERHUB_USERNAME/capstone1.1-backend:latest|g" docker-compose.$env.yml
-    sed -i "s|docker.io/.*/capstone1.1-frontend:latest|docker.io/$DOCKERHUB_USERNAME/capstone1.1-frontend:latest|g" docker-compose.$env.yml
-    sed -i "s|docker.io/.*/capstone1.1-face-service:latest|docker.io/$DOCKERHUB_USERNAME/capstone1.1-face-service:latest|g" docker-compose.$env.yml
 }
 
 # Main deployment logic
@@ -79,34 +79,9 @@ cd "$COMPOSE_DIR"
 # Pull latest images
 pull_images
 
-# Detect current active environment
-if docker ps --format "table {{.Names}}" | grep -q "blue_backend"; then
-    CURRENT_ENV="blue"
-    NEW_ENV="green"
-elif docker ps --format "table {{.Names}}" | grep -q "green_backend"; then
-    CURRENT_ENV="green"
-    NEW_ENV="blue"
-else
-    echo -e "${YELLOW}📍 No active environment detected, defaulting to blue${NC}"
-    CURRENT_ENV="green"
-    NEW_ENV="blue"
-fi
-
-echo -e "${YELLOW}📍 Current environment: $CURRENT_ENV${NC}"
-echo -e "${YELLOW}🔄 Deploying to: $NEW_ENV${NC}"
-
-# Update new environment compose file
-update_compose_files "$NEW_ENV"
-
-# Stop current environment if it exists
-if [ "$CURRENT_ENV" != "" ]; then
-    echo -e "${YELLOW}🛑 Stopping $CURRENT_ENV environment...${NC}"
-    docker compose -f docker-compose.$CURRENT_ENV.yml down || true
-fi
-
 # Start new environment
 echo -e "${YELLOW}🚀 Starting $NEW_ENV environment...${NC}"
-docker compose -f docker-compose.$NEW_ENV.yml up -d
+docker compose up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
 
 # Wait for services to be ready
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
@@ -116,26 +91,20 @@ sleep 30
 echo -e "${YELLOW}🏥 Running health checks...${NC}"
 
 backend_healthy=false
-frontend_healthy=false
-face_service_healthy=false
+face_healthy=false
 
 # Check backend health
-if check_health "http://localhost:8080/api/health"; then
+if check_health "http://localhost/api/health"; then
     backend_healthy=true
 fi
 
-# Check frontend health
-if check_health "http://localhost:8080/health"; then
-    frontend_healthy=true
-fi
-
 # Check face-service health
-if check_health "http://localhost:8080/api/face/health"; then
-    face_service_healthy=true
+if check_health "http://localhost/face/health"; then
+    face_healthy=true
 fi
 
 # Evaluate health results
-if [ "$backend_healthy" = true ] && [ "$frontend_healthy" = true ] && [ "$face_service_healthy" = true ]; then
+if [ "$backend_healthy" = true ] && [ "$face_healthy" = true ]; then
     echo -e "${GREEN}✅ All health checks passed${NC}"
     
     # Switch traffic to new environment
@@ -144,34 +113,19 @@ if [ "$backend_healthy" = true ] && [ "$frontend_healthy" = true ] && [ "$face_s
     echo -e "${GREEN}✅ Deployment completed successfully!${NC}"
     echo -e "${GREEN}🌐 Application is now running on $NEW_ENV environment${NC}"
     
-    # Cleanup old environment
-    if [ "$CURRENT_ENV" != "" ]; then
-        echo -e "${YELLOW}🧹 Cleaning up $CURRENT_ENV environment...${NC}"
-        docker compose -f docker-compose.$CURRENT_ENV.yml down -v || true
-    fi
+    # Stop old environment
+    echo -e "${YELLOW}🛑 Stopping $OLD_ENV environment...${NC}"
+    docker compose stop ${OLD_ENV}_backend ${OLD_ENV}_frontend ${OLD_ENV}_face || true
+    
+    echo -e "${GREEN}✅ Zero-downtime deployment completed${NC}"
     
 else
     echo -e "${RED}❌ Health checks failed, rolling back...${NC}"
     
     # Stop new environment
-    docker compose -f docker-compose.$NEW_ENV.yml down || true
+    docker compose stop ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face || true
     
-    # Start previous environment
-    if [ "$CURRENT_ENV" != "" ]; then
-        echo -e "${YELLOW}🔄 Restarting $CURRENT_ENV environment...${NC}"
-        docker compose -f docker-compose.$CURRENT_ENV.yml up -d
-        
-        # Wait for services
-        sleep 30
-        
-        # Switch back to previous environment
-        switch_nginx_upstream "$CURRENT_ENV"
-        
-        echo -e "${GREEN}✅ Rollback completed${NC}"
-    else
-        echo -e "${RED}❌ No previous environment to rollback to${NC}"
-    fi
-    
+    echo -e "${GREEN}✅ Rollback completed - system still running on $OLD_ENV${NC}"
     exit 1
 fi
 

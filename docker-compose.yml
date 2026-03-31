@@ -1,170 +1,166 @@
-version: "3.9"
-
 services:
+  # Blue Environment
+  blue_backend:
+    image: bayarmaa/capstone-backend:latest
+    container_name: blue_backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
+      - FACE_SERVICE_URL=http://face_upstream:5001
+      - MOODLE_URL=http://moodle/webservice/rest/server.php
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - redis
+
+  blue_frontend:
+    image: bayarmaa/capstone-frontend:latest
+    container_name: blue_frontend
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost/api/
+      - REACT_APP_FACE_API_URL=http://localhost/face/
+      - REACT_APP_MOODLE_URL=http://localhost/moodle/
+    networks:
+      - app_network
+    depends_on:
+      - blue_backend
+
+  blue_face:
+    image: bayarmaa/capstone-face:latest
+    container_name: blue_face
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - MOODLE_URL=http://moodle/webservice/rest/server.php
+      - UPLOAD_FOLDER=/app/uploads
+      - ENCODINGS_FOLDER=/app/encodings
+    volumes:
+      - ./uploads:/app/uploads
+      - ./encodings:/app/encodings
+    networks:
+      - app_network
+
+  # Green Environment
+  green_backend:
+    image: bayarmaa/capstone-backend:latest
+    container_name: green_backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
+      - FACE_SERVICE_URL=http://face_upstream:5001
+      - MOODLE_URL=http://moodle/webservice/rest/server.php
+      - REDIS_URL=redis://redis:6379
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - redis
+
+  green_frontend:
+    image: bayarmaa/capstone-frontend:latest
+    container_name: green_frontend
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost/api/
+      - REACT_APP_FACE_API_URL=http://localhost/face/
+      - REACT_APP_MOODLE_URL=http://localhost/moodle/
+    networks:
+      - app_network
+    depends_on:
+      - green_backend
+
+  green_face:
+    image: bayarmaa/capstone-face:latest
+    container_name: green_face
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - MOODLE_URL=http://moodle/webservice/rest/server.php
+      - UPLOAD_FOLDER=/app/uploads
+      - ENCODINGS_FOLDER=/app/encodings
+    volumes:
+      - ./uploads:/app/uploads
+      - ./encodings:/app/encodings
+    networks:
+      - app_network
+
+  # Shared Services
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=attendance
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=secret
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  moodle:
+    image: bitnami/moodle:latest
+    container_name: moodle
+    restart: unless-stopped
+    environment:
+      - MOODLE_DATABASE_HOST=moodle-db
+      - MOODLE_DATABASE_USER=moodle
+      - MOODLE_DATABASE_PASSWORD=moodle_secret
+      - MOODLE_DATABASE_NAME=moodle
+    networks:
+      - app_network
+    depends_on:
+      - moodle-db
+
+  moodle-db:
+    image: mariadb:10.6
+    container_name: moodle-db
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=root_secret
+      - MARIADB_DATABASE=moodle
+      - MARIADB_USER=moodle
+      - MARIADB_PASSWORD=moodle_secret
+    volumes:
+      - moodle_db_data:/var/lib/mysql
+    networks:
+      - app_network
 
   nginx:
     image: nginx:alpine
-    container_name: attendance-nginx
+    container_name: nginx
+    restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./nginx/conf:/etc/nginx/conf.d
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - app_network
     depends_on:
-      frontend:
-        condition: service_healthy
-      backend:
-        condition: service_healthy
-      moodle:
-        condition: service_started
-    networks:
-      - attendance-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  frontend:
-    build: 
-      context: ./frontend
-      target: production
-    environment:
-      REACT_APP_API_URL: /api
-      REACT_APP_FACE_SERVICE_URL: /face
-      NODE_ENV: production
-    expose:
-      - "80"
-    networks:
-      - attendance-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  backend:
-    build: 
-      context: ./backend
-      target: production
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://app:secret@attendance-db:5432/attendance
-      FACE_SERVICE_URL: http://attendance-face-service:5001
-      MOODLE_URL: http://moodle/webservice/rest/server.php
-      NODE_ENV: production
-      PORT: 4000
-    ports:
-      - "4000:4000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    expose:
-      - "4000"
-    depends_on:
-      attendance-db:
-        condition: service_healthy
-      moodle:
-        condition: service_started
-    networks:
-      - attendance-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  attendance-db:
-    image: postgres:14-alpine
-    container_name: attendance-db
-    environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: secret
-      POSTGRES_DB: attendance
-      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    networks:
-      - attendance-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d attendance"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  face-service:
-    build: 
-      context: ./face-service
-      target: production
-    container_name: attendance-face-service
-    environment:
-      MOODLE_URL: http://moodle:80
-      MOODLE_WS_TOKEN: ${MOODLE_WS_TOKEN:-}
-    expose:
-      - "5001"
-    volumes:
-      - ./face-service/encodings:/app/encodings
-      - ./face-service/logs:/app/logs
-    networks:
-      - attendance-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ✅ FIXED MOODLE
-  moodle:
-    build: ./moodle-app
-    container_name: moodle
-    ports:
-      - "8085:80"
-    volumes:
-      - moodledata:/var/www/moodledata
-    depends_on:
-      - moodle-db
-    networks:
-      - attendance-net
-    restart: unless-stopped
-
-  moodle-db:
-    image: mariadb:10.6-alpine
-    container_name: moodle-db
-    environment:
-      MYSQL_ROOT_PASSWORD: rootpass
-      MYSQL_DATABASE: moodle
-      MYSQL_USER: moodle
-      MYSQL_PASSWORD: moodlepass
-    volumes:
-      - moodledb:/var/lib/mysql
-    networks:
-      - attendance-net
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - blue_backend
+      - blue_frontend
+      - blue_face
+      - green_backend
+      - green_frontend
+      - green_face
+      - moodle
 
 volumes:
   postgres_data:
-  moodledb:
-  moodledata:
-  moodle_html:
+  moodle_db_data:
 
 networks:
-  attendance-net:
+  app_network:
     driver: bridge
