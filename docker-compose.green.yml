@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   green_backend:
-    image: docker.io/$bayarmaa/capstone1.1-backend:latest
+    image: docker.io/bayarmaa/capstone1.1-backend:latest
     container_name: green_backend
     restart: unless-stopped
     environment:
@@ -20,7 +20,7 @@ services:
       - "5002:5000"
 
   green_frontend:
-    image: docker.io/$bayarmaa/capstone1.1-frontend:latest
+    image: docker.io/bayarmaa/capstone1.1-frontend:latest
     container_name: green_frontend
     restart: unless-stopped
     environment:
@@ -34,7 +34,7 @@ services:
       - "3001:3000"
 
   green_face-service:
-    image: docker.io/${DOCKERHUB_USERNAME}/capstone1.1-face-service:latest
+    image: docker.io/bayarmaa/capstone1.1-face-service:latest
     container_name: green_face-service
     restart: unless-stopped
     environment:
