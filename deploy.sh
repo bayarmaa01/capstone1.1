@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-COMPOSE_DIR="/home/ubuntu/capstone1.1"
+COMPOSE_DIR="/home/azureuser/capstone1.1"
 HEALTH_CHECK_TIMEOUT=60
 MAX_RETRIES=10
 RETRY_INTERVAL=5
@@ -41,9 +41,9 @@ switch_nginx_upstream() {
     echo -e "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
     
     # Update nginx configuration
-    sed -i "s|server blue_backend:5000;|server ${target_env}_backend:5000;|g" /home/ubuntu/capstone1.1/nginx.conf
-    sed -i "s|server blue_frontend:3000;|server ${target_env}_frontend:3000;|g" /home/ubuntu/capstone1.1/nginx.conf
-    sed -i "s|server blue_face-service:5001;|server ${target_env}_face-service:5001;|g" /home/ubuntu/capstone1.1/nginx.conf
+    sed -i "s|server blue_backend:5000;|server ${target_env}_backend:5000;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_frontend:3000;|server ${target_env}_frontend:3000;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_face-service:5001;|server ${target_env}_face-service:5001;|g" /home/azureuser/capstone1.1/nginx.conf
     
     # Reload nginx
     docker exec nginx nginx -s reload || true
