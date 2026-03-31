@@ -21,9 +21,9 @@ services:
     container_name: blue_frontend
     restart: unless-stopped
     environment:
-      - REACT_APP_API_URL=http://localhost/api/
-      - REACT_APP_FACE_API_URL=http://localhost/face/
-      - REACT_APP_MOODLE_URL=http://localhost/moodle/
+      - REACT_APP_API_URL=/api/
+      - REACT_APP_FACE_API_URL=/face/
+      - REACT_APP_MOODLE_URL=/moodle/
     networks:
       - app_network
     depends_on:
@@ -66,9 +66,9 @@ services:
     container_name: green_frontend
     restart: unless-stopped
     environment:
-      - REACT_APP_API_URL=http://localhost/api/
-      - REACT_APP_FACE_API_URL=http://localhost/face/
-      - REACT_APP_MOODLE_URL=http://localhost/moodle/
+      - REACT_APP_API_URL=/api/
+      - REACT_APP_FACE_API_URL=/face/
+      - REACT_APP_MOODLE_URL=/moodle/
     networks:
       - app_network
     depends_on:
@@ -119,6 +119,9 @@ services:
       - MOODLE_DATABASE_USER=moodle
       - MOODLE_DATABASE_PASSWORD=moodle_secret
       - MOODLE_DATABASE_NAME=moodle
+      - MOODLE_WWWROOT=https://attendance-ml.duckdns.org/moodle
+      - MOODLE_REVERSEPROXY=true
+      - MOODLE_SSLPROXY=true
     networks:
       - app_network
     depends_on:

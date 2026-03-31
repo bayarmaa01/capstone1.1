@@ -14,18 +14,16 @@ HEALTH_CHECK_TIMEOUT=60
 MAX_RETRIES=10
 RETRY_INTERVAL=5
 
-# Parse arguments
-NEW_ENV=$1
-OLD_ENV=$2
-
-if [ -z "$NEW_ENV" ] || [ -z "$OLD_ENV" ]; then
-    echo -e "${RED}❌ Usage: $0 <new_env> <old_env>${NC}"
-    echo -e "${YELLOW}Example: $0 green blue${NC}"
-    exit 1
-fi
-
 echo -e "${YELLOW}🚀 Starting Blue/Green deployment...${NC}"
-echo -e "${YELLOW}🔄 Deploying: $NEW_ENV (replacing $OLD_ENV)${NC}"
+
+# Function to detect active environment
+detect_active_env() {
+    if grep -q "server blue_backend:" /home/azureuser/capstone1.1/nginx.conf; then
+        echo "blue"
+    else
+        echo "green"
+    fi
+}
 
 # Function to check health
 check_health() {
@@ -52,9 +50,15 @@ switch_nginx_upstream() {
     echo -e "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
     
     # Update nginx configuration
-    sed -i "s|server blue_backend:4000;|server ${target_env}_backend:4000;|g" /home/azureuser/capstone1.1/nginx.conf
-    sed -i "s|server blue_frontend:80;|server ${target_env}_frontend:80;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_backend:5000;|server ${target_env}_backend:5000;|g" /home/azureuser/capstone1.1/nginx.conf
+    sed -i "s|server blue_frontend:3000;|server ${target_env}_frontend:3000;|g" /home/azureuser/capstone1.1/nginx.conf
     sed -i "s|server blue_face:5001;|server ${target_env}_face:5001;|g" /home/azureuser/capstone1.1/nginx.conf
+    
+    # Test nginx configuration
+    docker exec nginx nginx -t || {
+        echo -e "${RED}❌ Nginx configuration test failed${NC}"
+        return 1
+    }
     
     # Reload nginx (no downtime)
     docker exec nginx nginx -s reload || true
@@ -78,6 +82,21 @@ cd "$COMPOSE_DIR"
 
 # Pull latest images
 pull_images
+
+# Detect active environment
+ACTIVE_ENV=$(detect_active_env)
+echo -e "${YELLOW}🔍 Active environment: $ACTIVE_ENV${NC}"
+
+# Determine new environment
+if [ "$ACTIVE_ENV" = "blue" ]; then
+    NEW_ENV="green"
+    OLD_ENV="blue"
+else
+    NEW_ENV="blue"
+    OLD_ENV="green"
+fi
+
+echo -e "${YELLOW}🔄 Deploying: $NEW_ENV (replacing $OLD_ENV)${NC}"
 
 # Start new environment
 echo -e "${YELLOW}🚀 Starting $NEW_ENV environment...${NC}"
