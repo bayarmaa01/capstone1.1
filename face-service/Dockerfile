@@ -26,7 +26,7 @@ WORKDIR /app
 
 # Create non-root user for security
 RUN addgroup -g 1001 appuser && \
-    adduser -D -s /bin/sh -u 1001 -G appuser appuser
+    adduser -D -u 1001 -G appuser appuser
 
 # Copy dependencies
 COPY --from=deps /usr/local/lib/python3.*/site-packages /usr/local/lib/python3.*/site-packages
