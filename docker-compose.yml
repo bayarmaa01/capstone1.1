@@ -1,7 +1,7 @@
 services:
   # Blue Environment
   blue_backend:
-    image: bayarmaa01/capstone1.1-backend:latest
+    image: bayarmaa/capstone1.1-backend:latest
     container_name: blue_backend
     restart: unless-stopped
     environment:
@@ -17,7 +17,7 @@ services:
       - redis
 
   blue_frontend:
-    image: bayarmaa01/capstone1.1-frontend:latest
+    image: bayarmaa/capstone1.1-frontend:latest
     container_name: blue_frontend
     restart: unless-stopped
     environment:
@@ -30,7 +30,7 @@ services:
       - blue_backend
 
   blue_face:
-    image: bayarmaa01/capstone1.1-face-service:latest
+    image: bayarmaa/capstone1.1-face-service:latest
     container_name: blue_face
     restart: unless-stopped
     environment:
@@ -46,7 +46,7 @@ services:
 
   # Green Environment
   green_backend:
-    image: bayarmaa01/capstone1.1-backend:latest
+    image: bayarmaa/capstone1.1-backend:latest
     container_name: green_backend
     restart: unless-stopped
     environment:
@@ -62,7 +62,7 @@ services:
       - redis
 
   green_frontend:
-    image: bayarmaa01/capstone1.1-frontend:latest
+    image: bayarmaa/capstone1.1-frontend:latest
     container_name: green_frontend
     restart: unless-stopped
     environment:
@@ -75,7 +75,7 @@ services:
       - green_backend
 
   green_face:
-    image: bayarmaa01/capstone1.1-face-service:latest
+    image: bayarmaa/capstone1.1-face-service:latest
     container_name: green_face
     restart: unless-stopped
     environment:
