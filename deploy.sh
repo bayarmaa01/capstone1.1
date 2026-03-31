@@ -31,10 +31,33 @@ check_health() {
     local attempts=0
     
     while [ $attempts -lt $MAX_RETRIES ]; do
-        if curl -f -s --max-time $HEALTH_CHECK_TIMEOUT "$url" > /dev/null 2>&1; then
-            echo -e "${GREEN}✅ Health check passed for $url${NC}"
-            return 0
+        # Check container health first
+        local container_name=""
+        case "$url" in
+            *api/health*) container_name="green_backend" ;;
+            *face/health*) container_name="green_face" ;;
+        esac
+        
+        if [ ! -z "$container_name" ]; then
+            local health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
+            if [ "$health_status" = "healthy" ]; then
+                echo -e "${GREEN}✅ Container $container_name is healthy${NC}"
+                return 0
+            elif [ "$health_status" = "none" ]; then
+                # Fallback to curl if no health check defined
+                if curl -f -s --max-time 10 "$url" > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ Health check passed for $url${NC}"
+                    return 0
+                fi
+            fi
+        else
+            # Fallback to curl
+            if curl -f -s --max-time 10 "$url" > /dev/null 2>&1; then
+                echo -e "${GREEN}✅ Health check passed for $url${NC}"
+                return 0
+            fi
         fi
+        
         attempts=$((attempts + 1))
         echo -e "${YELLOW}⏳ Health check attempt $attempts/$MAX_RETRIES failed for $url, retrying in ${RETRY_INTERVAL}s...${NC}"
         sleep $RETRY_INTERVAL
@@ -104,7 +127,11 @@ docker compose up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
 
 # Wait for services to be ready
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
-sleep 30
+sleep 60
+
+# Check if containers are running
+echo -e "${YELLOW}🔍 Checking container status...${NC}"
+docker ps --filter "name=green_" --format "table {{.Names}}\t{{.Status}}"
 
 # Health checks
 echo -e "${YELLOW}🏥 Running health checks...${NC}"
