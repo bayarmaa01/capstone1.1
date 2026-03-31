@@ -133,21 +133,22 @@ jobs:
         with:
           context: ./backend
           push: false
+          load: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          load: true
 
       - name: Scan Docker image (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
           format: sarif
           output: trivy-backend-results.sarif
           severity: CRITICAL,HIGH
           exit-code: 1
+          scanners: vuln
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -191,21 +192,22 @@ jobs:
         with:
           context: ./frontend
           push: false
+          load: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          load: true
 
       - name: Scan Docker image (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
           format: sarif
           output: trivy-frontend-results.sarif
           severity: CRITICAL,HIGH
           exit-code: 1
+          scanners: vuln
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
@@ -249,21 +251,22 @@ jobs:
         with:
           context: ./face-service
           push: false
+          load: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          load: true
 
       - name: Scan Docker image (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
           format: sarif
           output: trivy-face-service-results.sarif
           severity: CRITICAL,HIGH
           exit-code: 1
+          scanners: vuln
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
