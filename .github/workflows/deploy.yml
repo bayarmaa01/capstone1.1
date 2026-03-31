@@ -118,7 +118,7 @@ jobs:
     needs: [test-backend, test-frontend, test-face-service]
     
     outputs:
-      image: ${{ steps.meta.outputs.tags }}
+      image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:latest
 
     steps:
       - name: Checkout code
@@ -130,24 +130,46 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
-          tags: |
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: false
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Docker image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:${{ github.sha }}
+          format: sarif
+          output: trivy-backend-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-backend-results.sarif
+
+      - name: FS Scan fallback
+        if: failure()
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: ./backend
+
+      - name: Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -157,7 +179,7 @@ jobs:
     needs: [test-backend, test-frontend, test-face-service]
     
     outputs:
-      image: ${{ steps.meta.outputs.tags }}
+      image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:latest
 
     steps:
       - name: Checkout code
@@ -169,24 +191,46 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: false
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan Docker image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:${{ github.sha }}
+          format: sarif
+          output: trivy-frontend-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-frontend-results.sarif
+
+      - name: FS Scan fallback
+        if: failure()
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: ./frontend
+
+      - name: Push Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -196,7 +240,7 @@ jobs:
     needs: [test-backend, test-frontend, test-face-service]
     
     outputs:
-      image: ${{ steps.meta.outputs.tags }}
+      image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:latest
 
     steps:
       - name: Checkout code
@@ -208,58 +252,49 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Generate build metadata
-        id: meta
-        uses: docker/metadata-action@v4
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service
-          tags: |
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
+      - name: Build Docker image
         uses: docker/build-push-action@v4
         with:
           context: ./face-service
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          push: false
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:${{ github.sha }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-# -----------------------------
-# 🔍 SECURITY SCANNING
-# -----------------------------
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend, build-face-service]
-    if: github.event_name != 'pull_request'
-    strategy:
-      matrix:
-        service: [backend, frontend, face-service]
-        image: 
-          - ${{ needs.build-backend.outputs.image }}
-          - ${{ needs.build-frontend.outputs.image }}
-          - ${{ needs.build-face-service.outputs.image }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
+      - name: Scan Docker image (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ matrix.image }}
-          format: 'sarif'
-          output: 'trivy-${{ matrix.service }}-results.sarif'
+          image-ref: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:${{ github.sha }}
+          format: sarif
+          output: trivy-face-service-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: 1
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-${{ matrix.service }}-results.sarif'
+          sarif_file: trivy-face-service-results.sarif
+
+      - name: FS Scan fallback
+        if: failure()
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: ./face-service
+
+      - name: Push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./face-service
+          push: true
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:latest
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
 # -----------------------------
 # 🚀 DEPLOYMENT STAGE
@@ -274,7 +309,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to EC2 via SSH
+      - name: Check server availability
+        id: check_server
+        run: |
+          timeout 5 bash -c "</dev/tcp/${{ secrets.EC2_HOST }}/22" \
+            && echo "alive=true" >> $GITHUB_OUTPUT \
+            || echo "alive=false" >> $GITHUB_OUTPUT
+
+      - name: Deploy to EC2
+        if: steps.check_server.outputs.alive == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -284,25 +327,24 @@ jobs:
             cd ~/capstone1.1
             git pull origin main
 
-            echo "🐳 Updating docker-compose with new images"
-            echo "Backend image: ${{ needs.build-backend.outputs.image }}"
-            echo "Frontend image: ${{ needs.build-frontend.outputs.image }}"
-            echo "Face-service image: ${{ needs.build-face-service.outputs.image }}"
+            echo "🐳 Updating images"
+            sed -i "s|image: .*-backend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-backend:latest|g" docker-compose.yml
+            sed -i "s|image: .*-frontend:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-frontend:latest|g" docker-compose.yml
+            sed -i "s|image: .*-face-service:.*|image: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1-face-service:latest|g" docker-compose.yml
             
-            sed -i "s|image: .*-backend:.*|image: ${{ needs.build-backend.outputs.image }}|g" docker-compose.yml
-            sed -i "s|image: .*-frontend:.*|image: ${{ needs.build-frontend.outputs.image }}|g" docker-compose.yml
-            sed -i "s|image: .*-face-service:.*|image: ${{ needs.build-face-service.outputs.image }}|g" docker-compose.yml
-
-            echo "🚀 Pulling new images and restarting services"
             docker compose pull
             docker compose down
             docker compose up -d
 
-            echo "🧹 Cleaning old images"
+            echo "🧹 Cleanup"
             docker image prune -f
 
-            echo "⏱️ Waiting for services to start"
-            sleep 30
+            echo "⏱️ Waiting..."
+            sleep 20
+
+      - name: Skip deploy (server offline)
+        if: steps.check_server.outputs.alive == 'false'
+        run: echo "⚠️ Server is offline. Deployment skipped."
 
 # -----------------------------
 # 🏥 Health Check & Validation
