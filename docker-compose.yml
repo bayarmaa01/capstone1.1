@@ -111,7 +111,7 @@ services:
       - app_network
 
   moodle:
-    image: bitnami/moodle:latest
+    image: moodlehq/moodle:latest
     container_name: moodle
     restart: unless-stopped
     environment:
