@@ -1,4 +1,4 @@
-name: 🚀 Production CI/CD Pipeline
+name: 🚀 Enterprise CI/CD Pipeline
 
 on:
   push:
@@ -111,15 +111,51 @@ jobs:
           python -m pytest tests/ -v --cov=app --cov-report=xml
 
 # -----------------------------
-# 🏗️ PARALLEL BUILD & SCAN STAGE
+# 🔍 CHANGE DETECTION
 # -----------------------------
-  build-backend:
+  changes:
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service]
-    
     outputs:
-      image-latest: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
-      image-sha: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      face-service: ${{ steps.changes.outputs.face-service }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect file changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            face-service:
+              - 'face-service/**'
+
+# -----------------------------
+# 🏗️ MATRIX BUILD & SCAN STAGE
+# -----------------------------
+  build-and-scan:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend, test-face-service, changes]
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs['face-service'] == 'true'
+    strategy:
+      matrix:
+        service: [backend, frontend, face-service]
+        include:
+          - service: backend
+            context: ./backend
+            port: 5000
+          - service: frontend
+            context: ./frontend
+            port: 3000
+          - service: face-service
+            context: ./face-service
+            port: 5001
+      fail-fast: false
 
     steps:
       - name: Checkout code
@@ -131,21 +167,21 @@ jobs:
       - name: Build Docker image locally
         uses: docker/build-push-action@v4
         with:
-          context: ./backend
+          context: ${{ matrix.context }}
           push: false
           load: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest
+            ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Scan Docker image (Trivy)
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
+          image-ref: ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
           format: sarif
-          output: trivy-backend-results.sarif
+          output: trivy-${{ matrix.service }}-results.sarif
           severity: CRITICAL,HIGH
           exit-code: 1
           scanners: vuln
@@ -153,7 +189,7 @@ jobs:
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-backend-results.sarif
+          sarif_file: trivy-${{ matrix.service }}-results.sarif
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -164,138 +200,20 @@ jobs:
       - name: Push Docker image to Docker Hub
         uses: docker/build-push-action@v4
         with:
-          context: ./backend
+          context: ${{ matrix.context }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-frontend:
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service]
-    
-    outputs:
-      image-latest: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
-      image-sha: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image locally
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: false
-          load: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
-          format: sarif
-          output: trivy-frontend-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 1
-          scanners: vuln
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-frontend-results.sarif
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push Docker image to Docker Hub
-        uses: docker/build-push-action@v4
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  build-face-service:
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service]
-    
-    outputs:
-      image-latest: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:latest
-      image-sha: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image locally
-        uses: docker/build-push-action@v4
-        with:
-          context: ./face-service
-          push: false
-          load: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
-          format: sarif
-          output: trivy-face-service-results.sarif
-          severity: CRITICAL,HIGH
-          exit-code: 1
-          scanners: vuln
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-face-service-results.sarif
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Push Docker image to Docker Hub
-        uses: docker/build-push-action@v4
-        with:
-          context: ./face-service
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-face-service:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
 # -----------------------------
-# 🚀 DEPLOYMENT STAGE (OPTIONAL)
+# 🚀 BLUE/GREEN DEPLOYMENT
 # -----------------------------
   deploy:
     runs-on: ubuntu-latest
-    needs: [build-backend, build-frontend, build-face-service]
+    needs: [build-and-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
 
@@ -327,67 +245,81 @@ jobs:
 
             git pull origin main || true
 
-            echo "🐳 Updating docker-compose with new images"
-            sed -i "s|image: .*-backend:.*|image: ${{ needs.build-backend.outputs.image-latest }}|g" docker-compose.yml
-            sed -i "s|image: .*-frontend:.*|image: ${{ needs.build-frontend.outputs.image-latest }}|g" docker-compose.yml
-            sed -i "s|image: .*-face-service:.*|image: ${{ needs.build-face-service.outputs.image-latest }}|g" docker-compose.yml
-
-            echo "🚀 Pulling new images and restarting services"
-            docker compose pull || true
-            docker compose down || true
-            docker compose up -d || true
-
-            echo "🧹 Cleaning old images"
-            docker image prune -f || true
+            echo "🚀 Starting Blue/Green deployment"
+            chmod +x deploy.sh
+            ./deploy.sh
 
       - name: Skip deploy (VM OFF)
         if: steps.check_server.outputs.alive == 'false'
         run: echo "⚠️ VM is OFF. Deployment skipped, pipeline continues."
 
 # -----------------------------
-# 🏥 HEALTH CHECK & VALIDATION
+# 📊 MONITORING SETUP
 # -----------------------------
-  health-check:
+  setup-monitoring:
     runs-on: ubuntu-latest
     needs: [deploy]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     continue-on-error: true
 
     steps:
-      - name: Wait for deployment to be ready
-        run: sleep 60
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Check backend health
+      - name: Deploy monitoring stack
+        continue-on-error: true
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd ~/capstone1.1 || exit 0
+            
+            docker compose -f docker-compose.monitoring.yml up -d || true
+            
+            echo "📊 Monitoring stack deployed"
+            echo "Prometheus: http://${{ secrets.PRODUCTION_URL }}:9090"
+            echo "Grafana: http://${{ secrets.PRODUCTION_URL }}:3001"
+            echo "Loki: http://${{ secrets.PRODUCTION_URL }}:3100"
+
+# -----------------------------
+# 🚨 ALERTING
+# -----------------------------
+  alerting:
+    runs-on: ubuntu-latest
+    needs: [setup-monitoring]
+    if: failure() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    continue-on-error: true
+
+    steps:
+      - name: Send alert notification
         continue-on-error: true
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_URL }}/api/health" || echo "000")
-          if [ "$response" != "200" ]; then
-            echo "Backend health check failed with status: $response"
-            exit 1
-          fi
-          echo "Backend health check passed"
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🚨 Deployment Failed! Repository: ${{ github.repository }} Commit: ${{ github.sha }}"}' \
+            ${{ secrets.SLACK_WEBHOOK_URL }} || echo "Alert failed"
 
-      - name: Check frontend health
+# -----------------------------
+# 🧹 CLEANUP
+# -----------------------------
+  cleanup:
+    runs-on: ubuntu-latest
+    needs: [alerting]
+    if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
+    continue-on-error: true
+
+    steps:
+      - name: Cleanup old Docker images
         continue-on-error: true
-        run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_URL }}/" || echo "000")
-          if [ "$response" != "200" ]; then
-            echo "Frontend health check failed with status: $response"
-            exit 1
-          fi
-          echo "Frontend health check passed"
-
-      - name: Check face-service health
-        continue-on-error: true
-        run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.PRODUCTION_URL }}/api/face/health" || echo "000")
-          if [ "$response" != "200" ]; then
-            echo "Face-service health check failed with status: $response"
-            exit 1
-          fi
-          echo "Face-service health check passed"
-
-      - name: Notify deployment success
-        run: |
-          echo "✅ Deployment completed successfully!"
-          echo "🌐 Application is available at: ${{ secrets.PRODUCTION_URL }}"
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd ~/capstone1.1 || exit 0
+            
+            docker images --format "table {{.Repository}}:{{.Tag}}" | grep "capstone1.1" | tail -n +6 | awk '{print $1":"$2}' | xargs -r docker rmi || true
+            
+            echo "🧹 Cleanup completed"

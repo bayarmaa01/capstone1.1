@@ -17,21 +17,21 @@ services:
     networks:
       - app_network
     ports:
-      - "5000:5000"
+      - "5002:5000"
 
   green_frontend:
     image: docker.io/${DOCKERHUB_USERNAME}/capstone1.1-frontend:latest
     container_name: green_frontend
     restart: unless-stopped
     environment:
-      - REACT_APP_API_URL=http://localhost:5000/api
-      - REACT_APP_FACE_API_URL=http://localhost:5001
+      - REACT_APP_API_URL=http://localhost:5002/api
+      - REACT_APP_FACE_API_URL=http://localhost:5003
     depends_on:
       - green_backend
     networks:
       - app_network
     ports:
-      - "3000:3000"
+      - "3001:3000"
 
   green_face-service:
     image: docker.io/${DOCKERHUB_USERNAME}/capstone1.1-face-service:latest
@@ -47,7 +47,7 @@ services:
     networks:
       - app_network
     ports:
-      - "5001:5001"
+      - "5003:5001"
 
   postgres:
     image: postgres:14
@@ -72,6 +72,22 @@ services:
       - app_network
     ports:
       - "6379:6379"
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - green_backend
+      - green_frontend
+      - green_face-service
+    networks:
+      - app_network
 
 volumes:
   postgres_data:
