@@ -111,7 +111,7 @@ services:
       - app_network
 
   moodle:
-    image: moodlehq/moodle:latest
+    build: ./moodle-app
     container_name: moodle
     restart: unless-stopped
     environment:
