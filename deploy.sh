@@ -10,7 +10,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 COMPOSE_DIR="/home/ubuntu/capstone1.1"
-HEALTH_CHECK_URL="http://localhost:8080/api/health"
+HEALTH_CHECK_TIMEOUT=60
 MAX_RETRIES=10
 RETRY_INTERVAL=5
 
@@ -18,16 +18,20 @@ echo -e "${YELLOW}🚀 Starting Blue/Green deployment...${NC}"
 
 # Function to check health
 check_health() {
+    local url=$1
     local attempts=0
+    
     while [ $attempts -lt $MAX_RETRIES ]; do
-        if curl -f -s "$HEALTH_CHECK_URL" > /dev/null; then
-            echo -e "${GREEN}✅ Health check passed${NC}"
+        if curl -f -s --max-time $HEALTH_CHECK_TIMEOUT "$url" > /dev/null 2>&1; then
+            echo -e "${GREEN}✅ Health check passed for $url${NC}"
             return 0
         fi
         attempts=$((attempts + 1))
-        echo -e "${YELLOW}⏳ Health check attempt $attempts/$MAX_RETRIES failed, retrying in ${RETRY_INTERVAL}s...${NC}"
+        echo -e "${YELLOW}⏳ Health check attempt $attempts/$MAX_RETRIES failed for $url, retrying in ${RETRY_INTERVAL}s...${NC}"
         sleep $RETRY_INTERVAL
     done
+    
+    echo -e "${RED}❌ Health check failed for $url after $MAX_RETRIES attempts${NC}"
     return 1
 }
 
@@ -37,34 +41,43 @@ switch_nginx_upstream() {
     echo -e "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
     
     # Update nginx configuration
-    if [ "$target_env" = "blue" ]; then
-        sed -i 's|server green_backend:5000;|server blue_backend:5000;|g' /home/ubuntu/capstone1.1/nginx.conf
-        sed -i 's|server green_frontend:3000;|server blue_frontend:3000;|g' /home/ubuntu/capstone1.1/nginx.conf
-        sed -i 's|server green_face-service:5001;|server blue_face-service:5001;|g' /home/ubuntu/capstone1.1/nginx.conf
-    else
-        sed -i 's|server blue_backend:5000;|server green_backend:5000;|g' /home/ubuntu/capstone1.1/nginx.conf
-        sed -i 's|server blue_frontend:3000;|server green_frontend:3000;|g' /home/ubuntu/capstone1.1/nginx.conf
-        sed -i 's|server blue_face-service:5001;|server green_face-service:5001;|g' /home/ubuntu/capstone1.1/nginx.conf
-    fi
+    sed -i "s|server blue_backend:5000;|server ${target_env}_backend:5000;|g" /home/ubuntu/capstone1.1/nginx.conf
+    sed -i "s|server blue_frontend:3000;|server ${target_env}_frontend:3000;|g" /home/ubuntu/capstone1.1/nginx.conf
+    sed -i "s|server blue_face-service:5001;|server ${target_env}_face-service:5001;|g" /home/ubuntu/capstone1.1/nginx.conf
     
     # Reload nginx
-    docker exec nginx nginx -s reload
+    docker exec nginx nginx -s reload || true
     echo -e "${GREEN}✅ Traffic switched to $target_env${NC}"
 }
 
-# Function to update docker-compose files with new images
-update_images() {
-    local env=$1
-    echo -e "${YELLOW}🐳 Updating $env environment with new images...${NC}"
+# Function to pull latest images
+pull_images() {
+    echo -e "${YELLOW}🐳 Pulling latest Docker images...${NC}"
     
-    # Update docker-compose file with new images
-    sed -i "s|docker.io/.*/capstone1.1-backend:latest|docker.io/${DOCKERHUB_USERNAME:-user}/capstone1.1-backend:latest|g" docker-compose.$env.yml
-    sed -i "s|docker.io/.*/capstone1.1-frontend:latest|docker.io/${DOCKERHUB_USERNAME:-user}/capstone1.1-frontend:latest|g" docker-compose.$env.yml
-    sed -i "s|docker.io/.*/capstone1.1-face-service:latest|docker.io/${DOCKERHUB_USERNAME:-user}/capstone1.1-face-service:latest|g" docker-compose.$env.yml
+    # Pull latest images
+    docker pull $DOCKERHUB_USERNAME/capstone1.1-backend:latest || true
+    docker pull $DOCKERHUB_USERNAME/capstone1.1-frontend:latest || true
+    docker pull $DOCKERHUB_USERNAME/capstone1.1-face-service:latest || true
+    
+    echo -e "${GREEN}✅ Images pulled successfully${NC}"
+}
+
+# Function to update docker-compose files
+update_compose_files() {
+    local env=$1
+    echo -e "${YELLOW}📝 Updating docker-compose.$env.yml with latest images...${NC}"
+    
+    # Update docker-compose file with latest images
+    sed -i "s|docker.io/.*/capstone1.1-backend:latest|docker.io/$DOCKERHUB_USERNAME/capstone1.1-backend:latest|g" docker-compose.$env.yml
+    sed -i "s|docker.io/.*/capstone1.1-frontend:latest|docker.io/$DOCKERHUB_USERNAME/capstone1.1-frontend:latest|g" docker-compose.$env.yml
+    sed -i "s|docker.io/.*/capstone1.1-face-service:latest|docker.io/$DOCKERHUB_USERNAME/capstone1.1-face-service:latest|g" docker-compose.$env.yml
 }
 
 # Main deployment logic
 cd "$COMPOSE_DIR"
+
+# Pull latest images
+pull_images
 
 # Detect current active environment
 if docker ps --format "table {{.Names}}" | grep -q "blue_backend"; then
@@ -82,8 +95,8 @@ fi
 echo -e "${YELLOW}📍 Current environment: $CURRENT_ENV${NC}"
 echo -e "${YELLOW}🔄 Deploying to: $NEW_ENV${NC}"
 
-# Update new environment with latest images
-update_images "$NEW_ENV"
+# Update new environment compose file
+update_compose_files "$NEW_ENV"
 
 # Stop current environment if it exists
 if [ "$CURRENT_ENV" != "" ]; then
@@ -99,9 +112,31 @@ docker compose -f docker-compose.$NEW_ENV.yml up -d
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
 sleep 30
 
-# Health check
-if check_health; then
-    echo -e "${GREEN}✅ Health check passed${NC}"
+# Health checks
+echo -e "${YELLOW}🏥 Running health checks...${NC}"
+
+backend_healthy=false
+frontend_healthy=false
+face_service_healthy=false
+
+# Check backend health
+if check_health "http://localhost:8080/api/health"; then
+    backend_healthy=true
+fi
+
+# Check frontend health
+if check_health "http://localhost:8080/health"; then
+    frontend_healthy=true
+fi
+
+# Check face-service health
+if check_health "http://localhost:8080/api/face/health"; then
+    face_service_healthy=true
+fi
+
+# Evaluate health results
+if [ "$backend_healthy" = true ] && [ "$frontend_healthy" = true ] && [ "$face_service_healthy" = true ]; then
+    echo -e "${GREEN}✅ All health checks passed${NC}"
     
     # Switch traffic to new environment
     switch_nginx_upstream "$NEW_ENV"
@@ -116,7 +151,7 @@ if check_health; then
     fi
     
 else
-    echo -e "${RED}❌ Health check failed, rolling back...${NC}"
+    echo -e "${RED}❌ Health checks failed, rolling back...${NC}"
     
     # Stop new environment
     docker compose -f docker-compose.$NEW_ENV.yml down || true

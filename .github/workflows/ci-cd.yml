@@ -1,4 +1,4 @@
-name: 🚀 Enterprise CI/CD Pipeline
+name: 🚀 Production CI/CD Pipeline
 
 on:
   push:
@@ -111,37 +111,11 @@ jobs:
           python -m pytest tests/ -v --cov=app --cov-report=xml
 
 # -----------------------------
-# 🔍 CHANGE DETECTION
-# -----------------------------
-  changes:
-    runs-on: ubuntu-latest
-    outputs:
-      backend: ${{ steps.changes.outputs.backend }}
-      frontend: ${{ steps.changes.outputs.frontend }}
-      face-service: ${{ steps.changes.outputs.face-service }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Detect file changes
-        uses: dorny/paths-filter@v2
-        id: changes
-        with:
-          filters: |
-            backend:
-              - 'backend/**'
-            frontend:
-              - 'frontend/**'
-            face-service:
-              - 'face-service/**'
-
-# -----------------------------
-# 🏗️ MATRIX BUILD (NO TRIVY)
+# 🏗️ BUILD & PUSH STAGE
 # -----------------------------
   build-and-push:
     runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend, test-face-service, changes]
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true' || needs.changes.outputs['face-service'] == 'true'
+    needs: [test-backend, test-frontend, test-face-service]
     
     strategy:
       matrix:
@@ -174,13 +148,13 @@ jobs:
           context: ${{ matrix.context }}
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}-${{ matrix.service }}:latest
+            ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
 # -----------------------------
-# 🚀 DEPLOYMENT STAGE
+# 🚀 BLUE/GREEN DEPLOYMENT
 # -----------------------------
   deploy:
     runs-on: ubuntu-latest
@@ -225,58 +199,11 @@ jobs:
         run: echo "⚠️ VM is OFF. Deployment skipped, pipeline continues."
 
 # -----------------------------
-# 📊 MONITORING SETUP
-# -----------------------------
-  setup-monitoring:
-    runs-on: ubuntu-latest
-    needs: [deploy]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    continue-on-error: true
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy monitoring stack
-        continue-on-error: true
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd ~/capstone1.1 || exit 0
-            
-            docker compose -f docker-compose.monitoring.yml up -d || true
-            
-            echo "📊 Monitoring stack deployed"
-            echo "Prometheus: http://${{ secrets.PRODUCTION_URL }}:9090"
-            echo "Grafana: http://${{ secrets.PRODUCTION_URL }}:3001"
-            echo "Loki: http://${{ secrets.PRODUCTION_URL }}:3100"
-
-# -----------------------------
-# 🚨 ALERTING
-# -----------------------------
-  alerting:
-    runs-on: ubuntu-latest
-    needs: [setup-monitoring]
-    if: failure() && github.ref == 'refs/heads/main' && github.event_name == 'push'
-    continue-on-error: true
-
-    steps:
-      - name: Send alert notification
-        continue-on-error: true
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-            --data '{"text":"🚨 Deployment Failed! Repository: ${{ github.repository }} Commit: ${{ github.sha }}"}' \
-            ${{ secrets.SLACK_WEBHOOK_URL }} || echo "Alert failed"
-
-# -----------------------------
 # 🧹 CLEANUP
 # -----------------------------
   cleanup:
     runs-on: ubuntu-latest
-    needs: [alerting]
+    needs: [deploy]
     if: always() && github.ref == 'refs/heads/main' && github.event_name == 'push'
     continue-on-error: true
 
