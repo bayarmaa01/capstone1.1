@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  green_backend:
+    image: docker.io/${DOCKERHUB_USERNAME}/capstone1.1-backend:latest
+    container_name: green_backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/attendance
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app_network
+    ports:
+      - "5000:5000"
+
+  green_frontend:
+    image: docker.io/${DOCKERHUB_USERNAME}/capstone1.1-frontend:latest
+    container_name: green_frontend
+    restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_FACE_API_URL=http://localhost:5001
+    depends_on:
+      - green_backend
+    networks:
+      - app_network
+    ports:
+      - "3000:3000"
+
+  green_face-service:
+    image: docker.io/${DOCKERHUB_USERNAME}/capstone1.1-face-service:latest
+    container_name: green_face-service
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - UPLOAD_FOLDER=/app/uploads
+      - ENCODINGS_FOLDER=/app/encodings
+    volumes:
+      - ./uploads:/app/uploads
+      - ./encodings:/app/encodings
+    networks:
+      - app_network
+    ports:
+      - "5001:5001"
+
+  postgres:
+    image: postgres:14
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=attendance
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    networks:
+      - app_network
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge
