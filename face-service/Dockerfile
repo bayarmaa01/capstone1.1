@@ -48,8 +48,12 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 EXPOSE 5001
 
-# Security: Remove sensitive files and caches
-RUN rm -rf /tmp/* /var/tmp/* /root/.cache
+# Security: Remove sensitive files and caches (run as root before switching user)
+USER root
+RUN rm -rf /tmp/* /var/tmp/* /root/.cache || true
+
+# Switch to non-root user
+USER appuser
 
 # Use gunicorn for production with proper configuration
 CMD ["gunicorn", "-b", "0.0.0.0:5001", "-w", "2", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "50", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
