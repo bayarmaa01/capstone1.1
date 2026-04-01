@@ -2,7 +2,7 @@
 FROM jjanzic/docker-python3-opencv:latest AS base
 
 # Install Python dependencies
-RUN pip install --upgrade pip setuptools wheel gunicorn requests
+RUN pip install --upgrade pip setuptools wheel
 
 # Dependencies stage
 FROM base AS deps
