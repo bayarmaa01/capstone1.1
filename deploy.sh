@@ -85,23 +85,18 @@ switch_nginx_upstream() {
     echo -e "${GREEN}✅ Traffic switched to $target_env${NC}"
 }
 
-# Function to pull latest images
-pull_images() {
-    echo -e "${YELLOW}🐳 Pulling latest DockerHub images...${NC}"
-    
-    # Pull latest images
-    docker pull bayarmaa/capstone1.1-backend:latest || true
-    docker pull bayarmaa/capstone1.1-frontend:latest || true
-    docker pull bayarmaa/capstone1.1-face-service:latest || true
-    
-    echo -e "${GREEN}✅ Images pulled successfully${NC}"
+# Function to build local images (no pull - we use local builds)
+build_images() {
+    echo -e "${YELLOW}🚀 Building local images...${NC}"
+    docker compose build --no-cache
+    echo -e "${GREEN}✅ Local images built successfully${NC}"
 }
 
 # Main deployment logic
 cd "$COMPOSE_DIR"
 
-# Pull latest images
-pull_images
+# Build local images
+build_images
 
 # Detect active environment
 ACTIVE_ENV=$(detect_active_env)
