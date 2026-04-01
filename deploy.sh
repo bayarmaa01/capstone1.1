@@ -124,7 +124,7 @@ docker compose up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
 
 # Wait for services to be ready
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
-sleep 60
+sleep 90
 
 # Check individual container logs for debugging
 echo -e "${YELLOW}🔍 Checking container logs...${NC}"
@@ -141,18 +141,28 @@ echo -e "${YELLOW}🏥 Running health checks...${NC}"
 backend_healthy=false
 face_healthy=false
 
-# Check backend health
+# Check backend health using localhost ports
 echo -e "${YELLOW}🔍 Testing backend connection...${NC}"
-if curl -f -s --max-time 5 http://${NEW_ENV}_backend:4000/api/health > /dev/null 2>&1; then
+backend_port="4000"
+if [ "$NEW_ENV" = "green" ]; then
+    backend_port="4001"
+fi
+
+if curl -f -s --max-time 10 http://localhost:$backend_port/api/health > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Backend health check passed${NC}"
     backend_healthy=true
 else
     echo -e "${RED}❌ Backend health check failed${NC}"
 fi
 
-# Check face-service health
+# Check face-service health using localhost ports
 echo -e "${YELLOW}🔍 Testing face service connection...${NC}"
-if curl -f -s --max-time 5 http://${NEW_ENV}_face:5001/health > /dev/null 2>&1; then
+face_port="5001"
+if [ "$NEW_ENV" = "green" ]; then
+    face_port="5002"
+fi
+
+if curl -f -s --max-time 10 http://localhost:$face_port/health > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Face service health check passed${NC}"
     face_healthy=true
 else

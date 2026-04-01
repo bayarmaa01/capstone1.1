@@ -1,7 +1,7 @@
-# Multi-stage build for face recognition service
+# Production-ready Python face service with optimized build
 FROM python:3.9-slim AS base
 
-# Install system dependencies
+# Install system dependencies efficiently
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
@@ -36,7 +36,7 @@ WORKDIR /app
 RUN groupadd -g 1001 appuser && \
     useradd -m -u 1001 -g appuser appuser
 
-# Copy dependencies
+# Copy dependencies from deps stage
 COPY --from=deps /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 COPY --from=deps /usr/local/bin /usr/local/bin
 
@@ -50,13 +50,13 @@ RUN mkdir -p encodings logs uploads && \
 # Switch to non-root user
 USER appuser
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Health check - face service uses /health
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
   CMD python -c "import requests; requests.get('http://localhost:5001/health', timeout=5)" || exit 1
 
 EXPOSE 5001
 
-# Security: Remove sensitive files and caches (run as root before switching user)
+# Security: Remove sensitive files and caches
 USER root
 RUN rm -rf /tmp/* /var/tmp/* /root/.cache || true
 

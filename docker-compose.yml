@@ -3,7 +3,7 @@ services:
   blue_backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.new
+      dockerfile: Dockerfile
     container_name: blue_backend
     restart: unless-stopped
     env_file:
@@ -14,11 +14,19 @@ services:
       - FACE_SERVICE_URL=http://blue_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+    ports:
+      - "4000:4000"
     networks:
       - app_network
     depends_on:
       - postgres
       - redis
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   blue_frontend:
     image: bayarmaa/capstone1.1-frontend:latest
@@ -28,6 +36,8 @@ services:
       - REACT_APP_API_URL=/api/
       - REACT_APP_FACE_API_URL=/face/
       - REACT_APP_MOODLE_URL=/moodle/
+    ports:
+      - "3000:3000"
     networks:
       - app_network
     depends_on:
@@ -36,7 +46,7 @@ services:
   blue_face:
     build:
       context: ./face-service
-      dockerfile: Dockerfile.new
+      dockerfile: Dockerfile
     container_name: blue_face
     restart: unless-stopped
     environment:
@@ -44,17 +54,25 @@ services:
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - UPLOAD_FOLDER=/app/uploads
       - ENCODINGS_FOLDER=/app/encodings
+    ports:
+      - "5001:5001"
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Green Environment
   green_backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.new
+      dockerfile: Dockerfile
     container_name: green_backend
     restart: unless-stopped
     env_file:
@@ -65,6 +83,19 @@ services:
       - FACE_SERVICE_URL=http://green_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+    ports:
+      - "4001:4000"
+    networks:
+      - app_network
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       - app_network
     depends_on:
@@ -79,6 +110,8 @@ services:
       - REACT_APP_API_URL=/api/
       - REACT_APP_FACE_API_URL=/face/
       - REACT_APP_MOODLE_URL=/moodle/
+    ports:
+      - "3001:3000"
     networks:
       - app_network
     depends_on:
@@ -87,7 +120,7 @@ services:
   green_face:
     build:
       context: ./face-service
-      dockerfile: Dockerfile.new
+      dockerfile: Dockerfile
     container_name: green_face
     restart: unless-stopped
     environment:
@@ -95,11 +128,19 @@ services:
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - UPLOAD_FOLDER=/app/uploads
       - ENCODINGS_FOLDER=/app/encodings
+    ports:
+      - "5002:5001"
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # Shared Services
   postgres:
@@ -123,17 +164,17 @@ services:
       - app_network
 
   moodle:
-    build: ./moodle-app
+    build:
+      context: ./moodle-app
+      dockerfile: Dockerfile
     container_name: moodle
     restart: unless-stopped
     environment:
-      - MOODLE_DATABASE_HOST=moodle-db
-      - MOODLE_DATABASE_USER=moodle
-      - MOODLE_DATABASE_PASSWORD=moodle_secret
-      - MOODLE_DATABASE_NAME=moodle
       - MOODLE_WWWROOT=https://attendance-ml.duckdns.org/moodle
       - MOODLE_REVERSEPROXY=true
       - MOODLE_SSLPROXY=true
+    ports:
+      - "8080:80"
     networks:
       - app_network
     depends_on:
@@ -159,8 +200,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
     networks:
       - app_network
     depends_on:
