@@ -126,6 +126,11 @@ docker compose up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
 sleep 60
 
+# Check individual container logs for debugging
+echo -e "${YELLOW}🔍 Checking container logs...${NC}"
+docker logs ${NEW_ENV}_backend --tail 10 || echo "Backend logs not available"
+docker logs ${NEW_ENV}_face --tail 10 || echo "Face service logs not available"
+
 # Check if containers are running
 echo -e "${YELLOW}🔍 Checking container status...${NC}"
 docker ps --filter "name=${NEW_ENV}_" --format "table {{.Names}}\t{{.Status}}"
@@ -137,13 +142,21 @@ backend_healthy=false
 face_healthy=false
 
 # Check backend health
-if check_health "http://${NEW_ENV}_backend:4000/health"; then
+echo -e "${YELLOW}🔍 Testing backend connection...${NC}"
+if curl -f -s --max-time 5 http://${NEW_ENV}_backend:4000/health > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Backend health check passed${NC}"
     backend_healthy=true
+else
+    echo -e "${RED}❌ Backend health check failed${NC}"
 fi
 
 # Check face-service health
-if check_health "http://${NEW_ENV}_face:5001/health"; then
+echo -e "${YELLOW}🔍 Testing face service connection...${NC}"
+if curl -f -s --max-time 5 http://${NEW_ENV}_face:5001/health > /dev/null 2>&1; then
+    echo -e "${GREEN}✅ Face service health check passed${NC}"
     face_healthy=true
+else
+    echo -e "${RED}❌ Face service health check failed${NC}"
 fi
 
 # Evaluate health results
