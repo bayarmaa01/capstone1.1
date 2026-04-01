@@ -261,7 +261,8 @@ def recognize_and_mark():
             })
         
         # Check if we have any enrolled students
-        known_ids = list(encodings.keys())
+        current_encodings = get_encodings()
+        known_ids = list(current_encodings.keys())
         if len(known_ids) == 0:
             logger.warning("⚠️ No enrolled students yet")
             return jsonify({
@@ -271,7 +272,7 @@ def recognize_and_mark():
             })
         
         # Convert stored encodings back to numpy arrays
-        known_encodings = [np.array(encodings[k]) for k in known_ids]
+        known_encodings = [np.array(current_encodings[k]) for k in known_ids]
         
         matches = []
         attendance_results = []
@@ -315,11 +316,12 @@ def recognize_and_mark():
                         }
                         
                         # Add to attendance log
+                        current_attendance_log = get_attendance_log()
                         today = datetime.now().strftime("%Y-%m-%d")
-                        if today not in attendance_log:
-                            attendance_log[today] = []
-                        attendance_log[today].append(attendance_entry)
-                        save_attendance_log(attendance_log)
+                        if today not in current_attendance_log:
+                            current_attendance_log[today] = []
+                        current_attendance_log[today].append(attendance_entry)
+                        save_attendance_log(current_attendance_log)
                         
                         attendance_results.append({
                             "student_id": matched_student_id,
@@ -414,7 +416,8 @@ def recognize():
             return jsonify([])
         
         # Check if we have any enrolled students
-        known_ids = list(encodings.keys())
+        current_encodings = get_encodings()
+        known_ids = list(current_encodings.keys())
         if len(known_ids) == 0:
             logger.warning("⚠️ No enrolled students yet")
             return jsonify([])
@@ -422,7 +425,7 @@ def recognize():
         logger.info(f"👥 Comparing against {len(known_ids)} enrolled students: {known_ids}")
         
         # Convert stored encodings back to numpy arrays
-        known_encodings = [np.array(encodings[k]) for k in known_ids]
+        known_encodings = [np.array(current_encodings[k]) for k in known_ids]
         
         matches = []
         
@@ -465,12 +468,12 @@ def recognize():
 @app.route('/enrolled', methods=['GET'])
 def get_enrolled():
     """Get list of enrolled student IDs"""
+    current_encodings = get_encodings()
     return jsonify({
-        "enrolled_students": list(encodings.keys()), 
-        "count": len(encodings),
+        "enrolled_students": list(current_encodings.keys()), 
+        "count": len(current_encodings),
         "moodle_url": MOODLE_URL,
-        "service_status": "active",
-        "additional_info": "This is additional information"
+        "service_status": "active"
     })
 
 @app.route('/unenroll/<student_id>', methods=['DELETE'])
@@ -478,9 +481,10 @@ def unenroll(student_id):
     """Remove a student's face encoding"""
     try:
         student_id = student_id.upper()
-        if student_id in encodings:
-            del encodings[student_id]
-            save_encodings(encodings)
+        current_encodings = get_encodings()
+        if student_id in current_encodings:
+            del current_encodings[student_id]
+            save_encodings(current_encodings)
             logger.info(f"✅ Unenrolled student {student_id}")
             return jsonify({"success": True, "message": f"Student {student_id} unenrolled"})
         else:
@@ -493,11 +497,12 @@ def unenroll(student_id):
 def get_attendance_log():
     """Get attendance log"""
     try:
+        current_attendance_log = get_attendance_log()
         days = request.args.get('days', 7, type=int)
         cutoff_date = datetime.now() - timedelta(days=days)
         
         filtered_log = {}
-        for date_str, entries in attendance_log.items():
+        for date_str, entries in current_attendance_log.items():
             entry_date = datetime.strptime(date_str, "%Y-%m-%d")
             if entry_date >= cutoff_date:
                 filtered_log[date_str] = entries
@@ -553,9 +558,12 @@ if __name__ == '__main__':
     print("="*60)
     print(f"🌐 Moodle URL: {MOODLE_URL}")
     print(f"📁 Encodings path: {os.path.abspath(ENC_PATH)}")
-    print(f"👥 Enrolled students: {len(encodings)}")
-    if encodings:
-        print(f"📋 IDs: {', '.join(encodings.keys())}")
+    
+    # Use lazy loading for startup info
+    current_encodings = get_encodings()
+    print(f"👥 Enrolled students: {len(current_encodings)}")
+    if current_encodings:
+        print(f"📋 IDs: {', '.join(current_encodings.keys())}")
     else:
         print("⚠️ No faces enrolled yet!")
         print("💡 Use POST /enroll to add student faces")
