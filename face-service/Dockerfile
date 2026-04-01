@@ -56,4 +56,4 @@ RUN rm -rf /tmp/* /var/tmp/* /root/.cache || true
 USER appuser
 
 # Use gunicorn for production with proper configuration
-CMD ["gunicorn", "-b", "0.0.0.0:5001", "-w", "2", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "50", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:5001", "-w", "2", "--timeout", "300", "--max-requests", "1000", "--max-requests-jitter", "50", "--access-logfile", "-", "--error-logfile", "-", "app:app"]

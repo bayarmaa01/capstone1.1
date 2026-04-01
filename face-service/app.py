@@ -34,8 +34,9 @@ SESSION_TIMEOUT = 300  # 5 minutes between attendance for same student
 os.makedirs("encodings", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
 
-# Global variables
-encodings = {}
+# Global variables (lazy loading)
+encodings = None
+attendance_log = None
 attendance_sessions = {}  # Track last attendance time per student
 
 def load_encodings():
@@ -140,20 +141,28 @@ def update_attendance_session(student_id):
     attendance_sessions[student_id] = datetime.now()
     logger.info(f"⏰ Updated attendance session for student {student_id}")
 
-# Load data at startup
-encodings = load_encodings()
-attendance_log = load_attendance_log()
+def get_encodings():
+    """Lazy load encodings when needed"""
+    global encodings
+    if encodings is None:
+        encodings = load_encodings()
+    return encodings
+
+def get_attendance_log():
+    """Lazy load attendance log when needed"""
+    global attendance_log
+    if attendance_log is None:
+        attendance_log = load_attendance_log()
+    return attendance_log
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint"""
+    """Fast health check endpoint - no heavy operations"""
     return jsonify({
         "status": "ok", 
-        "service": "ai-smart-attendance", 
-        "enrolled": len(encodings),
-        "students": list(encodings.keys()),
-        "moodle_connected": True,
-        "moodle_url": MOODLE_URL
+        "service": "ai-smart-attendance",
+        "ready": True,
+        "timestamp": datetime.now().isoformat()
     })
 
 @app.route('/face/health', methods=['GET'])
@@ -161,7 +170,7 @@ def face_health():
     """Health check endpoint for nginx compatibility"""
     return jsonify({
         "status": "ok", 
-        "service": "ai-smart-attendance", 
+        "service": "ai-smart-attendance",
         "enrolled": len(encodings),
         "students": list(encodings.keys()),
     })
@@ -202,10 +211,11 @@ def enroll():
             return jsonify({"error": f"Multiple faces detected ({len(face_encodings)}). Please use image with single face."}), 400
         
         # Store encoding as list (for JSON serialization)
-        encodings[student_id] = face_encodings[0].tolist()
+        current_encodings = get_encodings()
+        current_encodings[student_id] = face_encodings[0].tolist()
         
         # Save to disk
-        if save_encodings(encodings):
+        if save_encodings(current_encodings):
             logger.info(f"✅ Successfully enrolled {student_id} (Total: {len(encodings)})")
             return jsonify({
                 "success": True, 

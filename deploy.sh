@@ -119,7 +119,7 @@ docker compose up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
 
 # Wait for services to be ready
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
-sleep 90
+sleep 120
 
 # Check individual container logs for debugging
 echo -e "${YELLOW}🔍 Checking container logs...${NC}"
@@ -157,11 +157,28 @@ if [ "$NEW_ENV" = "green" ]; then
     face_port="5002"
 fi
 
-if curl -f -s --max-time 10 http://localhost:$face_port/health > /dev/null 2>&1; then
-    echo -e "${GREEN}✅ Face service health check passed${NC}"
-    face_healthy=true
-else
-    echo -e "${RED}❌ Face service health check failed${NC}"
+# Retry face service health check with more attempts
+face_retry_count=0
+max_face_retries=5
+face_retry_interval=10
+
+while [ $face_retry_count -lt $max_face_retries ]; do
+    if curl -f -s --max-time 5 http://localhost:$face_port/health > /dev/null 2>&1; then
+        echo -e "${GREEN}✅ Face service health check passed${NC}"
+        face_healthy=true
+        break
+    else
+        face_retry_count=$((face_retry_count + 1))
+        echo -e "${YELLOW}⚠️ Face service health check attempt $face_retry_count/$max_face_retries failed${NC}"
+        if [ $face_retry_count -lt $max_face_retries ]; then
+            echo -e "${YELLOW}⏱️ Waiting $face_retry_interval seconds before retry...${NC}"
+            sleep $face_retry_interval
+        fi
+    fi
+done
+
+if [ "$face_healthy" != true ]; then
+    echo -e "${RED}❌ Face service health check failed after $max_face_retries attempts${NC}"
 fi
 
 # Evaluate health results
