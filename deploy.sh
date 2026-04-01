@@ -31,35 +31,24 @@ check_health() {
     local attempts=0
     
     while [ $attempts -lt $MAX_RETRIES ]; do
-        # Check container health first
-        local container_name=""
+        # Use container-to-container communication
         case "$url" in
-            *api/health*) container_name="green_backend" ;;
-            *face/health*) container_name="green_face" ;;
-        esac
-        
-        if [ ! -z "$container_name" ]; then
-            local health_status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
-            if [ "$health_status" = "healthy" ]; then
-                echo -e "${GREEN}✅ Container $container_name is healthy${NC}"
-                return 0
-            elif [ "$health_status" = "none" ]; then
-                # Fallback to curl if no health check defined
-                if curl -f -s --max-time 10 "$url" > /dev/null 2>&1; then
-                    echo -e "${GREEN}✅ Health check passed for $url${NC}"
+            *api/health*) 
+                if curl -f -s --max-time 10 http://green_backend:4000/health > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ Backend health check passed${NC}"
                     return 0
                 fi
-            fi
-        else
-            # Fallback to curl
-            if curl -f -s --max-time 10 "$url" > /dev/null 2>&1; then
-                echo -e "${GREEN}✅ Health check passed for $url${NC}"
-                return 0
-            fi
-        fi
+                ;;
+            *face/health*) 
+                if curl -f -s --max-time 10 http://green_face:5001/health > /dev/null 2>&1; then
+                    echo -e "${GREEN}✅ Face service health check passed${NC}"
+                    return 0
+                fi
+                ;;
+        esac
         
         attempts=$((attempts + 1))
-        echo -e "${YELLOW}⏳ Health check attempt $attempts/$MAX_RETRIES failed for $url, retrying in ${RETRY_INTERVAL}s...${NC}"
+        echo -e "${YELLOW}⏳ Health check attempt $attempts/$MAX_RETRIES failed, retrying in ${RETRY_INTERVAL}s...${NC}"
         sleep $RETRY_INTERVAL
     done
     
@@ -131,7 +120,7 @@ sleep 60
 
 # Check if containers are running
 echo -e "${YELLOW}🔍 Checking container status...${NC}"
-docker ps --filter "name=green_" --format "table {{.Names}}\t{{.Status}}"
+docker ps --filter "name=${NEW_ENV}_" --format "table {{.Names}}\t{{.Status}}"
 
 # Health checks
 echo -e "${YELLOW}🏥 Running health checks...${NC}"
@@ -140,12 +129,12 @@ backend_healthy=false
 face_healthy=false
 
 # Check backend health
-if check_health "http://localhost/api/health"; then
+if check_health "http://green_backend:4000/health"; then
     backend_healthy=true
 fi
 
 # Check face-service health
-if check_health "http://localhost/face/health"; then
+if check_health "http://green_face:5001/health"; then
     face_healthy=true
 fi
 

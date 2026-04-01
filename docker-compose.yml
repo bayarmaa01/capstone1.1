@@ -7,7 +7,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
-      - FACE_SERVICE_URL=http://face_upstream:5001
+      - FACE_SERVICE_URL=http://blue_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
     networks:
@@ -52,7 +52,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
-      - FACE_SERVICE_URL=http://face_upstream:5001
+      - FACE_SERVICE_URL=http://green_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
     networks:
