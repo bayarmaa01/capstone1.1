@@ -12,7 +12,7 @@ const rateLimit = require('express-rate-limit');
 
 // Trust proxy for nginx reverse proxy
 const app = express();
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 const { startAutoAbsentJob } = require('./autoAbsentJob');
 const lmsSyncService = require('./services/lms_sync');
