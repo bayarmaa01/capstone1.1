@@ -2,13 +2,13 @@
 FROM jjanzic/docker-python3-opencv:latest AS base
 
 # Install Python dependencies
-RUN pip install --upgrade pip setuptools wheel
+RUN pip install --upgrade pip setuptools wheel gunicorn
 
 # Dependencies stage
 FROM base AS deps
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Development stage
 FROM base AS development
