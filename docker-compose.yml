@@ -10,6 +10,7 @@ services:
       - FACE_SERVICE_URL=http://blue_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+      - AZURE_STORAGE_CONNECTION_STRING=
     networks:
       - app_network
     depends_on:
@@ -55,6 +56,7 @@ services:
       - FACE_SERVICE_URL=http://green_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+      - AZURE_STORAGE_CONNECTION_STRING=
     networks:
       - app_network
     depends_on:
