@@ -29,18 +29,26 @@ detect_active_env() {
 check_health() {
     local url=$1
     local attempts=0
+    local env_prefix=""
+    
+    # Determine environment prefix based on active deployment
+    if [ "$NEW_ENV" = "green" ]; then
+        env_prefix="green_"
+    else
+        env_prefix="blue_"
+    fi
     
     while [ $attempts -lt $MAX_RETRIES ]; do
-        # Use container-to-container communication
+        # Use container-to-container communication with dynamic environment
         case "$url" in
             *api/health*) 
-                if curl -f -s --max-time 10 http://green_backend:4000/health > /dev/null 2>&1; then
+                if curl -f -s --max-time 10 http://${env_prefix}backend:5000/health > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Backend health check passed${NC}"
                     return 0
                 fi
                 ;;
             *face/health*) 
-                if curl -f -s --max-time 10 http://green_face:5001/health > /dev/null 2>&1; then
+                if curl -f -s --max-time 10 http://${env_prefix}face:5001/health > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Face service health check passed${NC}"
                     return 0
                 fi
@@ -129,12 +137,12 @@ backend_healthy=false
 face_healthy=false
 
 # Check backend health
-if check_health "http://green_backend:4000/health"; then
+if check_health "http://${NEW_ENV}_backend:5000/health"; then
     backend_healthy=true
 fi
 
 # Check face-service health
-if check_health "http://green_face:5001/health"; then
+if check_health "http://${NEW_ENV}_face:5001/health"; then
     face_healthy=true
 fi
 

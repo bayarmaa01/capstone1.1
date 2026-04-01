@@ -4,13 +4,14 @@ services:
     image: bayarmaa/capstone1.1-backend:latest
     container_name: blue_backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
       - FACE_SERVICE_URL=http://blue_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
-      - AZURE_STORAGE_CONNECTION_STRING=
     networks:
       - app_network
     depends_on:
@@ -50,13 +51,14 @@ services:
     image: bayarmaa/capstone1.1-backend:latest
     container_name: green_backend
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
       - FACE_SERVICE_URL=http://green_face:5001
       - MOODLE_URL=http://moodle/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
-      - AZURE_STORAGE_CONNECTION_STRING=
     networks:
       - app_network
     depends_on:
