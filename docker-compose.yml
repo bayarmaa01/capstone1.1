@@ -43,9 +43,10 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
+      - ./face-service:/app
     networks:
       - app_network
-    command: ["python", "app.py"]
+    command: ["sh", "-c", "pip install requests && python app.py"]
 
   # Green Environment
   green_backend:
@@ -91,9 +92,10 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
+      - ./face-service:/app
     networks:
       - app_network
-    command: ["python", "app.py"]
+    command: ["sh", "-c", "pip install requests && python app.py"]
 
   # Shared Services
   postgres:
