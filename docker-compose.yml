@@ -45,6 +45,7 @@ services:
       - ./encodings:/app/encodings
     networks:
       - app_network
+    command: ["python", "app.py"]
 
   # Green Environment
   green_backend:
@@ -92,6 +93,7 @@ services:
       - ./encodings:/app/encodings
     networks:
       - app_network
+    command: ["python", "app.py"]
 
   # Shared Services
   postgres:

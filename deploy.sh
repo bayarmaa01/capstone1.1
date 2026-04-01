@@ -42,7 +42,7 @@ check_health() {
         # Use container-to-container communication with dynamic environment
         case "$url" in
             *api/health*) 
-                if curl -f -s --max-time 10 http://${env_prefix}backend:5000/health > /dev/null 2>&1; then
+                if curl -f -s --max-time 10 http://${env_prefix}backend:4000/health > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Backend health check passed${NC}"
                     return 0
                 fi
@@ -137,7 +137,7 @@ backend_healthy=false
 face_healthy=false
 
 # Check backend health
-if check_health "http://${NEW_ENV}_backend:5000/health"; then
+if check_health "http://${NEW_ENV}_backend:4000/health"; then
     backend_healthy=true
 fi
 
