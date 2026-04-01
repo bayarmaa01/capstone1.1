@@ -1,38 +1,21 @@
-# Multi-stage build for face recognition service
-FROM jjanzic/docker-python3-opencv:latest AS base
+# Single-stage build for face recognition service
+FROM jjanzic/docker-python3-opencv:latest
 
-# Install Python dependencies
+# Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
 
-# Dependencies stage
-FROM base AS deps
+# Set working directory
 WORKDIR /app
+
+# Copy requirements and install all dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Development stage
-FROM base AS development
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-RUN mkdir -p encodings logs
-EXPOSE 5001
-CMD ["python", "app.py"]
-
-# Production stage
-FROM base AS production
-WORKDIR /app
 
 # Create non-root user for security
 RUN groupadd -g 1001 appuser && \
     useradd -m -u 1001 -g appuser appuser
 
-# Copy dependencies
-COPY --from=deps /usr/local/lib/python3.*/site-packages /usr/local/lib/python3.*/site-packages
-COPY --from=deps /usr/local/bin /usr/local/bin
-
-# Copy application code
+# Copy application code with correct permissions
 COPY --chown=appuser:appuser . .
 
 # Create necessary directories
