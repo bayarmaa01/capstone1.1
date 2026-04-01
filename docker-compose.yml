@@ -96,11 +96,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    networks:
-      - app_network
-    depends_on:
-      - postgres
-      - redis
 
   green_frontend:
     image: bayarmaa/capstone1.1-frontend:latest
