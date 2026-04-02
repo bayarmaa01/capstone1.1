@@ -162,8 +162,6 @@ services:
       - MOODLE_WWWROOT=https://attendance-ml.duckdns.org/moodle
       - MOODLE_REVERSEPROXY=true
       - MOODLE_SSLPROXY=true
-    ports:
-      - "8080:80"
     networks:
       - app_network
     depends_on:
@@ -191,7 +189,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.fixed.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     networks:
       - app_network
