@@ -4,7 +4,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: blue_backend
     restart: unless-stopped
     env_file:
       - .env
@@ -17,21 +16,22 @@ services:
     networks:
       - app_network
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 40s
 
   blue_frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
-    container_name: blue_frontend
     restart: unless-stopped
     environment:
       - REACT_APP_API_URL=/api/
@@ -40,13 +40,13 @@ services:
     networks:
       - app_network
     depends_on:
-      - blue_backend
+      blue_backend:
+        condition: service_healthy
 
   blue_face:
     build:
       context: ./face-service
       dockerfile: Dockerfile
-    container_name: blue_face
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
@@ -60,17 +60,16 @@ services:
       - app_network
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health', timeout=5)"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 40s
 
   # Green Environment
   green_backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: green_backend
     restart: unless-stopped
     env_file:
       - .env
@@ -83,21 +82,22 @@ services:
     networks:
       - app_network
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 40s
 
   green_frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
-    container_name: green_frontend
     restart: unless-stopped
     environment:
       - REACT_APP_API_URL=/api/
@@ -106,13 +106,13 @@ services:
     networks:
       - app_network
     depends_on:
-      - green_backend
+      green_backend:
+        condition: service_healthy
 
   green_face:
     build:
       context: ./face-service
       dockerfile: Dockerfile
-    container_name: green_face
     restart: unless-stopped
     environment:
       - FLASK_ENV=production
@@ -126,15 +126,14 @@ services:
       - app_network
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5001/health', timeout=5)"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
-      retries: 3
-      start_period: 30s
+      retries: 5
+      start_period: 40s
 
   # Shared Services
   postgres:
     image: postgres:14
-    container_name: postgres
     restart: unless-stopped
     environment:
       - POSTGRES_DB=attendance
@@ -144,19 +143,29 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d attendance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
-    container_name: redis
     restart: unless-stopped
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   moodle:
     build:
       context: ./moodle-app
       dockerfile: Dockerfile
-    container_name: moodle
     restart: unless-stopped
     environment:
       - MOODLE_WWWROOT=https://attendance-ml.duckdns.org/moodle
@@ -165,11 +174,17 @@ services:
     networks:
       - app_network
     depends_on:
-      - moodle-db
+      moodle-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/moodle/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   moodle-db:
     image: mariadb:10.6
-    container_name: moodle-db
     restart: unless-stopped
     environment:
       - MARIADB_ROOT_PASSWORD=root_secret
@@ -180,10 +195,15 @@ services:
       - moodle_db_data:/var/lib/mysql
     networks:
       - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$MARIADB_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   nginx:
     image: nginx:alpine
-    container_name: nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -191,16 +211,29 @@ services:
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
+      - ./nginx.upstream.conf:/etc/nginx/conf.d/upstream.conf:ro
     networks:
       - app_network
     depends_on:
-      - blue_backend
-      - blue_frontend
-      - blue_face
-      - green_backend
-      - green_frontend
-      - green_face
-      - moodle
+      blue_backend:
+        condition: service_healthy
+      blue_frontend:
+        condition: service_started
+      blue_face:
+        condition: service_healthy
+      green_backend:
+        condition: service_healthy
+      green_frontend:
+        condition: service_started
+      green_face:
+        condition: service_healthy
+      moodle:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:
