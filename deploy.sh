@@ -1,6 +1,10 @@
 #!/bin/bash
 
-set -euo pipefail
+# ========================================
+# Zero-Downtime Blue/Green Deploy Script
+# ========================================
+
+set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -10,234 +14,145 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-COMPOSE_DIR="${COMPOSE_DIR:-$HOME/capstone1.1}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
-HEALTH_CHECK_TIMEOUT=300
-MAX_RETRIES=30
-RETRY_INTERVAL=10
-UPSTREAM_FILE="$COMPOSE_DIR/nginx.upstream.conf"
-LOG_FILE="$COMPOSE_DIR/deploy.log"
+COMPOSE_FILE="docker-compose.yml"
+HEALTH_TIMEOUT=300
+SWITCH_API_URL="http://localhost/api/deploy/switch"
 
-# Logging function
-log() {
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
-}
+echo -e "${BLUE}🚀 Starting Zero-Downtime Blue/Green Deployment${NC}"
 
-# Error handling and rollback
-rollback() {
-    local env_to_stop=${1:-$NEW_ENV}
-    local env_to_keep=${2:-$OLD_ENV}
+# Function to check service health
+check_health() {
+    local service_name=$1
+    local max_attempts=30
+    local attempt=1
     
-    log "${RED}❌ Rolling back to $env_to_keep environment${NC}"
+    echo -e "${YELLOW}⏳ Checking health of $service_name...${NC}"
     
-    # Stop failed environment
-    cd "$COMPOSE_DIR"
-    docker compose -f "$COMPOSE_FILE" stop ${env_to_stop}_backend ${env_to_stop}_frontend ${env_to_stop}_face 2>/dev/null || true
-    
-    # Restore upstream configuration
-    if [[ -f "${UPSTREAM_FILE}.backup" ]]; then
-        mv "${UPSTREAM_FILE}.backup" "$UPSTREAM_FILE"
-        log "${YELLOW}🔄 Restored upstream configuration${NC}"
-        
-        # Reload nginx
-        if docker exec nginx nginx -t; then
-            docker exec nginx nginx -s reload
-            log "${GREEN}✅ Nginx reloaded with restored configuration${NC}"
-        else
-            log "${RED}❌ Nginx configuration test failed during rollback${NC}"
-        fi
-    fi
-    
-    log "${GREEN}✅ Rollback completed - system running on $env_to_keep${NC}"
-    exit 1
-}
-
-# Set trap for cleanup
-trap 'rollback "$NEW_ENV" "$OLD_ENV"' ERR INT TERM
-
-log "${BLUE}🚀 Starting Production Blue/Green Deployment${NC}"
-
-# Function to wait for container health
-wait_for_health() {
-    local service=$1
-    local timeout=$2
-    local elapsed=0
-    
-    while [[ $elapsed -lt $timeout ]]; do
-        local status
-        status=$(docker inspect --format='{{.State.Health.Status}}' "$service" 2>/dev/null || echo "starting")
-        
-        if [[ "$status" == "healthy" ]]; then
-            log "${GREEN}✅ $service is healthy${NC}"
+    while [ $attempt -le $max_attempts ]; do
+        if docker compose ps $service_name | grep -q "healthy"; then
+            echo -e "${GREEN}✅ $service_name is healthy${NC}"
             return 0
-        elif [[ "$status" == "unhealthy" ]]; then
-            log "${RED}❌ $service is unhealthy${NC}"
-            return 1
         fi
         
-        sleep $RETRY_INTERVAL
-        elapsed=$((elapsed + RETRY_INTERVAL))
-        log "${YELLOW}⏳ Waiting for $service health... (${elapsed}s)${NC}"
+        echo -e "${YELLOW}⏳ Attempt $attempt/$max_attempts: $service_name not healthy yet...${NC}"
+        sleep 10
+        ((attempt++))
     done
     
-    log "${RED}❌ Timeout waiting for $service health${NC}"
+    echo -e "${RED}❌ $service_name failed to become healthy${NC}"
     return 1
 }
 
-# Function to check application health
-check_app_health() {
-    local env_prefix=$1
-    local attempts=0
+# Function to switch traffic
+switch_traffic() {
+    echo -e "${BLUE}🔄 Switching traffic...${NC}"
     
-    while [[ $attempts -lt $MAX_RETRIES ]]; do
-        # Check backend health
-        if docker exec ${env_prefix}_backend curl -f -s --max-time 10 http://localhost:4000/api/health >/dev/null 2>&1; then
-            log "${GREEN}✅ Backend health check passed${NC}"
-        else
-            log "${YELLOW}⏳ Backend health check attempt $((attempts + 1))/$MAX_RETRIES failed${NC}"
-            sleep $RETRY_INTERVAL
-            attempts=$((attempts + 1))
-            continue
-        fi
-        
-        # Check face service health
-        if docker exec ${env_prefix}_face curl -f -s --max-time 10 http://localhost:5001/health >/dev/null 2>&1; then
-            log "${GREEN}✅ Face service health check passed${NC}"
-            return 0
-        else
-            log "${YELLOW}⏳ Face service health check attempt $((attempts + 1))/$MAX_RETRIES failed${NC}"
-            sleep $RETRY_INTERVAL
-            attempts=$((attempts + 1))
-        fi
-    done
+    # Call the switch API
+    response=$(curl -s -X POST $SWITCH_API_URL)
     
-    log "${RED}❌ Health check failed for $env_prefix environment${NC}"
-    return 1
-}
-
-# Function to switch nginx upstream atomically
-switch_upstream() {
-    local target_env=$1
-    
-    log "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
-    
-    # Backup current configuration
-    cp "$UPSTREAM_FILE" "${UPSTREAM_FILE}.backup"
-    
-    # Create new upstream configuration
-    cat > "$UPSTREAM_FILE" << EOF
-# Dynamic upstream configuration for blue-green deployment
-# Updated: $(date)
-
-upstream backend_upstream {
-    server ${target_env}_backend:4000;
-    keepalive 32;
-}
-
-upstream frontend_upstream {
-    server ${target_env}_frontend:80;
-    keepalive 32;
-}
-
-upstream face_upstream {
-    server ${target_env}_face:5001;
-    keepalive 32;
-}
-EOF
-    
-    # Test nginx configuration
-    if docker exec nginx nginx -t; then
-        # Reload nginx (zero downtime)
-        docker exec nginx nginx -s reload
-        log "${GREEN}✅ Traffic switched to $target_env${NC}"
+    if echo "$response" | grep -q "Switched to"; then
+        echo -e "${GREEN}✅ Traffic switched successfully${NC}"
+        echo "$response"
         return 0
     else
-        # Restore backup on failure
-        mv "${UPSTREAM_FILE}.backup" "$UPSTREAM_FILE"
-        log "${RED}❌ Nginx configuration test failed, restored backup${NC}"
+        echo -e "${RED}❌ Failed to switch traffic${NC}"
+        echo "$response"
         return 1
     fi
 }
 
 # Main deployment logic
-cd "$COMPOSE_DIR"
-
-# Detect active environment
-ACTIVE_ENV="blue"
-if grep -q "server green_backend:" "$UPSTREAM_FILE" 2>/dev/null; then
-    ACTIVE_ENV="green"
-fi
-
-log "${YELLOW}🔍 Active environment: $ACTIVE_ENV${NC}"
-
-# Determine new environment
-if [[ "$ACTIVE_ENV" == "blue" ]]; then
-    NEW_ENV="green"
-    OLD_ENV="blue"
-else
-    NEW_ENV="blue"
-    OLD_ENV="green"
-fi
-
-log "${YELLOW}🔄 Deploying: $NEW_ENV (replacing $OLD_ENV)${NC}"
-
-# Build images
-log "${YELLOW}🏗️ Building images...${NC}"
-if ! docker compose -f "$COMPOSE_FILE" build --no-cache; then
-    log "${RED}❌ Build failed${NC}"
-    exit 1
-fi
-
-# Start new environment
-log "${YELLOW}🚀 Starting $NEW_ENV environment...${NC}"
-if ! docker compose -f "$COMPOSE_FILE" up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face; then
-    log "${RED}❌ Failed to start $NEW_ENV environment${NC}"
-    exit 1
-fi
-
-# Wait for containers to become healthy
-log "${YELLOW}⏱️ Waiting for services to become healthy...${NC}"
-for service in ${NEW_ENV}_backend ${NEW_ENV}_face; do
-    if ! wait_for_health "$service" "$HEALTH_CHECK_TIMEOUT"; then
-        log "${RED}❌ $service failed to become healthy${NC}"
-        rollback "$NEW_ENV" "$OLD_ENV"
+main() {
+    echo -e "${BLUE}📋 Current deployment status:${NC}"
+    docker compose ps
+    
+    # Determine current active environment
+    echo -e "${BLUE}🔍 Determining current active environment...${NC}"
+    if grep -q "blue_backend" nginx.upstream.conf; then
+        CURRENT_ENV="blue"
+        NEW_ENV="green"
+    else
+        CURRENT_ENV="green"
+        NEW_ENV="blue"
     fi
-done
+    
+    echo -e "${BLUE}📍 Current: $CURRENT_ENV, Building: $NEW_ENV${NC}"
+    
+    # Build new environment
+    echo -e "${BLUE}🔨 Building $NEW_ENV environment...${NC}"
+    docker compose build $NEW_ENV-backend $NEW_ENV-frontend $NEW_ENV-face
+    
+    # Start new environment
+    echo -e "${BLUE}🚀 Starting $NEW_ENV environment...${NC}"
+    docker compose up -d $NEW_ENV-backend $NEW_ENV-frontend $NEW_ENV-face
+    
+    # Wait for health checks
+    echo -e "${BLUE}🏥 Waiting for $NEW_ENV services to become healthy...${NC}"
+    
+    if check_health "$NEW_ENV-backend" && check_health "$NEW_ENV-frontend" && check_health "$NEW_ENV-face"; then
+        echo -e "${GREEN}✅ All $NEW_ENV services are healthy${NC}"
+    else
+        echo -e "${RED}❌ $NEW_ENV services failed health checks${NC}"
+        echo -e "${YELLOW}🔄 Rolling back...${NC}"
+        docker compose stop $NEW_ENV-backend $NEW_ENV-frontend $NEW_ENV-face
+        exit 1
+    fi
+    
+    # Switch traffic
+    if switch_traffic; then
+        echo -e "${GREEN}✅ Traffic switched to $NEW_ENV${NC}"
+        
+        # Wait a bit for the switch to take effect
+        sleep 10
+        
+        # Verify switch worked
+        echo -e "${BLUE}🔍 Verifying switch...${NC}"
+        if grep -q "$NEW_ENV-backend" nginx.upstream.conf; then
+            echo -e "${GREEN}✅ Switch verified - $NEW_ENV is now active${NC}"
+        else
+            echo -e "${RED}❌ Switch verification failed${NC}"
+            exit 1
+        fi
+        
+        # Stop old environment
+        echo -e "${BLUE}🛑 Stopping old $CURRENT_ENV environment...${NC}"
+        docker compose stop $CURRENT_ENV-backend $CURRENT_ENV-frontend $CURRENT_ENV-face
+        
+        echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
+        echo -e "${BLUE}📊 Final status:${NC}"
+        docker compose ps
+        
+    else
+        echo -e "${RED}❌ Traffic switch failed${NC}"
+        echo -e "${YELLOW}🔄 Rolling back...${NC}"
+        docker compose stop $NEW_ENV-backend $NEW_ENV-frontend $NEW_ENV-face
+        exit 1
+    fi
+}
 
-# Run application health checks
-log "${YELLOW}🏥 Running application health checks...${NC}"
-if ! check_app_health "$NEW_ENV"; then
-    log "${RED}❌ Application health checks failed${NC}"
-    rollback "$NEW_ENV" "$OLD_ENV"
-fi
-
-# Switch traffic to new environment
-if ! switch_upstream "$NEW_ENV"; then
-    log "${RED}❌ Failed to switch upstream${NC}"
-    rollback "$NEW_ENV" "$OLD_ENV"
-fi
-
-# Wait for traffic switch to propagate
-sleep 10
-
-# Verify new environment is serving traffic
-log "${YELLOW}🔍 Verifying traffic routing...${NC}"
-if ! curl -f -s --max-time 10 https://attendance-ml.duckdns.org/health >/dev/null 2>&1; then
-    log "${RED}❌ Health check failed after traffic switch${NC}"
-    rollback "$NEW_ENV" "$OLD_ENV"
-fi
-
-# Stop old environment
-log "${YELLOW}🛑 Stopping $OLD_ENV environment...${NC}"
-docker compose -f "$COMPOSE_FILE" stop ${OLD_ENV}_backend ${OLD_ENV}_frontend ${OLD_ENV}_face 2>/dev/null || true
-
-# Clean up
-log "${GREEN}🧹 Cleaning up old images...${NC}"
-docker image prune -f 2>/dev/null || true
-
-# Remove backup file on success
-rm -f "${UPSTREAM_FILE}.backup"
-
-log "${GREEN}✅ Zero-downtime deployment completed successfully!${NC}"
-log "${GREEN}🌐 Application is now running on $NEW_ENV environment${NC}"
-log "${GREEN}📊 Deployment completed at $(date)${NC}"
+# Handle script arguments
+case "${1:-}" in
+    "status")
+        echo -e "${BLUE}📊 Current deployment status:${NC}"
+        docker compose ps
+        if grep -q "blue_backend" nginx.upstream.conf; then
+            echo -e "${BLUE}📍 Active environment: BLUE${NC}"
+        else
+            echo -e "${BLUE}📍 Active environment: GREEN${NC}"
+        fi
+        ;;
+    "switch")
+        switch_traffic
+        ;;
+    "health")
+        check_health "blue_backend"
+        check_health "blue_frontend" 
+        check_health "blue_face"
+        check_health "green_backend"
+        check_health "green_frontend"
+        check_health "green_face"
+        ;;
+    *)
+        main
+        ;;
+esac

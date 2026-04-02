@@ -135,8 +135,71 @@ app.use((err, req, res, next) => {
 });
 
 // =======================================
-// Start Server
+// Blue/Green Deployment Switch API
 // =======================================
+const fs = require('fs').promises;
+const path = require('path');
+
+app.post('/deploy/switch', async (req, res) => {
+  try {
+    const upstreamConfigPath = path.join(__dirname, '../nginx.upstream.conf');
+    let config = await fs.readFile(upstreamConfigPath, 'utf8');
+    
+    // Toggle between blue and green
+    if (config.includes('blue_backend')) {
+      config = config.replace(/blue_backend/g, 'green_backend');
+      config = config.replace(/blue_frontend/g, 'green_frontend');
+      config = config.replace(/blue_face/g, 'green_face');
+      newEnv = 'green';
+    } else {
+      config = config.replace(/green_backend/g, 'blue_backend');
+      config = config.replace(/green_frontend/g, 'blue_frontend');
+      config = config.replace(/green_face/g, 'blue_face');
+      newEnv = 'blue';
+    }
+    
+    await fs.writeFile(upstreamConfigPath, config);
+    
+    // Reload nginx
+    const { exec } = require('child_process');
+    exec('nginx -s reload', (error, stdout, stderr) => {
+      if (error) {
+        console.error('Nginx reload failed:', error);
+        return res.status(500).json({ error: 'Failed to reload nginx' });
+      }
+      console.log(`✅ Switched to ${newEnv} environment`);
+      res.json({ 
+        message: `Switched to ${newEnv} environment`,
+        environment: newEnv,
+        timestamp: new Date().toISOString()
+      });
+    });
+  } catch (error) {
+    console.error('Switch failed:', error);
+    res.status(500).json({ error: 'Failed to switch environment' });
+  }
+});
+
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', 'text/plain');
+  res.send(`
+# HELP backend_health Health status of backend service
+# TYPE backend_health gauge
+backend_health{service="attendance-backend",status="ok"} 1
+
+# HELP backend_uptime_seconds Uptime in seconds
+# TYPE backend_uptime_seconds counter
+backend_uptime_seconds ${process.uptime()}
+
+# HELP nodejs_heap_size_used_bytes Node.js heap size used
+# TYPE nodejs_heap_size_used_bytes gauge
+nodejs_heap_size_used_bytes ${process.memoryUsage().heapUsed}
+
+# HELP nodejs_heap_size_total_bytes Node.js heap size total
+# TYPE nodejs_heap_size_total_bytes gauge
+nodejs_heap_size_total_bytes ${process.memoryUsage().heapTotal}
+  `.trim());
+});
 
 
 const PORT = process.env.PORT || 4000;
