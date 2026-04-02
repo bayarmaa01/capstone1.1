@@ -605,21 +605,28 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ---
 
-## 👥 Team & Acknowledgments
+## 👥 Team Members
 
-### 🎓 Research Team
-**Munkh Erdene Khurtsbileg¹**, **Ankush Pal¹**, **Bayarmaa Bumandorj¹**, **Aarohan Sarkar¹**, **Rudrax Bhalerao¹**  
+**Munkh Erdene Khurtsbileg¹**  
+**Ankush Pal¹**  
+**Bayarmaa Bumandorj¹**  
+**Aarohan Sarkar¹**  
+**Rudrax Bhalerao¹**
+
 ¹School of Computer Application, Lovely Professional University  
 Phagwara, Punjab, India
 
-### 👨‍🏫 Supervision
+---
+
+## � Supervisor
+
 **Amandeep Singh**  
-Assistant Professor, School of Computer Application, Lovely Professional University
+Assistant Professor  
+School of Computer Application  
+Lovely Professional University
 
-### 🎓 Project Created By
-**Bayarmaa Nergui** - Full-stack developer with passion for AI and education technology
+## 🙏 Acknowledgments
 
-### 🙏 Acknowledgments
 - **OpenCV** - Computer vision library
 - **face_recognition** - Face detection algorithms
 - **React** - Frontend framework
