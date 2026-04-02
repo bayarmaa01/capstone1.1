@@ -1,81 +1,456 @@
-# 🎓 AI Smart Attendance System
+# 🚀 AI Smart Attendance System
 
-> **Intelligent attendance tracking powered by facial recognition and automated scheduling**
+[![CI/CD Pipeline](https://github.com/bayarmaa01/capstone1.1/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/bayarmaa01/capstone1.1/actions/workflows/ci-cd.yml)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-18.x-green?logo=node.js)](https://nodejs.org/)
+[![Python](https://img.shields.io/badge/Python-3.9-blue?logo=python)](https://python.org/)
 
-A modern, cloud-native full-stack application that revolutionizes attendance management through AI-powered facial recognition, automated scheduling, and real-time analytics.
+> **Production-grade AI-powered attendance management with face recognition, QR scanning, and zero-downtime deployment**
 
----
-
-## 📁 Project Structure
-
-```
-automated-attendance-system/
-├── 📱 frontend/                 # React.js SPA with modern UI
-│   ├── src/
-│   │   ├── components/     # Reusable UI components
-│   │   ├── pages/         # Route-based page components
-│   │   ├── services/      # API client and utilities
-│   │   └── App.jsx        # Main application component
-│   ├── public/              # Static assets and PWA manifest
-│   └── package.json
-├── 🔧 backend/                  # Node.js/Express REST API
-│   ├── src/
-│   │   ├── routes/        # API endpoint handlers
-│   │   ├── middleware/    # Auth, CORS, security
-│   │   ├── services/      # Business logic & integrations
-│   │   └── server.js      # Application entry point
-│   ├── tests/              # Unit & integration tests
-│   └── package.json
-├── 🤖 face-service/             # Python Flask microservice
-│   ├── app.py              # Face recognition API
-│   ├── tests/              # Pytest test suite
-│   └── requirements.txt
-├── 🐳 nginx/                   # Reverse proxy & load balancer
-│   └── conf/
-│       └── default.conf   # Production-ready configuration
-├── 🚀 .github/workflows/         # CI/CD pipeline
-│   └── deploy.yml          # Parallel builds & deployment
-└── 📋 docker-compose.yml         # Container orchestration
-```
+A comprehensive, cloud-native attendance system that revolutionizes educational institution management through advanced facial recognition, automated scheduling, and real-time analytics. Built with enterprise-grade DevOps practices and scalable microservices architecture.
 
 ---
 
-## 🎯 Why This Project Matters
+## 🌐 Live Demo
 
-### 🚀 **DevOps Excellence**
-- **Parallel CI/CD Pipeline**: Optimized GitHub Actions workflow running backend, frontend, and face-service builds simultaneously
-- **Container-Native Architecture**: Docker multi-stage builds with security best practices
-- **Infrastructure as Code**: Complete deployment automation via SSH and docker-compose
+**🔗 [https://attendance-ml.duckdns.org](https://attendance-ml.duckdns.org)**
 
-### 🧠 **AI Innovation**
-- **Facial Recognition**: Real-time face detection and student identification
-- **Automated Attendance**: Intelligent scheduling and absence tracking
-- **Predictive Analytics**: ML-powered attendance pattern analysis
+---
 
-### 🏗️ **Modern Architecture**
-- **Microservices**: Decoupled face-service for scalability
-- **API Gateway**: Nginx reverse proxy with SSL termination
-- **Database Integration**: PostgreSQL with optimized queries
-- **Cloud Storage**: Azure Blob Storage for face encodings
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    User[� User] --> Frontend[⚛️ React Frontend]
+    Frontend --> Nginx[🌐 Nginx Load Balancer]
+    Nginx --> Backend[🔧 Node.js Backend]
+    Nginx --> FaceService[🤖 Python Face Service]
+    Nginx --> Moodle[🎓 Moodle LMS]
+    
+    Backend --> PostgreSQL[🗄️ PostgreSQL]
+    Backend --> Redis[⚡ Redis Cache]
+    Backend --> Azure[☁️ Azure Storage]
+    
+    FaceService --> Azure
+    FaceService --> Encodings[📁 Face Encodings]
+    
+    subgraph "DevOps Pipeline"
+        GitHub[📦 GitHub] --> Actions[🔄 GitHub Actions]
+        Actions --> Docker[🐳 Docker Hub]
+        Docker --> EC2[☁️ AWS EC2]
+    end
+```
+
+### Architecture Overview
+The system follows a microservices architecture with clear separation of concerns:
+
+- **Frontend Layer**: React SPA serving the user interface
+- **Gateway Layer**: Nginx reverse proxy with SSL termination and load balancing
+- **Service Layer**: Node.js backend API and Python face recognition service
+- **Data Layer**: PostgreSQL for persistent data, Redis for caching
+- **Storage Layer**: Azure Blob Storage for face images and encodings
+- **Integration Layer**: Moodle LMS for academic data synchronization
+
+---
+
+## 🔄 CI/CD Pipeline
+
+```mermaid
+graph LR
+    Code[📝 Code Push] --> Test[🧪 Parallel Tests]
+    Test --> Build[🏗️ Docker Build]
+    Build --> Push[📦 Docker Push]
+    Push --> Deploy[🚀 Blue/Green Deploy]
+    Deploy --> Prod[✅ Production]
+    
+    Test --> Backend[Backend Tests]
+    Test --> Frontend[Frontend Tests]
+    Test --> Face[Face Service Tests]
+    
+    Deploy --> Health[Health Checks]
+    Health --> Switch[Traffic Switch]
+    Switch --> Prod
+```
+
+### Pipeline Stages
+
+1. **🧪 Testing Phase**: Parallel execution of backend, frontend, and face-service tests
+2. **🏗️ Build Phase**: Multi-stage Docker builds with security scanning
+3. **📦 Push Phase**: Versioned Docker images pushed to registry
+4. **🚀 Deploy Phase**: Blue/green deployment with health validation
+
+---
+
+## 🔵🟢 Blue-Green Deployment
+
+```mermaid
+graph TD
+    User[👤 Users] --> Nginx[🌐 Nginx Gateway]
+    
+    Nginx --> Blue[🔵 Blue Environment]
+    Nginx --> Green[🟢 Green Environment]
+    
+    Blue --> BlueBackend[Backend API]
+    Blue --> BlueFrontend[React App]
+    Blue --> BlueFace[Face Service]
+    
+    Green --> GreenBackend[Backend API]
+    Green --> GreenFrontend[React App]
+    Green --> GreenFace[Face Service]
+    
+    subgraph "Deployment Flow"
+        NewVersion[📦 New Version] --> GreenDeploy[🟢 Deploy to Green]
+        GreenDeploy --> HealthCheck[🏥 Health Check]
+        HealthCheck --> TrafficSwitch[🔄 Switch Traffic]
+        TrafficSwitch --> BlueStop[🛑 Stop Blue]
+    end
+```
+
+### Zero-Downtime Strategy
+- **🔄 Traffic Switching**: Nginx upstream configuration dynamically updated
+- **�️ Rollback Protection**: Previous version kept as immediate fallback
+- **🏥 Health Monitoring**: Continuous health checks post-deployment
+
+---
+
+## 🧰 Tech Stack
+
+### 🎨 Frontend
+- **React 18** - Modern UI framework with hooks and concurrent features
+- **Material-UI (MUI)** - Professional component library with theming
+- **Axios** - HTTP client with interceptors and error handling
+- **React Router** - Client-side routing with lazy loading
+- **Chart.js** - Interactive data visualization
+
+### � Backend
+- **Node.js 18** - High-performance JavaScript runtime
+- **Express.js** - Fast, minimalist web framework
+- **PostgreSQL** - Robust relational database with ACID compliance
+- **Redis** - In-memory data structure store for caching
+- **JWT** - Secure token-based authentication
+- **Prisma** - Modern database ORM with type safety
+
+### 🤖 AI Services
+- **Python 3.9** - Face recognition service with scientific computing
+- **OpenCV** - Computer vision library for face detection
+- **Face Recognition** - Deep learning-based face recognition
+- **NumPy** - Numerical computing for image processing
+- **Flask** - Lightweight Python web framework
+
+### 🐳 DevOps & Infrastructure
+- **Docker** - Containerization with multi-stage builds
+- **Docker Compose** - Multi-container orchestration
+- **Nginx** - High-performance reverse proxy and load balancer
+- **GitHub Actions** - CI/CD pipeline with parallel execution
+- **AWS EC2** - Scalable cloud hosting
+- **Azure Storage** - Secure blob storage for media files
+- **Let's Encrypt** - Free SSL/TLS certificates
+
+## 📦 Project Structure
+
+```
+ai-attendance-system/
+├── 📁 backend/                 # Node.js API service
+│   ├── 📁 src/
+│   │   ├── 📁 controllers/     # Route controllers
+│   │   ├── 📁 middleware/      # Express middleware
+│   │   ├── 📁 models/          # Database models
+│   │   ├── 📁 routes/          # API routes
+│   │   ├── 📁 services/        # Business logic
+│   │   └── 📄 server.js        # Application entry point
+│   ├── 📁 tests/               # Test files
+│   ├── 📄 package.json
+│   └── 📄 Dockerfile
+├── 📁 frontend/               # React application
+│   ├── 📁 src/
+│   │   ├── 📁 components/      # Reusable components
+│   │   ├── 📁 pages/           # Page components
+│   │   ├── 📁 services/        # API services
+│   │   └── 📄 App.jsx          # Main app component
+│   ├── 📁 public/
+│   ├── 📄 package.json
+│   └── 📄 Dockerfile
+├── 📁 face-service/           # Python AI service
+│   ├── 📁 app/
+│   │   ├── 📄 face_recognition.py
+│   │   └── 📄 api.py
+│   ├── 📁 tests/
+│   ├── 📄 requirements.txt
+│   └── 📄 Dockerfile
+├── 📁 nginx/                  # Nginx configuration
+│   └── 📄 nginx.prod.conf
+├── 📁 .github/workflows/       # CI/CD pipeline
+│   └── 📄 ci-cd.yml
+├── 📄 docker-compose.yml       # Main orchestration
+├── 📄 deploy.sh               # Deployment script
+├── 📄 .env.example            # Environment template
+└── 📄 README.md               # This file
+```
+
+---
+
+## ⚙️ Installation & Setup
+
+### 🚀 Quick Start
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/bayarmaa01/capstone1.1.git
+cd capstone1.1
+
+# 2. Configure environment variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# 3. Start the system
+docker compose up -d --build
+
+# 4. Access the application
+open https://attendance-ml.duckdns.org
+```
+
+### 📋 Prerequisites
+- Docker & Docker Compose
+- Git
+- SSL certificates (for production)
+
+---
+
+## 🌐 Environment Variables
+
+Create a `.env` file with the following configuration:
+
+```bash
+# 🗄️ Database Configuration
+DATABASE_URL=postgresql://app:strong_password@postgres:5432/attendance
+POSTGRES_PASSWORD=strong_password
+
+# ⚡ Cache Configuration
+REDIS_URL=redis://redis:6379
+
+# 🔐 Security Configuration
+JWT_SECRET=your_32_character_random_secret_key
+NODE_ENV=production
+
+# ☁️ Azure Storage
+AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=yourstorage;AccountKey=your_key;EndpointSuffix=core.windows.net
+AZURE_STORAGE_CONTAINER=face-images
+
+# 🎓 Moodle Integration
+MOODLE_URL=https://attendance-ml.duckdns.org/moodle
+MOODLE_TOKEN=your_moodle_api_token
+MOODLE_WS_TOKEN=your_moodle_web_service_token
+
+# 🌐 Frontend Configuration
+REACT_APP_API_URL=https://attendance-ml.duckdns.org/api
+REACT_APP_FACE_SERVICE_URL=https://attendance-ml.duckdns.org/face
+FRONTEND_URL=https://attendance-ml.duckdns.org
+```
+
+---
+
+## 🔍 API Endpoints
+
+### 🏥 Health Checks
+```bash
+GET /health              # System health check
+GET /api/health          # Backend service health
+GET /face/health         # Face service health
+```
+
+### 👤 Authentication
+```bash
+POST /api/auth/login     # User login
+POST /api/auth/register  # User registration
+POST /api/auth/refresh   # Token refresh
+```
+
+### 📊 Attendance Management
+```bash
+GET /api/attendance      # Get attendance records
+POST /api/attendance     # Mark attendance
+GET /api/analytics       # Attendance analytics
+```
+
+### 🤖 Face Recognition
+```bash
+POST /face/recognize     # Face recognition
+POST /face/register      # Register new face
+GET /face/encodings      # Get face encodings
+```
+
+---
+
+## ❤️ Health Checks
+
+### 🏥 Docker Health Checks
+Each service includes built-in health checks:
+
+```dockerfile
+# Backend health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+
+# Face service health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:5001/health', timeout=5)"
+```
+
+### 🌐 Nginx Health Routing
+Nginx routes traffic only to healthy services:
+- **Automatic failover** to healthy instances
+- **Health check endpoint** at `/health`
+- **Service monitoring** with automatic recovery
+
+---
+
+## 🔐 Security Features
+
+### 🛡️ Web Security
+- **HTTPS/SSL** encryption with Let's Encrypt
+- **Rate limiting** (10r/s API, 5r/s face recognition)
+- **Security headers** (HSTS, XSS protection, CORS)
+- **Input validation** and SQL injection prevention
+
+### 🔒 Authentication & Authorization
+- **JWT-based authentication** with refresh tokens
+- **Role-based access control** (admin, user, instructor)
+- **Session management** with Redis
+- **Password hashing** with bcrypt
+
+### 🐳 Container Security
+- **Non-root users** in all containers
+- **Minimal base images** for reduced attack surface
+- **Secret management** through environment variables
+- **Network isolation** with Docker networks
+
+---
+
+## 📊 Features
+
+### 🧠 Face Recognition Attendance
+- **Real-time face detection** using OpenCV
+- **Face encoding storage** for accurate recognition
+- **Liveness detection** to prevent spoofing
+- **Multi-face support** for group attendance
+
+### 📱 QR Code Attendance
+- **Quick QR generation** for courses/events
+- **Mobile-friendly scanning** interface
+- **Time-based QR codes** for security
+- **Offline capability** with sync later
+
+### 🎓 Moodle LMS Integration
+- **Automatic course synchronization**
+- **Grade book integration**
+- **User account management**
+- **Assignment tracking**
+
+### 📈 Analytics & Reporting
+- **Real-time dashboards** with attendance trends
+- **Risk detection alerts** for <75% attendance
+- **Export functionality** (PDF, Excel, CSV)
+- **Custom reporting** with filters
+
+---
+
+## 🚀 Deployment
+
+### 🔄 CI/CD Pipeline
+The system uses GitHub Actions for automated deployment:
+
+1. **Code Push** → Triggers pipeline
+2. **Parallel Testing** → Backend, Frontend, Face Service
+3. **Docker Build** → Multi-stage optimized builds
+4. **Registry Push** → Docker Hub with versioning
+5. **Blue/Green Deploy** → Zero-downtime deployment
+
+### 🐳 Docker Deployment
+```bash
+# Production deployment
+docker compose -f docker-compose.fixed.yml up -d
+
+# Blue/Green deployment
+chmod +x deploy.fixed.sh
+./deploy.fixed.sh
+```
+
+### ☁️ AWS EC2 Setup
+- **Instance type**: t3.medium or higher
+- **Security groups**: 80, 443, 22, 8080
+- **SSL certificates**: Let's Encrypt automation
+- **Domain**: DuckDNS dynamic DNS
+
+---
+
+## 🧠 Future Improvements
+
+### 🏗️ Kubernetes Migration
+- **Container orchestration** with K8s
+- **Auto-scaling** based on load
+- **Service mesh** with Istio
+- **Helm charts** for deployment
+
+### 📊 Monitoring & Observability
+- **Prometheus** metrics collection
+- **Grafana** dashboards
+- **ELK stack** for logging
+- **Jaeger** distributed tracing
+
+### 🤖 AI Enhancements
+- **Deep learning models** for better accuracy
+- **Behavioral analysis** for engagement
+- **Predictive analytics** for attendance patterns
+- **Mobile face recognition** SDK
+
+---
+
+## 👨‍💻 Author
+
+**Bayarmaa Nergui**  
+🎓 Computer Science Student | 🚀 DevOps Enthusiast | 🤖 AI Engineer
+
+📧 [GitHub: @bayarmaa01](https://github.com/bayarmaa01)  
+🌐 [LinkedIn: bayarmaa-nergui](https://linkedin.com/in/bayarmaa-nergui)  
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **OpenCV** for face recognition capabilities
+- **React** for the modern frontend framework
+- **Docker** for containerization
+- **GitHub Actions** for CI/CD pipeline
+- **Moodle** for LMS integration support
+
+---
+
+⭐ **If this project helped you, please give it a star!** 🌟
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Node.js** 18+
-- **Python** 3.9+
 - **Docker** & **Docker Compose**
-- **PostgreSQL** 14+
+- **Git**
+- **SSL certificates** (for production)
 
 ### Local Development
 ```bash
 # Clone the repository
 git clone https://github.com/bayarmaa01/capstone1.1.git
-cd automated-attendance-system
+cd capstone1.1
 
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Access the application
 # Frontend: http://localhost:3000
@@ -94,112 +469,6 @@ cp .env.example .env
 # - Moodle integration settings
 # - JWT secrets
 ```
-
----
-
-## 🏗️ Architecture Overview
-
-```mermaid
-graph TB
-    subgraph "Frontend Layer"
-        A[React SPA]
-        B[Camera Capture]
-        C[Attendance Dashboard]
-        D[Schedule Management]
-    end
-    
-    subgraph "API Gateway"
-        E[Nginx Proxy]
-        F[SSL Termination]
-        G[Load Balancing]
-    end
-    
-    subgraph "Backend Services"
-        H[Express API]
-        I[PostgreSQL DB]
-        J[Azure Storage]
-    end
-    
-    subgraph "AI Services"
-        K[Face Recognition]
-        L[ML Analytics]
-        M[Automated Scheduling]
-    end
-
-    A --> E
-    E --> H
-    H --> I
-    H --> J
-    H --> K
-    K --> L
-    K --> M
-    
-    B --> K
-    C --> H
-    D --> H
-```
-
-### 🔄 Data Flow
-1. **Student Registration**: Face capture → encoding → storage
-2. **Attendance Check**: Camera → face service → recognition → database
-3. **Analytics**: Raw data → ML processing → insights dashboard
-4. **Automated Scheduling**: Time-based triggers → absence detection → notifications
-
----
-
-## 🔧 Technology Stack
-
-### 🎨 Frontend
-- **React 18** with modern hooks and patterns
-- **Material-UI Components** for consistent design
-- **Axios** for API communication
-- **HTML5 Camera API** for face capture
-- **Chart.js** for data visualization
-
-### 🔧 Backend
-- **Node.js/Express** REST API architecture
-- **PostgreSQL** for relational data storage
-- **JWT Authentication** with refresh tokens
-- **Jest** for comprehensive testing
-- **Azure Storage SDK** for cloud integration
-
-### 🤖 AI Services
-- **Python/Flask** microservice
-- **OpenCV & face_recognition** libraries
-- **Gunicorn** WSGI server
-- **Pytest** for testing and coverage
-
-### 🐳 Infrastructure
-- **Docker** multi-stage builds
-- **Nginx** reverse proxy with security headers
-- **GitHub Actions** CI/CD with parallel builds
-- **SSH Deployment** to production servers
-
----
-
-## 📊 Features
-
-### 🎯 Core Features
-- ✅ **Real-time Face Recognition** with 95%+ accuracy
-- ✅ **Automated Attendance Tracking** with geolocation
-- ✅ **Intelligent Scheduling** with conflict detection
-- ✅ **Mobile QR Code Check-in** for flexibility
-- ✅ **Comprehensive Analytics** with trend analysis
-- ✅ **Role-based Access Control** (Admin/Teacher/Student)
-
-### 🔒 Security Features
-- ✅ **JWT Authentication** with secure token management
-- ✅ **Data Encryption** at rest and in transit
-- ✅ **Rate Limiting** to prevent abuse
-- ✅ **CORS Protection** with domain whitelisting
-- ✅ **SQL Injection Prevention** with parameterized queries
-
-### 📈 Analytics Features
-- ✅ **Attendance Patterns** with heat maps
-- ✅ **Absence Trends** with predictive insights
-- ✅ **Class Performance** metrics
-- ✅ **Export Reports** in multiple formats
-- ✅ **Real-time Dashboards** with live updates
 
 ---
 
@@ -225,85 +494,6 @@ pytest tests/ --cov       # Python tests with coverage reporting
 - **Security Testing**: Trivy vulnerability scanning
 - **Performance Testing**: Load testing with Artillery
 - **Cross-browser Testing**: Chrome, Firefox, Safari compatibility
-
----
-
-## 🚀 Deployment
-
-### 🏭 Production Architecture
-```yaml
-# docker-compose.yml - Multi-service orchestration
-services:
-  nginx:          # API Gateway & Load Balancer
-  frontend:        # React SPA build
-  backend:         # Node.js API server
-  face-service:    # Python AI microservice
-  attendance-db:   # PostgreSQL database
-  moodle:          # LMS integration
-```
-
-### 🔄 CI/CD Pipeline
-```yaml
-# .github/workflows/deploy.yml - Automated deployment
-jobs:
-  backend:         # Parallel build & test
-  frontend:        # Parallel build & test  
-  face-service:    # Parallel build & test
-  security-scan:   # Vulnerability assessment
-  deploy:          # Production deployment
-  health-check:    # Post-deployment validation
-```
-
-### 📊 Monitoring & Observability
-- **Application Logs**: Structured logging with Winston
-- **Health Checks**: `/api/health`, `/face/health` endpoints
-- **Performance Metrics**: Response time tracking
-- **Error Tracking**: Sentry integration for production
-- **Database Monitoring**: Connection pool metrics
-
----
-
-## 🔧 Configuration
-
-### 🌍 Environment Variables
-```bash
-# Database Configuration
-DATABASE_URL=postgresql://user:password@localhost:5432/attendance
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=attendance
-
-# Azure Storage
-AZURE_STORAGE_CONNECTION_STRING=your_connection_string
-AZURE_STORAGE_CONTAINER=face-images
-
-# JWT Security
-JWT_SECRET=your-super-secret-key
-JWT_EXPIRES_IN=7d
-
-# Moodle Integration
-MOODLE_URL=http://moodle:80
-MOODLE_WS_TOKEN=your-web-service-token
-
-# Application
-NODE_ENV=production
-PORT=4000
-FRONTEND_URL=http://localhost:3000
-```
-
-### 🐳 Docker Configuration
-```dockerfile
-# Multi-stage builds for optimization
-FROM node:18-alpine AS base
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-
-FROM base AS production
-RUN npm run build
-EXPOSE 4000
-CMD ["npm", "start"]
-```
 
 ---
 
@@ -351,25 +541,6 @@ DELETE /face/unenroll/:studentId  # Remove student enrollment
 
 ---
 
-## 🔒 Security Considerations
-
-### 🛡️ Security Measures
-- **Input Validation**: Comprehensive data sanitization
-- **Rate Limiting**: 100 requests per minute per IP
-- **CORS Policy**: Strict domain whitelisting
-- **SQL Injection Prevention**: Parameterized queries only
-- **XSS Protection**: Content Security Policy headers
-- **Authentication**: JWT with secure httpOnly cookies
-
-### 🔐 Data Protection
-- **Encryption**: AES-256 for sensitive data
-- **Hashing**: bcrypt for password storage
-- **PII Protection**: Minimal personal data collection
-- **GDPR Compliance**: Right to deletion and data export
-- **Audit Logging**: All access attempts logged
-
----
-
 ## 🤝 Contributing Guidelines
 
 ### 📋 Development Workflow
@@ -386,13 +557,6 @@ DELETE /face/unenroll/:studentId  # Remove student enrollment
 - **Tests**: 85%+ coverage required for new features
 - **Documentation**: Update README for API changes
 
-### 🎯 Best Practices
-- **Small Commits**: Atomic, well-described changes
-- **Branch Strategy**: Feature branches with descriptive names
-- **Code Reviews**: Required for all changes
-- **Testing**: All features must include tests
-- **Documentation**: README updates for new capabilities
-
 ---
 
 ## 📞 Troubleshooting
@@ -405,10 +569,10 @@ DELETE /face/unenroll/:studentId  # Remove student enrollment
 lsof -i :4000  # Check what's using port 4000
 
 # Container logs
-docker-compose logs backend  # View service logs
+docker compose logs backend  # View service logs
 
 # Rebuild services
-docker-compose down && docker-compose up --build
+docker compose down && docker compose up --build
 ```
 
 #### Database Issues
@@ -417,8 +581,8 @@ docker-compose down && docker-compose up --build
 psql -h localhost -U postgres -d attendance  # Test DB connection
 
 # Reset database
-docker-compose down -v  # Remove volumes
-docker-compose up -d     # Fresh start
+docker compose down -v  # Remove volumes
+docker compose up -d     # Fresh start
 ```
 
 #### Face Recognition Issues
@@ -444,7 +608,7 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 ## 👥 Team & Acknowledgments
 
 ### 🎓 Project Created By
-**Bayarmaa** - Full-stack developer with passion for AI and education technology
+**Bayarmaa Nergui** - Full-stack developer with passion for AI and education technology
 
 ### 🙏 Acknowledgments
 - **OpenCV** - Computer vision library
@@ -461,10 +625,6 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 - **Documentation**: This README covers most scenarios
 - **Issues**: [GitHub Issues](https://github.com/bayarmaa01/capstone1.1/issues) for bug reports
 - **Discussions**: [GitHub Discussions](https://github.com/bayarmaa01/capstone1.1/discussions) for questions
-
-### 🔗 Live Demo
-- **Production**: [Deployed Application URL](https://your-domain.com)
-- **API Documentation**: [Swagger Docs](https://your-domain.com/api-docs)
 
 ---
 
