@@ -408,11 +408,10 @@ chmod +x deploy.fixed.sh
 
 ## 👨‍💻 Author
 
-**Bayarmaa Nergui**  
-🎓 Computer Science Student | 🚀 DevOps Enthusiast | 🤖 AI Engineer
+**DevOps Engineering Students**  
+🎓 Computer Science Students | 🚀 DevOps Enthusiast | 🤖 AI Engineer
 
-📧 [GitHub: @bayarmaa01](https://github.com/bayarmaa01)  
-🌐 [LinkedIn: bayarmaa-nergui](https://linkedin.com/in/bayarmaa-nergui)  
+📧 [GitHub: @bayarmaa01](https://github.com/bayarmaa01)   
 
 ---
 
@@ -607,13 +606,13 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ## 👥 Team Members
 
-**Munkh Erdene Khurtsbileg¹**  
-**Ankush Pal¹**  
-**Bayarmaa Bumandorj¹**  
-**Aarohan Sarkar¹**  
-**Rudrax Bhalerao¹**
+**Munkh Erdene Khurtsbileg**  
+**Ankush Pal**  
+**Bayarmaa Bumandorj**  
+**Aarohan Sarkar**  
+**Rudrax Bhalerao**
 
-¹School of Computer Application, Lovely Professional University  
+School of Computer Science, Lovely Professional University  
 Phagwara, Punjab, India
 
 ---
