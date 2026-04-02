@@ -177,11 +177,10 @@ services:
       moodle-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/moodle/ || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost/"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
 
   moodle-db:
     image: mariadb:10.6
@@ -207,28 +206,16 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
       - ./nginx.upstream.conf:/etc/nginx/conf.d/upstream.conf:ro
     networks:
       - app_network
     depends_on:
-      blue_backend:
-        condition: service_healthy
-      blue_frontend:
-        condition: service_started
-      blue_face:
-        condition: service_healthy
-      green_backend:
-        condition: service_healthy
-      green_frontend:
-        condition: service_started
-      green_face:
-        condition: service_healthy
-      moodle:
-        condition: service_healthy
+      - blue_backend
+      - blue_frontend
+      - blue_face
+      - moodle
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s

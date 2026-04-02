@@ -1,6 +1,9 @@
 # Single-stage build for face recognition service
 FROM jjanzic/docker-python3-opencv:latest
 
+# Install build dependencies
+RUN apt-get update && apt-get install -y cmake build-essential
+
 # Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
 
