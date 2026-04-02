@@ -14,8 +14,9 @@ class AzureStorageService {
       await this.containerClient.createIfNotExists();
       console.log('✅ Azure Storage container initialized');
     } catch (error) {
-      console.error('❌ Error initializing Azure Storage container:', error);
-      throw error;
+      console.log('⚠️ Azure Storage initialization failed:', error.message);
+      console.log('🔄 Continuing without Azure Storage - local storage will be used');
+      // Don't throw error - just log and continue
     }
   }
 

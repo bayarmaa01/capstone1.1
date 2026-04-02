@@ -7,6 +7,20 @@ function startAutoAbsentJob() {
     try {
       console.log('🕒 autoAbsentJob: checking schedules to finalize...');
 
+      // Check if class_schedules table exists first
+      const tableCheck = await db.query(`
+        SELECT EXISTS (
+          SELECT FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          AND table_name = 'class_schedules'
+        );
+      `);
+
+      if (!tableCheck.rows[0].exists) {
+        console.log('⚠️ class_schedules table does not exist - skipping auto absent job');
+        return;
+      }
+
       // 1) find schedules for today that have ended and are not completed
       const schedules = await db.query(`
         SELECT id, class_id, scheduled_date, start_time, end_time
