@@ -85,10 +85,9 @@ app.use('/uploads', express.static(uploadsDir));
 // Health Check Endpoint
 // =======================================
 app.get('/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     status: 'ok',
-    service: 'attendance-backend',
-    timestamp: new Date(),
+    service: 'backend'
   });
 });
 
@@ -180,35 +179,14 @@ app.post('/deploy/switch', async (req, res) => {
   }
 });
 
-app.get('/metrics', (req, res) => {
-  res.set('Content-Type', 'text/plain');
-  res.send(`
-# HELP backend_health Health status of backend service
-# TYPE backend_health gauge
-backend_health{service="attendance-backend",status="ok"} 1
-
-# HELP backend_uptime_seconds Uptime in seconds
-# TYPE backend_uptime_seconds counter
-backend_uptime_seconds ${process.uptime()}
-
-# HELP nodejs_heap_size_used_bytes Node.js heap size used
-# TYPE nodejs_heap_size_used_bytes gauge
-nodejs_heap_size_used_bytes ${process.memoryUsage().heapUsed}
-
-# HELP nodejs_heap_size_total_bytes Node.js heap size total
-# TYPE nodejs_heap_size_total_bytes gauge
-nodejs_heap_size_total_bytes ${process.memoryUsage().heapTotal}
-  `.trim());
-});
+const deployRoutes = require('./routes/deploy');
+app.use('/api/deploy', deployRoutes);
 
 
 const PORT = process.env.PORT || 4000;
 
 // Only start server if not disabled (for testing)
-if (process.env.DISABLE_SERVER_START !== 'true') {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Backend server running at: http://localhost:${PORT}`);
-    console.log(`📋 Health check: http://localhost:${PORT}/health`);
-  });
-}
+app.listen(4000, '0.0.0.0', () => {
+console.log('Server running on 0.0.0.0:4000');
+});
  

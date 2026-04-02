@@ -149,7 +149,6 @@ def get_encodings():
     return encodings
 
 def get_attendance_log():
-    """Lazy load attendance log when needed"""
     global attendance_log
     if attendance_log is None:
         attendance_log = load_attendance_log()
@@ -157,13 +156,7 @@ def get_attendance_log():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Fast health check endpoint - no heavy operations"""
-    return jsonify({
-        "status": "ok", 
-        "service": "ai-smart-attendance",
-        "ready": True,
-        "timestamp": datetime.now().isoformat()
-    })
+    return {"status": "ok", "service": "face"}, 200
 
 @app.route('/face/health', methods=['GET'])
 def face_health():
