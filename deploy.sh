@@ -18,7 +18,7 @@ echo -e "${YELLOW}🚀 Starting Blue/Green deployment...${NC}"
 
 # Function to detect active environment
 detect_active_env() {
-    if grep -q "server blue_backend:" /home/ubuntu/capstone1.1/nginx.conf; then
+    if grep -q "server blue_backend:" /home/ubuntu/capstone1.1/nginx.prod.conf; then
         echo "blue"
     else
         echo "green"
@@ -42,13 +42,13 @@ check_health() {
         # Use container-to-container communication with dynamic environment
         case "$url" in
             *api/health*) 
-                if curl -f -s --max-time 10 http://${env_prefix}backend:4000/api/health > /dev/null 2>&1; then
+                if docker exec ${env_prefix}backend curl -f -s --max-time 10 http://localhost:4000/api/health > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Backend health check passed${NC}"
                     return 0
                 fi
                 ;;
             *face/health*) 
-                if curl -f -s --max-time 10 http://${env_prefix}face:5001/health > /dev/null 2>&1; then
+                if docker exec ${env_prefix}face curl -f -s --max-time 10 http://localhost:5001/health > /dev/null 2>&1; then
                     echo -e "${GREEN}✅ Face service health check passed${NC}"
                     return 0
                 fi
@@ -70,9 +70,9 @@ switch_nginx_upstream() {
     echo -e "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
     
     # Update nginx configuration
-    sed -i "s|server blue_backend:4000;|server ${target_env}_backend:4000;|g" /home/ubuntu/capstone1.1/nginx.conf
-    sed -i "s|server blue_frontend:3000;|server ${target_env}_frontend:3000;|g" /home/ubuntu/capstone1.1/nginx.conf
-    sed -i "s|server blue_face:5001;|server ${target_env}_face:5001;|g" /home/ubuntu/capstone1.1/nginx.conf
+    sed -i "s|server blue_backend:4000;|server ${target_env}_backend:4000;|g" /home/ubuntu/capstone1.1/nginx.prod.conf
+    sed -i "s|server blue_frontend:80;|server ${target_env}_frontend:80;|g" /home/ubuntu/capstone1.1/nginx.prod.conf
+    sed -i "s|server blue_face:5001;|server ${target_env}_face:5001;|g" /home/ubuntu/capstone1.1/nginx.prod.conf
     
     # Test nginx configuration
     docker exec nginx nginx -t || {
@@ -85,10 +85,10 @@ switch_nginx_upstream() {
     echo -e "${GREEN}✅ Traffic switched to $target_env${NC}"
 }
 
-# Function to build local images (no pull - we use local builds)
+# Function to build local images
 build_images() {
     echo -e "${YELLOW}🚀 Building local images...${NC}"
-    docker compose build --no-cache
+    docker compose -f docker-compose.fixed.yml build --no-cache
     echo -e "${GREEN}✅ Local images built successfully${NC}"
 }
 
@@ -115,7 +115,7 @@ echo -e "${YELLOW}🔄 Deploying: $NEW_ENV (replacing $OLD_ENV)${NC}"
 
 # Start new environment
 echo -e "${YELLOW}🚀 Starting $NEW_ENV environment...${NC}"
-docker compose up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
+docker compose -f docker-compose.fixed.yml up -d ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face
 
 # Wait for services to be ready
 echo -e "${YELLOW}⏱️ Waiting for services to start...${NC}"
@@ -185,7 +185,7 @@ if [ "$backend_healthy" = true ] && [ "$face_healthy" = true ]; then
     
     # Stop old environment
     echo -e "${YELLOW}🛑 Stopping $OLD_ENV environment...${NC}"
-    docker compose stop ${OLD_ENV}_backend ${OLD_ENV}_frontend ${OLD_ENV}_face || true
+    docker compose -f docker-compose.fixed.yml stop ${OLD_ENV}_backend ${OLD_ENV}_frontend ${OLD_ENV}_face || true
     
     echo -e "${GREEN}✅ Zero-downtime deployment completed${NC}"
     
@@ -193,7 +193,7 @@ else
     echo -e "${RED}❌ Health checks failed, rolling back...${NC}"
     
     # Stop new environment
-    docker compose stop ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face || true
+    docker compose -f docker-compose.fixed.yml stop ${NEW_ENV}_backend ${NEW_ENV}_frontend ${NEW_ENV}_face || true
     
     echo -e "${GREEN}✅ Rollback completed - system still running on $OLD_ENV${NC}"
     exit 1
