@@ -8,7 +8,7 @@
 
 > **Production-grade AI-powered attendance management with face recognition, QR scanning, and zero-downtime deployment**
 
-A comprehensive, cloud-native attendance system that revolutionizes educational institution management through advanced facial recognition, automated scheduling, and real-time analytics. Built with enterprise-grade DevOps practices and scalable microservices architecture.
+A comprehensive, cloud-native attendance system that revolutionizes educational institution management through advanced facial recognition, automated scheduling, and real-time analytics. Built with enterprise-grade DevOps practices and scalable microservices architecture by our team of computer science engineering students.
 
 ---
 
@@ -43,7 +43,7 @@ graph TD
 ```
 
 ### Architecture Overview
-The system follows a microservices architecture with clear separation of concerns:
+Our system follows a microservices architecture with clear separation of concerns:
 
 - **Frontend Layer**: React SPA serving the user interface
 - **Gateway Layer**: Nginx reverse proxy with SSL termination and load balancing
@@ -79,6 +79,8 @@ graph LR
 2. **🏗️ Build Phase**: Multi-stage Docker builds with security scanning
 3. **📦 Push Phase**: Versioned Docker images pushed to registry
 4. **🚀 Deploy Phase**: Blue/green deployment with health validation
+
+Our team implemented this pipeline to ensure continuous integration and delivery.
 
 ---
 
@@ -358,7 +360,7 @@ Nginx routes traffic only to healthy services:
 ## 🚀 Deployment
 
 ### 🔄 CI/CD Pipeline
-The system uses GitHub Actions for automated deployment:
+Our system uses GitHub Actions for automated deployment:
 
 1. **Code Push** → Triggers pipeline
 2. **Parallel Testing** → Backend, Frontend, Face Service
@@ -369,11 +371,11 @@ The system uses GitHub Actions for automated deployment:
 ### 🐳 Docker Deployment
 ```bash
 # Production deployment
-docker compose -f docker-compose.fixed.yml up -d
+docker compose up -d
 
 # Blue/Green deployment
-chmod +x deploy.fixed.sh
-./deploy.fixed.sh
+chmod +x deploy.sh
+./deploy.sh
 ```
 
 ### ☁️ AWS EC2 Setup
@@ -406,12 +408,29 @@ chmod +x deploy.fixed.sh
 
 ---
 
-## 👨‍💻 Author
+## � Team & Academic Information
 
-**DevOps Engineering Students**  
-🎓 Computer Science Students | 🚀 DevOps Enthusiast | 🤖 AI Engineer
+**Capstone Project – Group 2RGD0037**
 
-📧 [GitHub: @bayarmaa01](https://github.com/bayarmaa01)   
+🎓 Program: B.Tech Computer Science Engineering (DevOps)  
+🏫 University: Lovely Professional University (LPU)  
+📍 Location: Phagwara, Punjab, India  
+📅 Year: 4th Year (Final Year Capstone Project)
+
+### �‍💻 Team Members
+- Munkh Erdene Khurtsbileg  
+- Ankush Pal  
+- Bayarmaa Bumandorj  
+- Aarohan Sarkar  
+- Rudrax Bhalerao  
+
+### 🎓 Supervisor
+Dr. Amandeep Singh  
+Assistant Professor  
+School of Computer Application  
+Lovely Professional University  
+
+Area of Specialization: Next Generation Programming Systems
 
 ---
 
@@ -423,11 +442,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
+Our team extends gratitude to:
 - **OpenCV** for face recognition capabilities
-- **React** for the modern frontend framework
+- **React** for modern frontend framework
 - **Docker** for containerization
 - **GitHub Actions** for CI/CD pipeline
 - **Moodle** for LMS integration support
+- **Dr. Amandeep Singh** for valuable guidance and supervision
+- **Lovely Professional University** for providing resources and support
 
 ---
 
@@ -606,31 +628,34 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ## 👥 Team Members
 
-**Munkh Erdene Khurtsbileg**  
-**Ankush Pal**  
-**Bayarmaa Bumandorj**  
-**Aarohan Sarkar**  
-**Rudrax Bhalerao**
+Munkh Erdene Khurtsbileg  
+Ankush Pal  
+Bayarmaa Bumandorj  
+Aarohan Sarkar  
+Rudrax Bhalerao  
 
 School of Computer Science, Lovely Professional University  
 Phagwara, Punjab, India
 
 ---
 
-## � Supervisor
+## 🎓 Supervisor
 
-**Amandeep Singh**  
+**Dr. Amandeep Singh**  
 Assistant Professor  
 School of Computer Application  
 Lovely Professional University
 
 ## 🙏 Acknowledgments
 
+Our team extends gratitude to:
 - **OpenCV** - Computer vision library
 - **face_recognition** - Face detection algorithms
 - **React** - Frontend framework
 - **Express.js** - Backend framework
 - **Docker** - Containerization platform
+- **Dr. Amandeep Singh** for mentorship and guidance
+- **Lovely Professional University** for academic support
 
 ---
 
@@ -643,6 +668,6 @@ Lovely Professional University
 
 ---
 
-> **🚀 Built with passion for revolutionizing education through AI and modern technology**
+> **🚀 Built with passion by our team for revolutionizing education through AI and modern technology**
 
-*This project demonstrates expertise in full-stack development, DevOps practices, AI integration, and production-ready software engineering.*
+*This project demonstrates our team's expertise in full-stack development, DevOps practices, AI integration, and production-ready software engineering.*
