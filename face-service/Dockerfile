@@ -1,8 +1,10 @@
 # Single-stage build for face recognition service
 FROM jjanzic/docker-python3-opencv:latest
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y cmake build-essential
+# Fix deprecated repositories and install build dependencies
+RUN sed -i 's|http://deb.debian.org|http://archive.debian.org|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.debian.org|http://archive.debian.org|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y cmake build-essential
 
 # Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
