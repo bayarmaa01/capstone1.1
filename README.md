@@ -607,6 +607,15 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 
 ## 👥 Team & Acknowledgments
 
+### 🎓 Research Team
+**Munkh Erdene Khurtsbileg¹**, **Ankush Pal¹**, **Bayarmaa Bumandorj¹**, **Aarohan Sarkar¹**, **Rudrax Bhalerao¹**  
+¹School of Computer Application, Lovely Professional University  
+Phagwara, Punjab, India
+
+### 👨‍🏫 Supervision
+**Amandeep Singh**  
+Assistant Professor, School of Computer Application, Lovely Professional University
+
 ### 🎓 Project Created By
 **Bayarmaa Nergui** - Full-stack developer with passion for AI and education technology
 
