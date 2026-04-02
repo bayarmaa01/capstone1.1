@@ -9,7 +9,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-COMPOSE_DIR="/home/ubuntu/capstone1.1"
+COMPOSE_DIR="/home/azureuser/capstone1.1"
 HEALTH_CHECK_TIMEOUT=60
 MAX_RETRIES=10
 RETRY_INTERVAL=5
@@ -18,7 +18,7 @@ echo -e "${YELLOW}🚀 Starting Blue/Green deployment...${NC}"
 
 # Function to detect active environment
 detect_active_env() {
-    if grep -q "server blue_backend:" /home/ubuntu/capstone1.1/nginx.prod.conf; then
+    if grep -q "server blue_backend:" /home/azureuser/capstone1.1/nginx.prod.conf; then
         echo "blue"
     else
         echo "green"
@@ -70,9 +70,9 @@ switch_nginx_upstream() {
     echo -e "${YELLOW}🔄 Switching nginx upstream to $target_env...${NC}"
     
     # Update nginx configuration
-    sed -i "s|server blue_backend:4000;|server ${target_env}_backend:4000;|g" /home/ubuntu/capstone1.1/nginx.prod.conf
-    sed -i "s|server blue_frontend:80;|server ${target_env}_frontend:80;|g" /home/ubuntu/capstone1.1/nginx.prod.conf
-    sed -i "s|server blue_face:5001;|server ${target_env}_face:5001;|g" /home/ubuntu/capstone1.1/nginx.prod.conf
+    sed -i "s|server blue_backend:4000;|server ${target_env}_backend:4000;|g" /home/azureuser/capstone1.1/nginx.prod.conf
+    sed -i "s|server blue_frontend:80;|server ${target_env}_frontend:80;|g" /home/azureuser/capstone1.1/nginx.prod.conf
+    sed -i "s|server blue_face:5001;|server ${target_env}_face:5001;|g" /home/azureuser/capstone1.1/nginx.prod.conf
     
     # Test nginx configuration
     docker exec nginx nginx -t || {
