@@ -156,7 +156,7 @@ def get_attendance_log():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return {"status": "ok", "service": "face"}, 200
+    return jsonify({"status": "ok", "service": "face"}), 200
 
 @app.route('/face/health', methods=['GET'])
 def face_health():
