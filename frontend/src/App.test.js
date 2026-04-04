@@ -1,5 +1,5 @@
-const { render, screen } = require('@testing-library/react');
-const React = require('react');
+import { render, screen } from '@testing-library/react';
+import React from 'react';
 
 // Simple test component that doesn't depend on routing
 function TestApp() {
