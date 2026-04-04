@@ -9,7 +9,7 @@ docker compose up -d
 echo "Waiting for health..."
 sleep 15
 
-STATUS=$(docker inspect --format='{{.State.Health.Status}}' capstone11-green_backend-1)
+STATUS=$(docker inspect --format='{{.State.Health.Status}}' capstone11-blue_backend-1)
 
 if [ "$STATUS" != "healthy" ]; then
 echo "Deployment failed. Rolling back..."

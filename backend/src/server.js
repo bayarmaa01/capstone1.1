@@ -136,13 +136,13 @@ app.use((err, req, res, next) => {
 // =======================================
 // Blue/Green Deployment Switch API
 // =======================================
-const fs = require('fs').promises;
+const fsPromises = fs.promises;
 const path = require('path');
 
 app.post('/deploy/switch', async (req, res) => {
   try {
     const upstreamConfigPath = path.join(__dirname, '../nginx.upstream.conf');
-    let config = await fs.readFile(upstreamConfigPath, 'utf8');
+    let config = await fsPromises.readFile(upstreamConfigPath, 'utf8');
     
     // Toggle between blue and green
     if (config.includes('blue_backend')) {
@@ -157,7 +157,7 @@ app.post('/deploy/switch', async (req, res) => {
       newEnv = 'blue';
     }
     
-    await fs.writeFile(upstreamConfigPath, config);
+    await fsPromises.writeFile(upstreamConfigPath, config);
     
     // Reload nginx
     const { exec } = require('child_process');
