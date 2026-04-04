@@ -20,14 +20,25 @@ const azureStorageService = require('./services/azure_storage');
 
 // Initialize Azure Storage (only if connection string is provided)
 if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
-  azureStorageService.initializeContainer().catch(console.error);
+  azureStorageService.initializeContainer().catch(err => {
+    console.error('Azure Storage initialization failed:', err.message);
+  });
 } else {
   console.log('⚠️ Azure Storage connection string not provided - skipping Azure initialization');
 }
 
-// Start background jobs
-startAutoAbsentJob();
-lmsSyncService.startScheduledSync();
+// Start background jobs (with error handling)
+try {
+  startAutoAbsentJob();
+} catch (err) {
+  console.error('Auto absent job failed to start:', err.message);
+}
+
+try {
+  lmsSyncService.startScheduledSync();
+} catch (err) {
+  console.error('LMS sync service failed to start:', err.message);
+}
 // =======================================
 // Middleware Setup
 // =======================================
@@ -178,10 +189,6 @@ app.post('/deploy/switch', async (req, res) => {
     res.status(500).json({ error: 'Failed to switch environment' });
   }
 });
-
-const deployRoutes = require('./routes/deploy');
-app.use('/api/deploy', deployRoutes);
-
 
 const PORT = process.env.PORT || 4000;
 

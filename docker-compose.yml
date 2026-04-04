@@ -219,6 +219,8 @@ services:
       - green_frontend
       - green_face
       - moodle
+      - postgres
+      - redis
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
