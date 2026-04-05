@@ -21,12 +21,20 @@ const azureStorageService = require('./services/azure_storage');
 // Initialize database schema on startup
 const initializeDatabase = async () => {
   try {
+    // Check if already initialized
+    const result = await db.query('SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'users\')');
+    
+    if (result.rows[0].exists) {
+      console.log('✅ Database already initialized');
+      return;
+    }
+    
     const initSQL = fs.readFileSync(path.join(__dirname, '../sql/init.sql'), 'utf8');
     await db.query(initSQL);
     console.log('✅ Database schema initialized');
   } catch (error) {
     console.error('❌ Database initialization failed:', error);
-    // Don't exit, just log the error
+    // Don't exit, just log error
   }
 };
 
@@ -40,11 +48,12 @@ if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
 }
 
 // Start background jobs (with error handling)
-try {
-  startAutoAbsentJob();
-} catch (err) {
-  console.error('Auto absent job failed to start:', err.message);
-}
+// Temporarily disabled to prevent crashes
+// try {
+//   startAutoAbsentJob();
+// } catch (err) {
+//   console.error('Auto absent job failed to start:', err.message);
+// }
 
 try {
   lmsSyncService.startScheduledSync();
