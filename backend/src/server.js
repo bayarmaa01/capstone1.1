@@ -18,6 +18,18 @@ const { startAutoAbsentJob } = require('./autoAbsentJob');
 const lmsSyncService = require('./services/lms_sync');
 const azureStorageService = require('./services/azure_storage');
 
+// Initialize database schema on startup
+const initializeDatabase = async () => {
+  try {
+    const initSQL = fs.readFileSync(path.join(__dirname, '../sql/init.sql'), 'utf8');
+    await db.query(initSQL);
+    console.log('✅ Database schema initialized');
+  } catch (error) {
+    console.error('❌ Database initialization failed:', error);
+    // Don't exit, just log the error
+  }
+};
+
 // Initialize Azure Storage (only if connection string is provided)
 if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
   azureStorageService.initializeContainer().catch(err => {
@@ -39,6 +51,10 @@ try {
 } catch (err) {
   console.error('LMS sync service failed to start:', err.message);
 }
+
+// Initialize database
+initializeDatabase();
+
 // =======================================
 // Middleware Setup
 // =======================================
