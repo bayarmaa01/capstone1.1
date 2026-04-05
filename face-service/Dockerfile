@@ -14,6 +14,8 @@ WORKDIR /app
 
 # Copy requirements and install all dependencies
 COPY requirements.txt .
+# Install face_recognition_models explicitly first
+RUN pip install --no-cache-dir git+https://github.com/ageitgey/face_recognition_models.git
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Create non-root user for security
