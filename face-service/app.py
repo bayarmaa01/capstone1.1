@@ -1,10 +1,8 @@
 import os
-import pickle
-import numpy as np
 import requests
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import face_recognition
@@ -12,6 +10,7 @@ from PIL import Image
 import io
 import threading
 import time
+import pickle
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -21,9 +20,9 @@ app = Flask(__name__)
 CORS(app)
 
 # Moodle Configuration (from environment variables)
-MOODLE_URL = os.getenv('MOODLE_URL', 'http://moodle:80')
+MOODLE_URL = os.getenv('MOODLE_URL', 'http://moodle:80/webservice/rest/server.php')
 MOODLE_WS_TOKEN = os.getenv('MOODLE_WS_TOKEN', '')
-MOODLE_WS_ENDPOINT = f"{MOODLE_URL}/webservice/rest/server.php"
+MOODLE_WS_ENDPOINT = f"{MOODLE_URL}?wstoken={MOODLE_WS_TOKEN}&wsfunction=mod_attendance_update_user_status&moodlewsrestformat=json"
 
 # Local configuration
 ENC_PATH = "encodings/encodings.pkl"

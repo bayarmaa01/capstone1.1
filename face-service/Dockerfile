@@ -12,18 +12,16 @@ RUN pip install --upgrade pip setuptools wheel
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install all dependencies
-COPY requirements.txt .
-# Install face_recognition_models explicitly first
-RUN pip install --no-cache-dir git+https://github.com/ageitgey/face_recognition_models.git
-RUN pip install --no-cache-dir -r requirements.txt
-
 # Create non-root user for security
 RUN groupadd -g 1001 appuser && \
     useradd -m -u 1001 -g appuser appuser
 
+# Copy requirements and install all dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Copy application code with correct permissions
-COPY --chown=appuser:appuser . .
+COPY --chown=appuser:appuser app_simple.py app.py
 
 # Create necessary directories
 RUN mkdir -p encodings logs && \
