@@ -52,9 +52,6 @@ try {
   console.error('LMS sync service failed to start:', err.message);
 }
 
-// Initialize database
-initializeDatabase();
-
 // =======================================
 // Middleware Setup
 // =======================================
@@ -209,7 +206,20 @@ app.post('/deploy/switch', async (req, res) => {
 const PORT = process.env.PORT || 4000;
 
 // Only start server if not disabled (for testing)
-app.listen(4000, '0.0.0.0', () => {
-console.log('Server running on 0.0.0.0:4000');
-});
+async function startServer() {
+  try {
+    // Initialize database first
+    await initializeDatabase();
+    
+    // Start server
+    app.listen(4000, '0.0.0.0', () => {
+      console.log('Server running on 0.0.0.0:4000');
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
  
