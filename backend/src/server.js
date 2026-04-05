@@ -14,8 +14,8 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 app.set('trust proxy', 1);
 
-const { startAutoAbsentJob } = require('./autoAbsentJob');
-const lmsSyncService = require('./services/lms_sync');
+// const { startAutoAbsentJob } = require('./autoAbsentJob');
+// const lmsSyncService = require('./services/lms_sync');
 const azureStorageService = require('./services/azure_storage');
 
 // Initialize database schema on startup
