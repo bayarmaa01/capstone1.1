@@ -16,6 +16,15 @@ CORS(app)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+@app.route('/health', methods=['GET'])
+def health():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "ok",
+        "service": "ai-analytics",
+        "timestamp": datetime.now().isoformat()
+    }), 200
+
 # Database connections
 def get_db_connection():
     """Get database connection"""
