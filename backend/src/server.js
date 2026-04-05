@@ -55,11 +55,11 @@ if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
 //   console.error('Auto absent job failed to start:', err.message);
 // }
 
-try {
-  lmsSyncService.startScheduledSync();
-} catch (err) {
-  console.error('LMS sync service failed to start:', err.message);
-}
+// try {
+//   lmsSyncService.startScheduledSync();
+// } catch (err) {
+//   console.error('LMS sync service failed to start:', err.message);
+// }
 
 // =======================================
 // Middleware Setup
