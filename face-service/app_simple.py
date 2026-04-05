@@ -222,6 +222,20 @@ def recognize_and_mark():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/enrolled', methods=['GET'])
+def get_enrolled():
+    """Get list of enrolled students"""
+    try:
+        current_encodings = get_encodings()
+        return jsonify({
+            "status": "ok",
+            "enrolled_students": list(current_encodings.keys()),
+            "total_enrolled": len(current_encodings)
+        })
+    except Exception as e:
+        logger.error(f"❌ Error getting enrolled students: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     logger.info("🚀 Starting Face Recognition Service (Simplified Mode)")
     app.run(host='0.0.0.0', port=5001, debug=False)

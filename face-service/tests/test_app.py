@@ -4,8 +4,8 @@ import os
 
 def test_health_check():
     """Test the health check endpoint"""
-    # Import app here to avoid circular imports
-    from app import app
+    # Import simplified app to avoid circular imports
+    from app_simple import app
     
     with app.test_client() as client:
         response = client.get('/health')
@@ -17,7 +17,7 @@ def test_health_check():
 
 def test_enrolled_endpoint():
     """Test the enrolled students endpoint"""
-    from app import app
+    from app_simple import app
     
     with app.test_client() as client:
         response = client.get('/enrolled')
