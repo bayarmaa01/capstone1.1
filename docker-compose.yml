@@ -229,7 +229,6 @@ services:
       - "80:80"
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx.upstream.conf:/etc/nginx/conf.d/upstream.conf:ro
     networks:
       - app_network
     depends_on:
