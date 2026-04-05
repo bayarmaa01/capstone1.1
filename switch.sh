@@ -162,7 +162,7 @@ main() {
     fi
     
     # Check analytics
-    if health_check "AI Analytics" "http://localhost/analytics/analytics/health"; then
+    if health_check "AI Analytics" "http://localhost/analytics/health"; then
         log "✅ AI Analytics is healthy"
     else
         warning "⚠️ AI Analytics not responding (optional service)"
