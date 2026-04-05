@@ -1,9 +1,8 @@
 #!/bin/bash
-
-# Simple Blue-Green Switch Script
+# Bulletproof Blue-Green Switch Script
 # Usage: ./switch.sh [blue|green]
 
-set -e
+set -euo pipefail
 
 # Colors
 GREEN='\033[0;32m'
@@ -78,7 +77,7 @@ health_check() {
     return 1
 }
 
-# Restart nginx
+# Restart nginx with timing optimization
 restart_nginx() {
     log "🔄 Restarting nginx..."
     
@@ -89,17 +88,17 @@ restart_nginx() {
         # Restart nginx
         docker restart capstone11-nginx-1
         
-        # Wait for nginx to start
-        sleep 10
+        # Wait for nginx to be ready (optimized timing)
+        for i in {1..6}; do
+            if curl -f -s http://localhost/nginx-health > /dev/null 2>&1; then
+                log "✅ Nginx restarted successfully (attempt $i/6)"
+                return 0
+            fi
+            sleep 1
+        done
         
-        # Check nginx health
-        if curl -f -s http://localhost/nginx-health > /dev/null 2>&1; then
-            log "✅ Nginx restarted successfully"
-            return 0
-        else
-            error "❌ Nginx failed to start properly"
-            return 1
-        fi
+        error "❌ Nginx failed to start properly"
+        return 1
     else
         error "❌ Invalid nginx configuration"
         # Restore backup
