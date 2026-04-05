@@ -141,37 +141,45 @@ main() {
     # Restart nginx
     restart_nginx
     
-    # Health checks
+    # Health checks with rollback protection
     log "🔍 Performing health checks..."
     
+    # Backup current nginx config before switching
+    cp nginx.prod.conf nginx.prod.conf.backup
+    
     # Check backend
-    if health_check "Backend API" "http://localhost/api/health"; then
-        log "✅ Backend API is healthy"
-    else
-        error "❌ Backend API failed health check"
+    if ! curl -f -s http://localhost/api/health > /dev/null 2>&1; then
+        log "❌ Backend health check failed - ROLLING BACK"
+        cp nginx.prod.conf.backup nginx.prod.conf
+        docker compose restart nginx
+        error "❌ SWITCH FAILED - Rolled back to previous config"
         exit 1
     fi
     
     # Check face service
-    if health_check "Face Service" "http://localhost/face/health"; then
-        log "✅ Face Service is healthy"
-    else
-        error "❌ Face Service failed health check"
+    if ! curl -f -s http://localhost/face/health > /dev/null 2>&1; then
+        log "❌ Face Service health check failed - ROLLING BACK"
+        cp nginx.prod.conf.backup nginx.prod.conf
+        docker compose restart nginx
+        error "❌ SWITCH FAILED - Rolled back to previous config"
         exit 1
     fi
     
     # Check analytics
-    if health_check "AI Analytics" "http://localhost/analytics/health"; then
-        log "✅ AI Analytics is healthy"
-    else
-        warning "⚠️ AI Analytics not responding (optional service)"
+    if ! curl -f -s http://localhost/analytics/health > /dev/null 2>&1; then
+        log "❌ Analytics health check failed - ROLLING BACK"
+        cp nginx.prod.conf.backup nginx.prod.conf
+        docker compose restart nginx
+        error "❌ SWITCH FAILED - Rolled back to previous config"
+        exit 1
     fi
     
     # Check frontend
-    if curl -f -s "http://localhost" > /dev/null 2>&1; then
-        log "✅ Frontend is healthy"
-    else
-        error "❌ Frontend failed health check"
+    if ! curl -f -s "http://localhost" > /dev/null 2>&1; then
+        log "❌ Frontend health check failed - ROLLING BACK"
+        cp nginx.prod.conf.backup nginx.prod.conf
+        docker compose restart nginx
+        error "❌ SWITCH FAILED - Rolled back to previous config"
         exit 1
     fi
     
