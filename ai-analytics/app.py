@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 @app.route('/health', methods=['GET'])
-def health():
+def root_health():
     """Health check endpoint"""
     return jsonify({
         "status": "ok",
@@ -45,13 +45,13 @@ def get_redis_connection():
         return None
 
 @app.route('/analytics/health', methods=['GET'])
-def health():
+def analytics_health():
     """Health check endpoint"""
     return jsonify({
-        "status": "ok", 
+        "status": "ok",
         "service": "ai-analytics",
         "timestamp": datetime.now().isoformat()
-    })
+    }), 200
 
 @app.route('/analytics/dashboard', methods=['GET'])
 def dashboard():
