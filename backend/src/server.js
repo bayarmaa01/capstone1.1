@@ -124,6 +124,24 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug route to test routing
+app.get('/api/debug', (req, res) => {
+  res.json({
+    message: 'Routes are working!',
+    timestamp: new Date(),
+    routes: Object.keys(app._router.stack)
+  });
+});
+
+// Debug POST route
+app.post('/api/debug', (req, res) => {
+  res.json({
+    message: 'POST routes are working!',
+    body: req.body,
+    timestamp: new Date()
+  });
+});
+
 // =======================================
 // API Routes
 // =======================================
