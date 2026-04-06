@@ -231,6 +231,7 @@ services:
       - "80:80"
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./uploads:/uploads
     networks:
       - app_network
     depends_on:
