@@ -36,6 +36,11 @@ WORKDIR /var/www/html
 # Download Moodle (stable branch)
 RUN git clone --depth=1 -b MOODLE_401_STABLE https://github.com/moodle/moodle.git .
 
+# Create moodledata directory with proper permissions
+RUN mkdir -p /var/www/moodledata && \
+    chown www-data:www-data /var/www/moodledata && \
+    chmod 755 /var/www/moodledata
+
 # Permissions
 RUN chown -R www-data:www-data /var/www/html
 
