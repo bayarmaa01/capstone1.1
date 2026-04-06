@@ -2,22 +2,6 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// ✅ Create new schedule
-router.post('/', async (req, res) => {
-  try {
-    const { class_id, day_of_week, scheduled_date, start_time, end_time, room_number } = req.body;
-    const result = await db.query(`
-      INSERT INTO class_schedules (class_id, day_of_week, scheduled_date, start_time, end_time, room_number)
-      VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING *;
-    `, [class_id, day_of_week, scheduled_date || null, start_time, end_time, room_number || null]);
-    res.status(201).json({ success: true, schedule: result.rows[0] });
-  } catch (err) {
-    console.error('Error creating schedule:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ✅ Get specific schedule by ID
 router.get('/:id', async (req, res) => {
   try {
@@ -42,6 +26,40 @@ router.get('/:id', async (req, res) => {
   } catch (err) {
     console.error("SCHEDULE ERROR:", err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ✅ Create new schedule
+router.post('/', async (req, res) => {
+  try {
+    const { class_id, day_of_week, scheduled_date, start_time, end_time, room_number } = req.body;
+    const result = await db.query(`
+      INSERT INTO class_schedules (class_id, day_of_week, scheduled_date, start_time, end_time, room_number)
+      VALUES ($1,$2,$3,$4,$5,$6)
+      RETURNING *;
+    `, [class_id, day_of_week, scheduled_date || null, start_time, end_time, room_number || null]);
+    res.status(201).json({ success: true, schedule: result.rows[0] });
+  } catch (err) {
+    console.error('Error creating schedule:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ Get today's active schedules
+router.get('/today', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT cs.*, c.code as class_code, c.name as class_name
+      FROM class_schedules cs
+      JOIN classes c ON c.id = cs.class_id
+      WHERE (cs.scheduled_date = CURRENT_DATE OR cs.scheduled_date IS NULL)
+        AND (cs.day_of_week = EXTRACT(DOW FROM CURRENT_DATE)::int)
+      ORDER BY cs.start_time;
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching today schedules:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
