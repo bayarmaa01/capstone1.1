@@ -230,7 +230,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf
     networks:
       - app_network
     depends_on:
