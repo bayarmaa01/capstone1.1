@@ -3,27 +3,28 @@ set -e
 
 echo "🔄 Switching deployment..."
 
-# detect current backend from nginx.conf
-CURRENT=$(grep active_backend nginx.prod.conf)
+FILE="nginx.prod.conf"
+
+CURRENT=$(grep "set \$active_backend" $FILE)
 
 if echo "$CURRENT" | grep -q blue_backend; then
     echo "🟢 Switching to GREEN..."
 
-    # health check
-    curl -f http://localhost:4000/api/health || echo "skip health"
+    # Health check before switching
+    curl -f http://green_backend:4000/api/health || exit 1
 
-    # replace in nginx.conf
-    sed -i 's/blue_backend/green_backend/' nginx.prod.conf
+    # SAFE replace (only this exact line)
+    sed -i 's/set \$active_backend blue_backend;/set \$active_backend green_backend;/' $FILE
 
 else
     echo "🔵 Switching to BLUE..."
 
-    curl -f http://localhost:4000/api/health || echo "skip health"
+    curl -f http://blue_backend:4000/api/health || exit 1
 
-    sed -i 's/green_backend/blue_backend/' nginx.prod.conf
+    sed -i 's/set \$active_backend green_backend;/set \$active_backend blue_backend;/' $FILE
 fi
 
-echo "🔄 Restarting nginx..."
-docker compose restart nginx
+echo "🔄 Reloading nginx (zero downtime)..."
+docker exec capstone11-nginx-1 nginx -s reload
 
 echo "✅ Switch complete!"
