@@ -190,6 +190,14 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
   const startCamera = useCallback(async () => {
     try {
+      // Check if mediaDevices is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setPermissionError('Camera API not supported in this browser');
+        setCameraStatus('error');
+        onError(new Error('Camera API not supported'));
+        return;
+      }
+
       setCameraStatus('requesting');
       setPermissionError('');
       recognizedRef.current = new Set();
@@ -213,24 +221,15 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
       setCameraStatus('active');
       setBanner('🔵 Camera active', '#17a2b8');
+      intervalRef.current = setInterval(() => {
+        captureAndRecognize();
+      }, 3000);
     } catch (err) {
       console.error('Camera start failed', err);
       setCameraStatus('error');
       setPermissionError('Please allow camera access');
       if (onError) onError(err);
     }
-  }, [setBanner, onError]);
-
-  useEffect(() => {
-    if (cameraStatus === 'active' && isScanning) {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = setInterval(() => {
-        captureAndRecognize();
-      }, 3000);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
   }, [cameraStatus, isScanning, captureAndRecognize]);
 
   const stopCamera = useCallback(() => {
