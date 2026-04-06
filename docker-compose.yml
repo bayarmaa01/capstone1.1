@@ -232,6 +232,7 @@ services:
     volumes:
       - ./nginx.prod.conf:/etc/nginx/nginx.conf
       - ./uploads:/uploads
+      - ./backend/uploads:/app/uploads:ro
     networks:
       - app_network
     depends_on:
