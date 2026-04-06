@@ -13,7 +13,17 @@ router.post('/record', async (req, res) => {
   try {
     const { class_id, student_id, session_date, method, confidence } = req.body;
 
+    console.log('📥 ATTENDANCE REQUEST:', { 
+      class_id, 
+      student_id, 
+      session_date, 
+      method, 
+      confidence,
+      bodyKeys: Object.keys(req.body)
+    });
+
     if (!class_id || !student_id || !session_date) {
+      console.log('❌ MISSING REQUIRED FIELDS:', { class_id, student_id, session_date });
       return res.status(400).json({ error: 'class_id, student_id, and session_date are required' });
     }
 

@@ -18,6 +18,33 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ✅ Get specific schedule by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    if (!id) {
+      return res.status(400).json({ error: "Invalid schedule ID" });
+    }
+
+    const result = await db.query(`
+      SELECT cs.*, c.code as class_code, c.name as class_name
+      FROM class_schedules cs
+      JOIN classes c ON c.id = cs.class_id
+      WHERE cs.id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Schedule not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error("SCHEDULE ERROR:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ✅ Get schedules for class
 router.get('/class/:classId', async (req, res) => {
   try {
