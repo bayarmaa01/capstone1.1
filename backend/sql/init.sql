@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS class_schedules (
   day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Sunday, 1=Monday, etc.
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
+  scheduled_date DATE, -- For specific date scheduling
+  is_completed BOOLEAN DEFAULT false, -- Track completion status
   room TEXT,
   is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT now(),
@@ -80,6 +82,8 @@ CREATE INDEX IF NOT EXISTS idx_enrollments_class ON enrollments(class_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
 CREATE INDEX IF NOT EXISTS idx_class_schedules_class ON class_schedules(class_id);
 CREATE INDEX IF NOT EXISTS idx_class_schedules_active ON class_schedules(is_active);
+CREATE INDEX IF NOT EXISTS idx_class_schedules_date ON class_schedules(scheduled_date);
+CREATE INDEX IF NOT EXISTS idx_class_schedules_completed ON class_schedules(is_completed);
 
 -- Insert a default admin user
 -- Username: admin
