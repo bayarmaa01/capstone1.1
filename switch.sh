@@ -10,8 +10,8 @@ CURRENT=$(grep "set \$active_backend" $FILE)
 if echo "$CURRENT" | grep -q blue_backend; then
     echo "🟢 Switching to GREEN..."
 
-    # Health check before switching
-    curl -f http://green_backend:4000/api/health || exit 1
+    # Health check using docker exec (more reliable)
+    docker exec capstone11-green_backend-1 curl -f -s http://localhost:4000/api/health > /dev/null || exit 1
 
     # SAFE replace (only this exact line)
     sed -i 's/set \$active_backend blue_backend;/set \$active_backend green_backend;/' $FILE
@@ -19,7 +19,8 @@ if echo "$CURRENT" | grep -q blue_backend; then
 else
     echo "🔵 Switching to BLUE..."
 
-    curl -f http://blue_backend:4000/api/health || exit 1
+    # Health check using docker exec (more reliable)
+    docker exec capstone11-blue_backend-1 curl -f -s http://localhost:4000/api/health > /dev/null || exit 1
 
     sed -i 's/set \$active_backend green_backend;/set \$active_backend blue_backend;/' $FILE
 fi
