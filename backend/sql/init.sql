@@ -59,12 +59,27 @@ CREATE TABLE IF NOT EXISTS attendance (
   UNIQUE(class_id, student_id, session_date)
 );
 
+-- Class schedules (for automated attendance)
+CREATE TABLE IF NOT EXISTS class_schedules (
+  id SERIAL PRIMARY KEY,
+  class_id INT REFERENCES classes(id) ON DELETE CASCADE,
+  day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6), -- 0=Sunday, 1=Monday, etc.
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  room TEXT,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_attendance_class ON attendance(class_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(session_date);
 CREATE INDEX IF NOT EXISTS idx_enrollments_class ON enrollments(class_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
+CREATE INDEX IF NOT EXISTS idx_class_schedules_class ON class_schedules(class_id);
+CREATE INDEX IF NOT EXISTS idx_class_schedules_active ON class_schedules(is_active);
 
 -- Insert a default admin user
 -- Username: admin
