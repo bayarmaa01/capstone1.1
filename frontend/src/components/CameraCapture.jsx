@@ -192,6 +192,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
     try {
       // Check if mediaDevices is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Camera requires HTTPS");
         setPermissionError('Camera API not supported in this browser');
         setCameraStatus('error');
         onError(new Error('Camera API not supported'));
