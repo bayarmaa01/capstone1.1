@@ -22,6 +22,8 @@ const azureStorageService = require('./services/azure_storage');
 const initializeDatabase = async () => {
   try {
     const db = require('./db');
+    console.log('🔍 Checking database initialization...');
+    
     // Check if already initialized
     const result = await db.query('SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'users\')');
     
@@ -30,12 +32,31 @@ const initializeDatabase = async () => {
       return;
     }
     
+    console.log('📝 Initializing database schema...');
     const initSQL = fs.readFileSync(path.join(__dirname, '../sql/init.sql'), 'utf8');
-    await db.query(initSQL);
-    console.log('✅ Database schema initialized');
+    
+    // Execute each statement separately to handle multiple commands
+    const statements = initSQL
+      .split(';')
+      .map(stmt => stmt.trim())
+      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+    
+    for (const statement of statements) {
+      if (statement.trim()) {
+        await db.query(statement);
+      }
+    }
+    
+    console.log('✅ Database schema initialized successfully');
+    
+    // Verify tables were created
+    const tables = await db.query('SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\' ORDER BY table_name');
+    console.log('📋 Created tables:', tables.rows.map(row => row.table_name).join(', '));
+    
   } catch (error) {
-    console.error('❌ Database initialization failed:', error);
-    // Don't exit, just log error
+    console.error('❌ Database initialization failed:', error.message);
+    console.error('🔍 Error details:', error);
+    // Don't exit, just log error and continue
   }
 };
 
