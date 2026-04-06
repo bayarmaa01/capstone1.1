@@ -190,6 +190,8 @@ services:
       context: ./moodle-app
       dockerfile: Dockerfile
     restart: unless-stopped
+    volumes:
+      - moodle_data:/var/www/moodledata
     environment:
       - MOODLE_WWWROOT=http://attendance-ml.duckdns.org/moodle
       - MOODLE_REVERSEPROXY=true
@@ -286,6 +288,7 @@ services:
 volumes:
   postgres_data:
   moodle_db_data:
+  moodle_data:
   prometheus_data:
   grafana_data:
 
