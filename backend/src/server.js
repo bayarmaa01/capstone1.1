@@ -21,6 +21,7 @@ const azureStorageService = require('./services/azure_storage');
 // Initialize database schema on startup
 const initializeDatabase = async () => {
   try {
+    const db = require('./db');
     // Check if already initialized
     const result = await db.query('SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = \'public\' AND table_name = \'users\')');
     
