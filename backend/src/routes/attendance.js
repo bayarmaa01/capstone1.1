@@ -64,7 +64,7 @@ router.post('/record', async (req, res) => {
                     confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
                     recorded_at = now()
       RETURNING *;
-    `, [class_id, numericStudentId, session_date, method || 'facial_recognition', confidence || 1.0]);
+    `, [class_id, numericStudentId, session_date, method || 'face_recognition', confidence || 1.0]);
 
     console.log(`✅ Marked: ${student_id} (ID: ${numericStudentId})`);
     res.json({ success: true, attendance: result.rows[0] });
