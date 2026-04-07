@@ -5,16 +5,62 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18.x-green?logo=node.js)](https://nodejs.org/)
 [![Python](https://img.shields.io/badge/Python-3.9-blue?logo=python)](https://python.org/)
+[![HTTPS](https://img.shields.io/badge/HTTPS-Enabled-success?logo=letsencrypt)](https://letsencrypt.org/)
 
-> **Production-grade AI-powered attendance management with face recognition, QR scanning, and zero-downtime deployment**
+> **Production-ready AI-powered attendance management with face recognition, blue/green deployment, and Moodle LMS integration**
 
-A comprehensive, cloud-native attendance system that revolutionizes educational institution management through advanced facial recognition, automated scheduling, and real-time analytics. Built with enterprise-grade DevOps practices and scalable microservices architecture by our team of computer science engineering students.
+A comprehensive, cloud-native attendance system that revolutionizes educational institution management through advanced facial recognition, automated scheduling, and real-time analytics. Built with enterprise-grade DevOps practices and scalable microservices architecture.
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
-**🔗 [https://attendance-ml.duckdns.org](https://attendance-ml.duckdns.org)**
+**[https://attendance-ml.duckdns.org](https://attendance-ml.duckdns.org)**
+
+### Current Status: **PRODUCTION READY** 
+
+| Component | Status | Details |
+|-----------|--------|---------|
+| HTTPS/SSL | **Working** | Let's Encrypt SSL certificates |
+| Camera & Face Recognition | **Working** | Requires HTTPS for browser security |
+| Attendance Recording | **Working** | Face-based attendance saving |
+| Schedule API | **Working** | Fixed route matching issues |
+| Database | **Connected** | PostgreSQL with proper constraints |
+| Moodle LMS | **Ready** | Installation completed |
+| Blue/Green Deployment | **Active** | Zero-downtime deployment working |
+
+---
+
+## Recent Updates & Changes
+
+### **Latest Features Added** 
+
+#### **HTTPS/SSL Implementation** 
+- **Let's Encrypt SSL certificates** for secure HTTPS access
+- **HTTP to HTTPS redirect** for all traffic
+- **Camera functionality restored** - Now requires HTTPS for browser security
+- **SSL certificate auto-renewal** support
+- **Nginx SSL configuration** with modern security headers
+
+#### **Attendance System Fixes**
+- **Database constraint resolution** - Fixed `attendance_method_check` constraint
+- **API route optimization** - Moved `/:id` routes before `/:classId` to prevent conflicts
+- **Debug logging added** - Enhanced error tracking and troubleshooting
+- **Method validation** - Changed from `facial_recognition` to `face_recognition`
+- **Schedule API** - Added missing `GET /schedule/:id` endpoint
+
+#### **Moodle LMS Integration**
+- **Docker volume fixes** - Added `moodle_data` volume for persistent storage
+- **Permission resolution** - Fixed data directory creation issues
+- **Database configuration** - MariaDB setup with proper credentials
+- **Web services ready** - API endpoints for integration
+- **Installation wizard** - Complete setup process documented
+
+#### **Blue/Green Deployment**
+- **Zero-downtime switching** - Dynamic Nginx upstream configuration
+- **Health checks** - Automated service validation
+- **Rollback capability** - Instant fallback to previous version
+- **Traffic management** - Smooth transition between environments
 
 ---
 
@@ -196,26 +242,42 @@ ai-attendance-system/
 
 ### 🚀 Quick Start
 
+### Prerequisites
+- **Docker** & **Docker Compose**
+- **Git**
+- **Linux Server** (for production deployment)
+
+### Production Deployment
+
 ```bash
 # 1. Clone the repository
 git clone https://github.com/bayarmaa01/capstone1.1.git
 cd capstone1.1
 
-# 2. Configure environment variables
-cp .env.example .env
-# Edit .env with your configuration
+# 2. Configure SSL certificates (production)
+sudo certbot certonly --standalone -d your-domain.com
 
 # 3. Start the system
 docker compose up -d --build
 
 # 4. Access the application
-open https://attendance-ml.duckdns.org
+open https://your-domain.com
 ```
 
-### 📋 Prerequisites
-- Docker & Docker Compose
-- Git
-- SSL certificates (for production)
+### Local Development
+
+```bash
+# Clone and start
+git clone https://github.com/bayarmaa01/capstone1.1.git
+cd capstone1.1
+docker compose up -d
+
+# Access locally
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:4000
+# Face Service: http://localhost:5001
+# Moodle: http://localhost/moodle
+```
 
 ---
 
