@@ -68,30 +68,29 @@ A comprehensive, cloud-native attendance system that revolutionizes educational 
 
 ```mermaid
 graph TD
-    User[� User] --> Frontend[⚛️ React Frontend]
-    Frontend --> Nginx[🌐 Nginx Load Balancer]
-    Nginx --> Backend[🔧 Node.js Backend]
-    Nginx --> FaceService[🤖 Python Face Service]
-    Nginx --> Moodle[🎓 Moodle LMS]
+    User[User] --> Nginx[Nginx Gateway]
+    Nginx --> Frontend[React Frontend]
+    Nginx --> Backend[Node.js Backend]
+    Nginx --> FaceService[Python Face Service]
+    Nginx --> Moodle[Moodle LMS]
     
-    Backend --> PostgreSQL[🗄️ PostgreSQL]
-    Backend --> Redis[⚡ Redis Cache]
-    Backend --> Azure[☁️ Azure Storage]
+    Backend --> PostgreSQL[PostgreSQL]
+    Backend --> Redis[Redis Cache]
+    Backend --> Azure[Azure Storage]
     
     FaceService --> Azure
-    FaceService --> Encodings[📁 Face Encodings]
+    FaceService --> Encodings[Face Encodings]
     
-    subgraph "DevOps Pipeline"
-        GitHub[📦 GitHub] --> Actions[🔄 GitHub Actions]
-        Actions --> Docker[🐳 Docker Hub]
-        Docker --> EC2[☁️ AWS EC2]
+    subgraph "Blue/Green Deployment"
+        Blue[Blue Environment]
+        Green[Green Environment]
     end
 ```
 
 ### Architecture Overview
 Our system follows a microservices architecture with clear separation of concerns:
 
-- **Frontend Layer**: React SPA serving the user interface
+- **Frontend Layer**: React SPA serving the user interface with HTTPS security
 - **Gateway Layer**: Nginx reverse proxy with SSL termination and load balancing
 - **Service Layer**: Node.js backend API and Python face recognition service
 - **Data Layer**: PostgreSQL for persistent data, Redis for caching
@@ -100,65 +99,215 @@ Our system follows a microservices architecture with clear separation of concern
 
 ---
 
-## 🔄 CI/CD Pipeline
+## CI/CD Pipeline Architecture
 
 ```mermaid
 graph LR
-    Code[📝 Code Push] --> Test[🧪 Parallel Tests]
-    Test --> Build[🏗️ Docker Build]
-    Build --> Push[📦 Docker Push]
-    Push --> Deploy[🚀 Blue/Green Deploy]
-    Deploy --> Prod[✅ Production]
+    Code[Code Push] --> GitHub[GitHub Actions]
+    GitHub --> Tests[Parallel Tests]
+    Tests --> Build[Docker Build]
+    Build --> Security[Security Scan]
+    Security --> Push[Push to Registry]
+    Push --> Deploy[Blue/Green Deploy]
+    Deploy --> Monitor[Health Monitoring]
     
-    Test --> Backend[Backend Tests]
-    Test --> Frontend[Frontend Tests]
-    Test --> Face[Face Service Tests]
+    subgraph "Testing Suite"
+        Tests --> Backend[Backend Tests]
+        Tests --> Frontend[Frontend Tests]
+        Tests --> Face[Face Service Tests]
+        Tests --> SecurityTests[Security Tests]
+    end
     
-    Deploy --> Health[Health Checks]
-    Health --> Switch[Traffic Switch]
-    Switch --> Prod
+    subgraph "Deployment Flow"
+        Deploy --> BlueDeploy[Deploy to Blue]
+        Deploy --> GreenDeploy[Deploy to Green]
+        BlueDeploy --> HealthCheck[Health Check]
+        GreenDeploy --> TrafficSwitch[Traffic Switch]
+        HealthCheck --> Rollback[Rollback if Failed]
+        TrafficSwitch --> Production[Production Ready]
+    end
 ```
 
 ### Pipeline Stages
 
-1. **🧪 Testing Phase**: Parallel execution of backend, frontend, and face-service tests
-2. **🏗️ Build Phase**: Multi-stage Docker builds with security scanning
-3. **📦 Push Phase**: Versioned Docker images pushed to registry
-4. **🚀 Deploy Phase**: Blue/green deployment with health validation
-
-Our team implemented this pipeline to ensure continuous integration and delivery.
+1. **Code Analysis**: Automated code quality checks and security scanning
+2. **Parallel Testing**: Backend, frontend, and face service tests executed simultaneously
+3. **Multi-Stage Build**: Optimized Docker builds with security scanning
+4. **Registry Push**: Versioned Docker images with proper tagging
+5. **Blue/Green Deployment**: Zero-downtime deployment with health validation
+6. **Monitoring**: Continuous health checks and performance metrics
 
 ---
 
-## 🔵🟢 Blue-Green Deployment
+## Blue/Green Deployment Flow
 
 ```mermaid
 graph TD
-    User[👤 Users] --> Nginx[🌐 Nginx Gateway]
-    
-    Nginx --> Blue[🔵 Blue Environment]
-    Nginx --> Green[🟢 Green Environment]
-    
-    Blue --> BlueBackend[Backend API]
-    Blue --> BlueFrontend[React App]
-    Blue --> BlueFace[Face Service]
-    
-    Green --> GreenBackend[Backend API]
-    Green --> GreenFrontend[React App]
-    Green --> GreenFace[Face Service]
-    
-    subgraph "Deployment Flow"
-        NewVersion[📦 New Version] --> GreenDeploy[🟢 Deploy to Green]
-        GreenDeploy --> HealthCheck[🏥 Health Check]
-        HealthCheck --> TrafficSwitch[🔄 Switch Traffic]
-        TrafficSwitch --> BlueStop[🛑 Stop Blue]
+    subgraph "Current Production"
+        CurrentUsers[Current Users] --> CurrentNginx[Nginx - Blue]
+        CurrentNginx --> CurrentBackend[Backend - Blue]
+        CurrentNginx --> CurrentFrontend[Frontend - Blue]
+        CurrentNginx --> CurrentFace[Face Service - Blue]
     end
+    
+    subgraph "New Deployment"
+        NewCode[New Code] --> GreenDeploy[Deploy to Green]
+        GreenDeploy --> GreenBuild[Build Services]
+        GreenBuild --> GreenHealth[Health Checks]
+        GreenHealth --> GreenTest[Smoke Tests]
+    end
+    
+    subgraph "Traffic Switch"
+        SwitchDecision{Health OK?}
+        SwitchDecision -->|Yes| TrafficSwitch[Switch Traffic]
+        SwitchDecision -->|No| Rollback[Rollback to Blue]
+        TrafficSwitch --> NewUsers[Users to Green]
+        Rollback --> BlueStays[Blue Remains Active]
+    end
+    
+    GreenTest --> SwitchDecision
+    NewUsers --> GreenNginx[Nginx - Green]
+    GreenNginx --> GreenBackend[Backend - Green]
+    GreenNginx --> GreenFrontend[Frontend - Green]
+    GreenNginx --> GreenFace[Face Service - Green]
 ```
 
-### Zero-Downtime Strategy
-- **🔄 Traffic Switching**: Nginx upstream configuration dynamically updated
-- **�️ Rollback Protection**: Previous version kept as immediate fallback
-- **🏥 Health Monitoring**: Continuous health checks post-deployment
+### Zero-Downtime Strategy Features
+- **Instant Traffic Switching**: Nginx upstream configuration updated dynamically
+- **Health Validation**: Comprehensive health checks before traffic switch
+- **Automatic Rollback**: Instant fallback to previous version on failure
+- **Database Migration**: Safe database schema migrations
+- **Session Persistence**: User sessions maintained during deployment
+
+---
+
+## Data Flow Architecture
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Nginx
+    participant Backend
+    participant FaceService
+    participant Database
+    participant Storage
+    
+    User->>Frontend: Access Application
+    Frontend->>Nginx: HTTPS Request
+    Nginx->>Backend: API Call
+    
+    alt Face Recognition
+        Backend->>FaceService: Face Recognition Request
+        FaceService->>Storage: Fetch Encodings
+        Storage-->>FaceService: Face Data
+        FaceService-->>Backend: Recognition Result
+    end
+    
+    Backend->>Database: Save Attendance
+    Database-->>Backend: Confirmation
+    Backend-->>Nginx: Response
+    Nginx-->>Frontend: HTTPS Response
+    Frontend-->>User: Updated UI
+```
+
+---
+
+## Security Architecture
+
+```mermaid
+graph TB
+    Internet[Internet] --> Firewall[Firewall]
+    Firewall --> LoadBalancer[Load Balancer]
+    LoadBalancer --> Nginx[Nginx - SSL Termination]
+    
+    Nginx --> Frontend[React Frontend]
+    Nginx --> Backend[Backend API]
+    Nginx --> FaceService[Face Service]
+    Nginx --> Moodle[Moodle LMS]
+    
+    subgraph "Security Layers"
+        SSL[SSL/TLS Encryption]
+        Auth[JWT Authentication]
+        Rate[Rate Limiting]
+        CORS[CORS Protection]
+        Input[Input Validation]
+        Container[Container Security]
+    end
+    
+    Backend --> Auth
+    Backend --> Rate
+    Backend --> Input
+    Nginx --> SSL
+    Nginx --> CORS
+    
+    subgraph "Data Protection"
+        PostgreSQL[(PostgreSQL)]
+        Redis[(Redis Cache)]
+        Azure[Azure Storage]
+    end
+    
+    Backend --> PostgreSQL
+    Backend --> Redis
+    FaceService --> Azure
+```
+
+---
+
+## Microservices Communication
+
+```mermaid
+graph TB
+    subgraph "Frontend Services"
+        React[React App]
+        Auth[Auth Service]
+        Camera[Camera Component]
+        Dashboard[Dashboard]
+    end
+    
+    subgraph "API Gateway"
+        Nginx[Nginx Proxy]
+        SSL[SSL Handler]
+        Router[Route Manager]
+    end
+    
+    subgraph "Backend Services"
+        NodeAPI[Node.js API]
+        Attendance[Attendance Service]
+        Schedule[Schedule Service]
+        Analytics[Analytics Service]
+    end
+    
+    subgraph "AI Services"
+        PythonAPI[Python API]
+        FaceRecognition[Face Recognition]
+        Encoding[Face Encoding]
+    end
+    
+    subgraph "Data Services"
+        PostgreSQL[(PostgreSQL)]
+        Redis[(Redis Cache)]
+        AzureBlob[Azure Storage]
+    end
+    
+    React --> Nginx
+    Auth --> Nginx
+    Camera --> Nginx
+    Dashboard --> Nginx
+    
+    Nginx --> NodeAPI
+    Nginx --> PythonAPI
+    
+    NodeAPI --> Attendance
+    NodeAPI --> Schedule
+    NodeAPI --> Analytics
+    NodeAPI --> PostgreSQL
+    NodeAPI --> Redis
+    
+    PythonAPI --> FaceRecognition
+    PythonAPI --> Encoding
+    PythonAPI --> AzureBlob
+```
 
 ---
 
