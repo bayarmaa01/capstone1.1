@@ -190,12 +190,14 @@ services:
       context: ./moodle-app
       dockerfile: Dockerfile
     restart: unless-stopped
+    ports:
+      - "8081:80"
     volumes:
       - moodle_data:/var/www/moodledata
     environment:
-      - MOODLE_WWWROOT=http://attendance-ml.duckdns.org/moodle
-      - MOODLE_REVERSEPROXY=true
-      - MOODLE_SSLPROXY=true
+      - MOODLE_WWWROOT=http://40.90.174.78:8081
+      - MOODLE_REVERSEPROXY=false
+      - MOODLE_SSLPROXY=false
     networks:
       - app_network
     depends_on:
