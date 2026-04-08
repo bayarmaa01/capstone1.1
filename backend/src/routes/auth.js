@@ -104,11 +104,11 @@ router.post('/login', async (req, res) => {
       LIMIT 1
     `, [moodleUser.id]);
     
-    if (roleResult[0].length === 0) {
+    if (roleResult.length === 0) {
       return res.status(403).json({ error: 'Access denied. Teacher role required.' });
     }
     
-    const userRole = roleResult[0][0].shortname;
+    const userRole = roleResult[0].shortname;
     
     // Generate JWT token
     const token = jwt.sign(
