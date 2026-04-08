@@ -37,8 +37,8 @@ router.post('/register', async (req, res) => {
     const password_hash = await bcrypt.hash(password, 10);
     
     // Insert user
-    const result = await db.query(
-      'INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3) RETURNING id, username, role',
+    const result = await moodlePool.query(
+      'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?) RETURNING id, username, role',
       [username, password_hash, role || 'teacher']
     );
     
