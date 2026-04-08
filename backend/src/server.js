@@ -186,6 +186,7 @@ try {
   app.use('/api/ai', require('./routes/ai'));
   app.use('/api/storage', require('./routes/storage'));
   app.use('/api/moodle', require('./routes/moodle'));
+  app.use('/api/moodle-schedule', require('./routes/moodleSchedule'));
   console.log('✅ Routes loaded successfully');
 } catch (err) {
   console.error('❌ Error loading routes:', err);
