@@ -4,6 +4,24 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const db = require('../db');
+const mysql = require('mysql2/promise');
+
+// Moodle database connection (same as moodleSchedule.js)
+const moodleDbConfig = {
+  host: process.env.MOODLE_DB_HOST || 'capstone11-moodle-db-1',
+  user: process.env.MOODLE_DB_USER || 'moodle',
+  password: process.env.MOODLE_DB_PASSWORD || 'moodle_secret',
+  database: process.env.MOODLE_DB_NAME || 'moodle',
+  port: process.env.MOODLE_DB_PORT || 3306
+};
+
+const moodlePool = mysql.createPool({
+  ...moodleDbConfig,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+});
+
 const oauthService = require('../services/oauth');
 
 // Register new teacher/admin
@@ -45,16 +63,16 @@ router.post('/login', async (req, res) => {
     }
     
     // Query Moodle user database
-    const moodleResult = await db.query(
-      'SELECT id, username, password, email, firstname, lastname FROM mdl_user WHERE username = $1 AND deleted = 0',
+    const moodleResult = await moodlePool.query(
+      'SELECT id, username, password, email, firstname, lastname FROM mdl_user WHERE username = ? AND deleted = 0',
       [username]
     );
     
-    if (moodleResult.rows.length === 0) {
+    if (moodleResult.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    const moodleUser = moodleResult.rows[0];
+    const moodleUser = moodleResult[0];
     
     // Verify password using Moodle's MD5 hash
     const verifyPassword = (input, hash) => {
@@ -74,23 +92,23 @@ router.post('/login', async (req, res) => {
     }
     
     // Check if user is a teacher using Moodle role assignments
-    const roleResult = await db.query(`
+    const roleResult = await moodlePool.query(`
       SELECT ra.roleid, r.shortname, c.id as course_id, c.fullname as course_name
       FROM mdl_role_assignments ra
       JOIN mdl_role r ON ra.roleid = r.id
       JOIN mdl_context ctx ON ra.contextid = ctx.id
       JOIN mdl_course c ON ctx.instanceid = c.id
-      WHERE ra.userid = $1 
+      WHERE ra.userid = ? 
       AND ctx.contextlevel = 50  -- Course context level
       AND r.shortname IN ('editingteacher', 'teacher', 'manager')
       LIMIT 1
     `, [moodleUser.id]);
     
-    if (roleResult.rows.length === 0) {
+    if (roleResult[0].length === 0) {
       return res.status(403).json({ error: 'Access denied. Teacher role required.' });
     }
     
-    const userRole = roleResult.rows[0].shortname;
+    const userRole = roleResult[0][0].shortname;
     
     // Generate JWT token
     const token = jwt.sign(
@@ -153,32 +171,32 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret_change_this');
     
     // Get fresh user data from Moodle database
-    const result = await db.query(
-      'SELECT id, username, email, firstname, lastname FROM mdl_user WHERE id = $1 AND deleted = 0',
+    const result = await moodlePool.query(
+      'SELECT id, username, email, firstname, lastname FROM mdl_user WHERE id = ? AND deleted = 0',
       [decoded.id]
     );
     
-    if (result.rows.length === 0) {
+    if (result.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
     
     // Get user role
-    const roleResult = await db.query(`
+    const roleResult = await moodlePool.query(`
       SELECT r.shortname, c.id as course_id, c.fullname as course_name
       FROM mdl_role_assignments ra
       JOIN mdl_role r ON ra.roleid = r.id
       JOIN mdl_context ctx ON ra.contextid = ctx.id
       JOIN mdl_course c ON ctx.instanceid = c.id
-      WHERE ra.userid = $1 
+      WHERE ra.userid = ? 
       AND ctx.contextlevel = 50
       AND r.shortname IN ('editingteacher', 'teacher', 'manager')
       LIMIT 1
     `, [decoded.id]);
     
-    const user = result.rows[0];
-    user.role = roleResult.rows.length > 0 ? roleResult.rows[0].shortname : 'student';
-    user.course_id = roleResult.rows.length > 0 ? roleResult.rows[0].course_id : null;
-    user.course_name = roleResult.rows.length > 0 ? roleResult.rows[0].course_name : null;
+    const user = result[0];
+    user.role = roleResult.length > 0 ? roleResult[0].shortname : 'student';
+    user.course_id = roleResult.length > 0 ? roleResult[0].course_id : null;
+    user.course_name = roleResult.length > 0 ? roleResult[0].course_name : null;
     user.name = `${user.firstname} ${user.lastname}`;
     
     res.json({ user });
