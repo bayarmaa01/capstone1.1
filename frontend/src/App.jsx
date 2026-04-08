@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import ClassPage from './pages/ClassPage';
 import AttendancePage from './pages/AttendancePage';
+import AttendanceSession from './components/AttendanceSession';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -68,6 +69,10 @@ function App() {
         <Route 
           path="/attendance/:classId/:scheduleId" 
           element={user ? <AttendancePage /> : <Navigate to="/" />} 
+        />
+        <Route 
+          path="/attendance/:id" 
+          element={user ? <AttendanceSession /> : <Navigate to="/" />} 
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

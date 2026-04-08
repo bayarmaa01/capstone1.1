@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import moment from 'moment';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import AddScheduleForm from './AddScheduleForm';
@@ -9,7 +8,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 
 export default function ClassSchedule({ classId, onScheduleUpdated }) {
   const [showForm, setShowForm] = useState(false);
-  const [currentTime, setCurrentTime] = useState(moment());
+  const [currentTime, setCurrentTime] = useState(new Date());
   const navigate = useNavigate();
   
   // Use dual schedule hook
@@ -26,7 +25,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
   useEffect(() => {
     // Update current time every minute
     const timer = setInterval(() => {
-      setCurrentTime(moment());
+      setCurrentTime(new Date());
     }, 60000);
     return () => clearInterval(timer);
   }, []);
@@ -53,57 +52,94 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
   };
 
   const isScheduleActive = (scheduleItem) => {
-    const now = currentTime;
+    const now = new Date();
     
     if (scheduleItem.source === 'moodle') {
-      // For Moodle sessions, check against the session date and time
-      const sessionDate = moment(scheduleItem.date);
-      const sessionStartTime = moment(scheduleItem.date);
-      const sessionEndTime = moment(scheduleItem.date).add(scheduleItem.duration || 3600, 'seconds');
+      // For Moodle sessions, check within ±10 minutes of session time
+      const sessionStart = new Date(scheduleItem.sessdate * 1000);
+      const sessionEnd = new Date(sessionStart.getTime() + scheduleItem.duration * 60000);
       
-      return now.isBetween(sessionStartTime, sessionEndTime, null, '[)');
+      // Allow attendance ±10 minutes from session start/end
+      const earlyStart = new Date(sessionStart.getTime() - 10 * 60000);
+      const lateEnd = new Date(sessionEnd.getTime() + 10 * 60000);
+      
+      return now >= earlyStart && now <= lateEnd;
     } else {
-      // For manual schedules, use day of week logic
-      const scheduleDay = now.clone().day(scheduleItem.day_of_week);
-      const startTime = moment(scheduleItem.start_time, 'HH:mm');
-      const endTime = moment(scheduleItem.end_time, 'HH:mm');
-      const currentTimeStr = now.format('HH:mm');
-      const currentMoment = moment(currentTimeStr, 'HH:mm');
+      // For manual schedules, check day match and time within ±10 minutes
+      const scheduleDay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(scheduleItem.day);
+      const currentDay = now.getDay();
       
-      return now.day() === scheduleItem.day_of_week && 
-             currentMoment.isBetween(startTime, endTime, null, '[)');
+      if (scheduleDay !== currentDay) {
+        return false;
+      }
+      
+      const [startTime, endTime] = scheduleItem.time.split('-');
+      const sessionStart = new Date();
+      sessionStart.setHours(...startTime.split(':').map(Number), 0, 0);
+      
+      const sessionEnd = new Date();
+      sessionEnd.setHours(...endTime.split(':').map(Number), 0, 0);
+      
+      // Allow attendance ±10 minutes from session start/end
+      const earlyStart = new Date(sessionStart.getTime() - 10 * 60000);
+      const lateEnd = new Date(sessionEnd.getTime() + 10 * 60000);
+      
+      return now >= earlyStart && now <= lateEnd;
     }
   };
 
   const getScheduleStatus = (scheduleItem) => {
+    const now = new Date();
+    
     if (scheduleItem.source === 'moodle') {
-      const sessionDate = moment(scheduleItem.date);
-      const now = currentTime;
+      const sessionStart = new Date(scheduleItem.sessdate * 1000);
+      const earlyStart = new Date(sessionStart.getTime() - 10 * 60000);
+      const sessionEnd = new Date(sessionStart.getTime() + scheduleItem.duration * 60000);
+      const lateEnd = new Date(sessionEnd.getTime() + 10 * 60000);
       
-      if (now.isBefore(sessionDate)) {
+      if (now < earlyStart) {
         return 'upcoming';
-      } else if (isScheduleActive(scheduleItem)) {
+      } else if (now >= earlyStart && now <= lateEnd) {
         return 'live';
       } else {
         return 'closed';
       }
     } else {
-      return isScheduleActive(scheduleItem) ? 'live' : 'inactive';
+      const scheduleDay = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].indexOf(scheduleItem.day);
+      const currentDay = now.getDay();
+      
+      if (scheduleDay !== currentDay) {
+        return 'inactive';
+      }
+      
+      const [startTime, endTime] = scheduleItem.time.split('-');
+      const sessionStart = new Date();
+      sessionStart.setHours(...startTime.split(':').map(Number), 0, 0);
+      
+      const earlyStart = new Date(sessionStart.getTime() - 10 * 60000);
+      const sessionEnd = new Date();
+      sessionEnd.setHours(...endTime.split(':').map(Number), 0, 0);
+      
+      const lateEnd = new Date(sessionEnd.getTime() + 10 * 60000);
+      
+      if (now < earlyStart) {
+        return 'upcoming';
+      } else if (now >= earlyStart && now <= lateEnd) {
+        return 'live';
+      } else {
+        return 'closed';
+      }
     }
   };
 
   const handleScheduleClick = (scheduleItem) => {
     if (getScheduleStatus(scheduleItem) !== 'live') {
-      alert('Attendance is only available during scheduled class time');
+      alert('Attendance not available');
       return;
     }
     
-    // Navigate to attendance page with appropriate parameters
-    if (scheduleItem.source === 'moodle') {
-      navigate(`/attendance/${classId}/${scheduleItem.sessionId}?source=moodle`);
-    } else {
-      navigate(`/attendance/${classId}/${scheduleItem.id}?source=manual`);
-    }
+    // Navigate to attendance page with session ID
+    navigate(`/attendance/${scheduleItem.id}`);
   };
 
   const handleAttendanceClick = (e, scheduleItem) => {
@@ -246,18 +282,13 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
         </thead>
         <tbody>
           {schedule.map((s) => {
-            const isActive = isScheduleActive(s);
             const status = getScheduleStatus(s);
-            const today = new Date();
-            const isToday = s.source === 'moodle' 
-              ? moment(s.date).isSame(today, 'day')
-              : today.getDay() === s.day_of_week;
             
             return (
               <tr 
                 key={s.id} 
                 style={{
-                  background: status === 'live' ? '#d4edda' : isToday ? '#e6f7ff' : 'transparent',
+                  background: status === 'live' ? '#d4edda' : 'transparent',
                   cursor: status === 'live' ? 'pointer' : 'default',
                   opacity: status === 'live' ? 1 : 0.7,
                   transition: 'all 0.3s ease'
@@ -266,25 +297,17 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
                 title={status === 'live' ? 'Click to take attendance' : 'Attendance not available'}
               >
                 <td style={cell}>
-                  <div>
-                    <strong>{s.courseCode || 'N/A'}</strong>
-                    {s.courseName && <div style={{ fontSize: '12px', color: '#666' }}>{s.courseName}</div>}
-                  </div>
+                  <strong>{s.course}</strong>
                 </td>
                 <td style={cell}>
-                  {s.source === 'moodle' 
-                    ? moment(s.date).format('MMM DD, YYYY')
-                    : DAYS[s.day_of_week]
-                  }
-                  {isToday && <span style={{ marginLeft: '5px', color: '#28a745' }}>Today</span>}
+                  {s.day}
                 </td>
                 <td style={cell}>
-                  {s.source === 'moodle' 
-                    ? moment(s.date).format('h:mm A')
-                    : `${s.start_time} - ${s.end_time}`
-                  }
+                  {s.time}
                 </td>
-                <td style={cell}>{s.room || 'TBD'}</td>
+                <td style={cell}>
+                  {s.room_number || 'TBD'}
+                </td>
                 <td style={cell}>
                   <span style={{
                     padding: '2px 8px',
@@ -310,7 +333,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
                     background: s.source === 'moodle' ? '#28a745' : '#ffc107',
                     color: 'white'
                   }}>
-                    {s.source === 'moodle' ? 'Moodle' : 'Manual'}
+                    {s.source === 'moodle' ? 'Synced' : 'Fallback'}
                   </span>
                 </td>
                 <td style={cell}>
@@ -360,7 +383,14 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
         fontSize: '14px',
         color: '#6c757d'
       }}>
-        Current Time: {currentTime.format('MMMM Do YYYY, h:mm A')}
+        Current Time: {currentTime.toLocaleString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}
       </div>
 
       {/* Add Schedule Modal */}

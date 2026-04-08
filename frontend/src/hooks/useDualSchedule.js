@@ -1,6 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
 
+// Format function as specified
+function formatSession(s) {
+  const d = new Date(s.sessdate * 1000);
+
+  const start = d.toTimeString().slice(0,5);
+  const endDate = new Date(d.getTime() + s.duration * 60000);
+  const end = endDate.toTimeString().slice(0,5);
+
+  return {
+    id: s.sessionId,
+    day: d.toLocaleString("en-US", { weekday: "long" }),
+    time: `${start}-${end}`,
+    course: s.course,
+    source: "moodle",
+    sessdate: s.sessdate,
+    duration: s.duration
+  };
+}
+
 export const useDualSchedule = (classId) => {
   const [schedule, setSchedule] = useState([]);
   const [useMoodle, setUseMoodle] = useState(false);
@@ -14,12 +33,10 @@ export const useDualSchedule = (classId) => {
       const response = await api.get('/moodle-schedule');
       
       if (response.data.success && response.data.data.length > 0) {
-        // Filter by class if course is provided
-        const filteredSchedule = classId 
-          ? response.data.data.filter(item => item.course === parseInt(classId))
-          : response.data.data;
+        // Format Moodle data using exact formatSession function
+        const formattedSchedule = response.data.data.map(formatSession);
         
-        setSchedule(filteredSchedule);
+        setSchedule(formattedSchedule);
         setUseMoodle(true);
         setError(null);
         return true;
@@ -30,25 +47,24 @@ export const useDualSchedule = (classId) => {
       console.warn('Moodle schedule fetch failed:', err);
       return false;
     }
-  }, [classId]);
+  }, []);
 
   // Fetch manual schedule
   const fetchManualSchedule = useCallback(async () => {
     try {
       const response = await api.get(`/schedule/class/${classId}`);
       
-      // Format manual schedule to match structure
+      // Format manual schedule to match structure with source = "manual"
       const formattedSchedule = response.data.map(item => ({
-        ...item,
-        sessionId: `manual_${item.id}`,
-        source: 'manual',
-        date: item.scheduled_date || getNextOccurrence(item.day_of_week),
-        courseName: 'Manual Schedule',
-        courseCode: 'MANUAL',
-        sessionName: `${item.day_of_week} Class`,
-        description: `Room: ${item.room_number || 'TBD'}`,
-        duration: 3600, // 1 hour default
-        timemodified: new Date().getTime() / 1000
+        id: item.id,
+        day: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][item.day_of_week],
+        time: `${item.start_time}-${item.end_time}`,
+        course: classId || 'Manual Course',
+        source: "manual",
+        day_of_week: item.day_of_week,
+        start_time: item.start_time,
+        end_time: item.end_time,
+        room_number: item.room_number
       }));
       
       setSchedule(formattedSchedule);
@@ -72,7 +88,7 @@ export const useDualSchedule = (classId) => {
     }
   }, []);
 
-  // Initialize schedule
+  // Initialize schedule with exact merge logic
   useEffect(() => {
     const initializeSchedule = async () => {
       setLoading(true);
@@ -144,15 +160,5 @@ export const useDualSchedule = (classId) => {
     fetchManualSchedule
   };
 };
-
-// Helper function to get next occurrence of a day
-function getNextOccurrence(dayOfWeek) {
-  const today = new Date();
-  const currentDay = today.getDay();
-  const daysUntilNext = (dayOfWeek - currentDay + 7) % 7 || 7;
-  const nextDate = new Date(today);
-  nextDate.setDate(today.getDate() + daysUntilNext);
-  return nextDate.toISOString().split('T')[0];
-}
 
 export default useDualSchedule;
