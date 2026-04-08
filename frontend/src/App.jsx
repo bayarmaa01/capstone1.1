@@ -66,7 +66,7 @@ function App() {
           element={user ? <ClassPage /> : <Navigate to="/" />} 
         />
         <Route 
-          path="/attendance/:classId" 
+          path="/attendance/:classId/:scheduleId" 
           element={user ? <AttendancePage /> : <Navigate to="/" />} 
         />
         <Route path="*" element={<Navigate to="/" />} />

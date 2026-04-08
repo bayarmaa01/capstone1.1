@@ -3,22 +3,69 @@ import api from '../services/api';
 import { useParams, useNavigate } from 'react-router-dom';
 import QRScanner from '../components/QRScanner';
 import CameraCapture from '../components/CameraCapture';
+import moment from 'moment';
 
 export default function AttendancePage() {
-  const { classId } = useParams();
+  const { classId, scheduleId } = useParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState('face'); // 'face' or 'qr'
   const [classInfo, setClassInfo] = useState(null);
+  const [scheduleInfo, setScheduleInfo] = useState(null);
   const [attendance, setAttendance] = useState([]);
   const [sessionDate] = useState(new Date().toISOString().split('T')[0]);
   const [recognizedIds, setRecognizedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  
+  const [isActive, setIsActive] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetchClassInfo();
-    fetchTodayAttendance();
-  }, [classId]);
+    if (scheduleId) {
+      fetchScheduleStatus();
+    } else {
+      // Fallback to old behavior if no scheduleId
+      fetchClassInfo();
+      fetchTodayAttendance();
+    }
+    
+    // Check status every 30 seconds if schedule-based
+    const interval = scheduleId ? setInterval(fetchScheduleStatus, 30000) : null;
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [classId, scheduleId]);
+
+  const fetchScheduleStatus = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await api.get(`/schedule/attendance/status?scheduleId=${scheduleId}`);
+      
+      if (response.data.success) {
+        setScheduleInfo(response.data.schedule);
+        setIsActive(response.data.is_active);
+        
+        // Fetch class info and attendance
+        await fetchClassInfo();
+        await fetchTodayAttendance();
+        
+        // Redirect if not active
+        if (!response.data.is_active) {
+          setError('Attendance is only available during scheduled class time');
+        }
+      } else {
+        setError('Failed to load schedule status');
+      }
+    } catch (err) {
+      console.error('Error fetching schedule status:', err);
+      setError(err.response?.data?.error || 'Failed to load schedule status');
+      // Fallback to old behavior
+      await fetchClassInfo();
+      await fetchTodayAttendance();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchClassInfo = async () => {
     try {
@@ -43,8 +90,8 @@ export default function AttendancePage() {
         response.data.filter(s => s.present).map(s => s.student_id)
       );
       setRecognizedIds(presentIds);
-      console.log('✓ Loaded attendance:', response.data.length, 'students');
-      console.log('✓ Already present:', presentIds.size, 'students');
+      console.log('Loaded attendance:', response.data.length, 'students');
+      console.log('Already present:', presentIds.size, 'students');
     } catch (error) {
       console.error('Error fetching attendance:', error);
       alert('Failed to load attendance data');
@@ -55,7 +102,7 @@ export default function AttendancePage() {
 
   const handleQRScan = async (decodedText) => {
     try {
-      console.log('📱 QR Code scanned:', decodedText);
+      console.log(' QR Code scanned:', decodedText);
       
       // Extract student ID
       let studentId = decodedText.trim();
@@ -246,19 +293,48 @@ export default function AttendancePage() {
     );
   }
 
+  if (error && scheduleId) {
+    return (
+      <div style={{ padding: '20px', textAlign: 'center' }}>
+        <div style={{ 
+          background: '#f8d7da', 
+          color: '#721c24', 
+          padding: '15px', 
+          borderRadius: '8px',
+          marginBottom: '20px'
+        }}>
+          <h3>Attendance Not Available</h3>
+          <p>{error}</p>
+        </div>
+        <button onClick={() => navigate(`/class/${classId}`)} style={styles.backBtn}>
+          Back to Class
+        </button>
+      </div>
+    );
+  }
+
   const presentCount = attendance.filter(s => s.present).length;
   const totalCount = attendance.length;
 
   return (
     <div style={styles.container}>
       <button onClick={() => navigate(`/class/${classId}`)} style={styles.backBtn}>
-        ← Back to Class
+        {scheduleId ? 'Back to Schedule' : 'Back to Class'}
       </button>
 
       <header style={styles.header}>
         <div>
           <h1>📋 Attendance Session</h1>
           <p style={styles.headerText}>{classInfo.code} - {classInfo.name}</p>
+          <p style={styles.headerText}>
+            {scheduleInfo && (
+              <>
+                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][scheduleInfo.day_of_week]} | 
+                {scheduleInfo.start_time} - {scheduleInfo.end_time} | 
+                {scheduleInfo.room_number && ` Room ${scheduleInfo.room_number}`}
+              </>
+            )}
+          </p>
           <p style={styles.headerText}>
             📅 {new Date(sessionDate).toLocaleDateString('en-US', { 
               weekday: 'long', 
@@ -267,6 +343,15 @@ export default function AttendancePage() {
               day: 'numeric' 
             })}
           </p>
+          {scheduleId && (
+            <p style={{
+              ...styles.headerText,
+              color: isActive ? '#28a745' : '#dc3545',
+              fontWeight: 'bold'
+            }}>
+              Status: {isActive ? 'Active' : 'Inactive'}
+            </p>
+          )}
         </div>
         <div style={styles.stats}>
           <div style={styles.statBox}>
@@ -279,6 +364,14 @@ export default function AttendancePage() {
             </div>
             <div style={styles.statLabel}>Attendance</div>
           </div>
+          {scheduleId && (
+            <div style={styles.statBox}>
+              <div style={styles.statNum}>
+                {moment().format('h:mm A')}
+              </div>
+              <div style={styles.statLabel}>Current Time</div>
+            </div>
+          )}
         </div>
       </header>
 

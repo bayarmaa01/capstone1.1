@@ -201,4 +201,79 @@ router.get('/today', async (req, res) => {
   }
 });
 
+// Get attendance status for a schedule
+router.get('/attendance/status', async (req, res) => {
+  try {
+    const { scheduleId } = req.query;
+    
+    if (!scheduleId) {
+      return res.status(400).json({ error: 'Schedule ID is required' });
+    }
+
+    // Check if schedule exists and is active
+    const scheduleResult = await db.query(`
+      SELECT cs.*, c.code as class_code, c.name as class_name
+      FROM class_schedules cs
+      JOIN classes c ON c.id = cs.class_id
+      WHERE cs.id = $1
+    `, [scheduleId]);
+
+    if (scheduleResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    const schedule = scheduleResult.rows[0];
+    
+    // Check if current time is within schedule range
+    const now = new Date();
+    const currentDay = now.getDay(); // 0=Sunday, 1=Monday, etc.
+    const currentTime = now.toTimeString().slice(0, 5); // HH:mm format
+    
+    const isActive = schedule.day_of_week === currentDay && 
+                   currentTime >= schedule.start_time && 
+                   currentTime < schedule.end_time;
+
+    // Get attendance statistics for this schedule
+    const attendanceStats = await db.query(`
+      SELECT 
+        COUNT(*) as total_students,
+        COUNT(CASE WHEN present = true THEN 1 END) as present_count,
+        COUNT(CASE WHEN present = false THEN 1 END) as absent_count
+      FROM attendance 
+      WHERE class_id = $1 
+        AND session_date = CURRENT_DATE
+    `, [schedule.class_id]);
+
+    const stats = attendanceStats.rows[0];
+
+    res.json({
+      success: true,
+      schedule: {
+        id: schedule.id,
+        class_id: schedule.class_id,
+        class_code: schedule.class_code,
+        class_name: schedule.class_name,
+        day_of_week: schedule.day_of_week,
+        start_time: schedule.start_time,
+        end_time: schedule.end_time,
+        room_number: schedule.room_number
+      },
+      is_active: isActive,
+      current_time: now.toISOString(),
+      attendance_stats: {
+        total_students: parseInt(stats.total_students) || 0,
+        present_count: parseInt(stats.present_count) || 0,
+        absent_count: parseInt(stats.absent_count) || 0,
+        attendance_rate: stats.total_students > 0 
+          ? ((stats.present_count / stats.total_students) * 100).toFixed(2) + '%'
+          : '0%'
+      }
+    });
+
+  } catch (err) {
+    console.error('Error getting attendance status:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

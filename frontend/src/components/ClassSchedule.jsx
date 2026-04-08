@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import moment from 'moment';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import AddScheduleForm from './AddScheduleForm';
 
@@ -8,9 +10,16 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [currentTime, setCurrentTime] = useState(moment());
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchSchedules();
+    // Update current time every minute
+    const timer = setInterval(() => {
+      setCurrentTime(moment());
+    }, 60000);
+    return () => clearInterval(timer);
   }, [classId]);
 
   const fetchSchedules = async () => {
@@ -47,14 +56,45 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
     fetchSchedules();
   };
 
-  if (loading) return <p>⏳ Loading schedule...</p>;
+  const isScheduleActive = (schedule) => {
+    const now = currentTime;
+    const scheduleDay = now.clone().day(schedule.day_of_week);
+    
+    // Parse start and end times
+    const startTime = moment(schedule.start_time, 'HH:mm');
+    const endTime = moment(schedule.end_time, 'HH:mm');
+    
+    // Check if current time is within schedule range
+    const currentTimeStr = now.format('HH:mm');
+    const currentMoment = moment(currentTimeStr, 'HH:mm');
+    
+    return now.day() === schedule.day_of_week && 
+           currentMoment.isBetween(startTime, endTime, null, '[)');
+  };
+
+  const handleScheduleClick = (schedule) => {
+    if (!isScheduleActive(schedule)) {
+      alert('Attendance is only available during scheduled class time');
+      return;
+    }
+    
+    // Navigate to attendance page
+    navigate(`/attendance/${classId}/${schedule.id}`);
+  };
+
+  const handleAttendanceClick = (e, schedule) => {
+    e.stopPropagation(); // Prevent row click
+    handleScheduleClick(schedule);
+  };
+
+  if (loading) return <p>Loading schedule...</p>;
 
   return (
     <div style={{ marginTop: '10px' }}>
       {/* Header with Add Button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ color: '#333', fontSize: '18px', margin: '10px 0' }}>📅 Class Schedule</h2>
-        <button onClick={() => setShowForm(true)} style={btnAdd}>➕ Add Schedule</button>
+        <h2 style={{ color: '#333', fontSize: '18px', margin: '10px 0' }}>Class Schedule</h2>
+        <button onClick={() => setShowForm(true)} style={btnAdd}>Add Schedule</button>
       </div>
 
       <table style={{
@@ -71,28 +111,76 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
             <th style={cell}>Start</th>
             <th style={cell}>End</th>
             <th style={cell}>Room</th>
+            <th style={cell}>Status</th>
             <th style={cell}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {schedules.map((s) => {
+            const isActive = isScheduleActive(s);
             const today = new Date();
             const isToday = today.getDay() === s.day_of_week;
+            
             return (
-              <tr key={s.id} style={{ background: isToday ? '#e6f7ff' : 'transparent' }}>
-                <td style={cell}>{DAYS[s.day_of_week]}</td>
+              <tr 
+                key={s.id} 
+                style={{
+                  background: isActive ? '#d4edda' : isToday ? '#e6f7ff' : 'transparent',
+                  cursor: isActive ? 'pointer' : 'default',
+                  opacity: isActive ? 1 : 0.7,
+                  transition: 'all 0.3s ease'
+                }}
+                onClick={() => handleScheduleClick(s)}
+                title={isActive ? 'Click to take attendance' : 'Attendance not available'}
+              >
+                <td style={cell}>
+                  {DAYS[s.day_of_week]}
+                  {isToday && <span style={{ marginLeft: '5px', color: '#28a745' }}>Today</span>}
+                </td>
                 <td style={cell}>{s.start_time}</td>
                 <td style={cell}>{s.end_time}</td>
                 <td style={cell}>{s.room_number || '-'}</td>
                 <td style={cell}>
-                  <button onClick={() => handleEdit(s)} style={btnEdit}>✏️</button>
-                  <button onClick={() => handleDelete(s.id)} style={btnDel}>🗑️</button>
+                  {isActive ? (
+                    <span style={{ color: '#155724', fontWeight: 'bold' }}>Active</span>
+                  ) : (
+                    <span style={{ color: '#6c757d' }}>Inactive</span>
+                  )}
+                </td>
+                <td style={cell}>
+                  <button 
+                    onClick={(e) => handleAttendanceClick(e, s)}
+                    disabled={!isActive}
+                    style={{
+                      ...btnAttendance,
+                      background: isActive ? '#28a745' : '#6c757d',
+                      cursor: isActive ? 'pointer' : 'not-allowed',
+                      opacity: isActive ? 1 : 0.5
+                    }}
+                    title={isActive ? 'Take Attendance' : 'Not available'}
+                  >
+                    Attendance
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); handleEdit(s); }} style={btnEdit}>Edit</button>
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} style={btnDel}>Delete</button>
                 </td>
               </tr>
             );
           })}
         </tbody>
       </table>
+
+      {/* Current Time Display */}
+      <div style={{ 
+        marginTop: '10px', 
+        padding: '8px', 
+        background: '#f8f9fa', 
+        borderRadius: '5px',
+        fontSize: '14px',
+        color: '#6c757d'
+      }}>
+        Current Time: {currentTime.format('MMMM Do YYYY, h:mm A')}
+      </div>
 
       {/* Add Schedule Modal */}
       {showForm && (
@@ -129,6 +217,18 @@ const btnAdd = {
   cursor: 'pointer',
   fontWeight: '600',
   fontSize: '14px'
+};
+
+const btnAttendance = {
+  background: '#28a745',
+  color: 'white',
+  border: 'none',
+  padding: '5px 10px',
+  borderRadius: '5px',
+  cursor: 'pointer',
+  marginRight: '5px',
+  fontSize: '12px',
+  fontWeight: '600'
 };
 
 const btnEdit = {
