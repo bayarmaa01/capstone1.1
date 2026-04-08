@@ -237,151 +237,17 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
               padding: '8px 14px',
               borderRadius: '6px',
               cursor: 'pointer',
-              fontWeight: '600',
               fontSize: '14px'
             }}
           >
             Switch to {source === 'moodle' ? 'Manual' : 'Synced'}
           </button>
-          <button onClick={() => setShowForm(true)} style={{
-            background: '#28a745',
-            color: 'white',
-            border: 'none',
-            padding: '8px 14px',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: '600',
-            fontSize: '14px'
-          }}>
-            Add Schedule
-          </button>
         </div>
       </div>
 
-      <table style={{
-        width: '100%',
-        borderCollapse: 'collapse',
-        background: '#fff',
-        borderRadius: '8px',
-        overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <thead style={{ background: '#667eea', color: 'white' }}>
-          <tr>
-            <th style={cell}>Course</th>
-            <th style={cell}>Date/Day</th>
-            <th style={cell}>Time</th>
-            <th style={cell}>Room</th>
-            <th style={cell}>Status</th>
-            <th style={cell}>Source</th>
-            <th style={cell}>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {schedule.map((s) => {
-            const status = getScheduleStatus(s);
-            
-            return (
-              <tr 
-                key={s.id} 
-                style={{
-                  background: status === 'live' ? '#d4edda' : 'transparent',
-                  cursor: status === 'live' ? 'pointer' : 'default',
-                  opacity: status === 'live' ? 1 : 0.7,
-                  transition: 'all 0.3s ease'
-                }}
-                onClick={() => handleScheduleClick(s)}
-                title={status === 'live' ? 'Click to take attendance' : 'Attendance not available'}
-              >
-                <td style={cell}>
-                  <strong>{s.course}</strong>
-                </td>
-                <td style={cell}>
-                  {s.day}
-                </td>
-                <td style={cell}>
-                  {s.time}
-                </td>
-                <td style={cell}>
-                  {s.room_number || 'TBD'}
-                </td>
-                <td style={cell}>
-                  <span style={{
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    background: status === 'live' ? '#28a745' : 
-                               status === 'upcoming' ? '#ffc107' : 
-                               status === 'closed' ? '#dc3545' : '#6c757d',
-                    color: 'white'
-                  }}>
-                    {status === 'live' ? 'Live' : 
-                     status === 'upcoming' ? 'Upcoming' : 
-                     status === 'closed' ? 'Closed' : 'Inactive'}
-                  </span>
-                </td>
-                <td style={cell}>
-                  <span style={{
-                    padding: '2px 8px',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    background: s.source === 'moodle' ? '#28a745' : '#ffc107',
-                    color: 'white'
-                  }}>
-                    {s.source === 'moodle' ? 'Synced' : 'Manual'}
-                  </span>
-                </td>
-                <td style={cell}>
-                  <button 
-                    onClick={(e) => handleAttendanceClick(e, s)}
-                    disabled={status !== 'live'}
-                    style={{
-                      ...btnAttendance,
-                      background: status === 'live' ? '#28a745' : '#6c757d',
-                      cursor: status === 'live' ? 'pointer' : 'not-allowed',
-                      opacity: status === 'live' ? 1 : 0.5,
-                      marginRight: '5px'
-                    }}
-                    title={status === 'live' ? 'Take Attendance' : 'Not available'}
-                  >
-                    Attendance
-                  </button>
-                  {s.source === 'manual' && (
-                    <>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleEdit(s); }} 
-                        style={btnEdit}
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} 
-                        style={btnDel}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-          {schedule.length === 0 && !loading && (
-            <tr>
-              <td colSpan="7" style={{ 
-                textAlign: 'center', 
-                padding: '40px', 
-                color: '#999',
-                fontStyle: 'italic'
-              }}>
-                No sessions available. {source === 'moodle' ? 'Try switching to Manual schedule.' : 'Add a schedule to get started.'}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {loading && (
+        <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+          Loading schedule...
 
       {/* Current Time Display */}
       <div style={{ 

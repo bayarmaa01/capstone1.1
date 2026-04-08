@@ -34,7 +34,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+// Login - Query Moodle DB for teacher authentication
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -43,34 +43,72 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
     
-    // Find user
-    const result = await db.query('SELECT * FROM users WHERE username = $1', [username]);
+    // Query Moodle user database
+    const moodleResult = await db.query(
+      'SELECT id, username, password, email, firstname, lastname FROM mdl_user WHERE username = $1 AND deleted = 0',
+      [username]
+    );
     
-    if (result.rows.length === 0) {
+    if (moodleResult.rows.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    const user = result.rows[0];
+    const moodleUser = moodleResult.rows[0];
     
-    // Verify password
-    const valid = await bcrypt.compare(password, user.password_hash);
+    // Verify password using Moodle's password hash
+    const valid = await bcrypt.compare(password, moodleUser.password);
     
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
+    // Check if user is a teacher using Moodle role assignments
+    const roleResult = await db.query(`
+      SELECT ra.roleid, r.shortname, c.id as course_id, c.fullname as course_name
+      FROM mdl_role_assignments ra
+      JOIN mdl_role r ON ra.roleid = r.id
+      JOIN mdl_context ctx ON ra.contextid = ctx.id
+      JOIN mdl_course c ON ctx.instanceid = c.id
+      WHERE ra.userid = $1 
+      AND ctx.contextlevel = 50  -- Course context level
+      AND r.shortname IN ('editingteacher', 'teacher', 'manager')
+      LIMIT 1
+    `, [moodleUser.id]);
+    
+    if (roleResult.rows.length === 0) {
+      return res.status(403).json({ error: 'Access denied. Teacher role required.' });
+    }
+    
+    const userRole = roleResult.rows[0].shortname;
+    
     // Generate JWT token
     const token = jwt.sign(
-      { id: user.id, username: user.username, role: user.role },
+      { 
+        id: moodleUser.id, 
+        username: moodleUser.username, 
+        email: moodleUser.email,
+        name: `${moodleUser.firstname} ${moodleUser.lastname}`,
+        role: userRole,
+        course_id: roleResult.rows[0].course_id,
+        course_name: roleResult.rows[0].course_name
+      },
       process.env.JWT_SECRET || 'default_secret_change_this',
       { expiresIn: '24h' }
     );
     
-    console.log(`✓ User logged in: ${username}`);
+    console.log(`✓ Teacher logged in: ${username} (${userRole})`);
     res.json({ 
       success: true, 
       token, 
-      user: { id: user.id, username: user.username, role: user.role }
+      user: { 
+        id: moodleUser.id, 
+        username: moodleUser.username,
+        email: moodleUser.email,
+        name: `${moodleUser.firstname} ${moodleUser.lastname}`,
+        role: userRole,
+        course_id: roleResult.rows[0].course_id,
+        course_name: roleResult.rows[0].course_name
+      }
     });
   } catch (error) {
     console.error('Login error:', error);
@@ -93,75 +131,7 @@ router.get('/verify', async (req, res) => {
   }
 });
 
-// OAuth2 Login - Redirect to Moodle
-router.get('/oauth/login', (req, res) => {
-  try {
-    const authUrl = oauthService.getAuthorizationUrl();
-    res.redirect(authUrl);
-  } catch (error) {
-    console.error('OAuth login error:', error);
-    res.status(500).json({ error: 'Failed to initiate OAuth login' });
-  }
-});
-
-// OAuth2 Callback - Handle Moodle response
-router.get('/oauth/callback', async (req, res) => {
-  try {
-    const { code, state } = req.query;
-    
-    if (!code) {
-      return res.status(400).json({ error: 'Authorization code not provided' });
-    }
-
-    // Exchange code for tokens
-    const tokens = await oauthService.exchangeCodeForToken(code, state);
-    
-    // Get user information from Moodle
-    const userInfo = await oauthService.getUserInfo(tokens.access_token);
-    
-    // Get user courses to determine role
-    const courses = await oauthService.getUserCourses(tokens.access_token);
-    
-    // Determine user role (default to student, check if teacher in any course)
-    let userRole = 'student';
-    if (courses && courses.length > 0) {
-      // Check first course for role (could be enhanced to check all courses)
-      userRole = await oauthService.getUserRole(tokens.access_token, courses[0].id);
-    }
-    
-    // Create or update user in database
-    const user = await oauthService.createOrUpdateUser(userInfo, tokens);
-    
-    // Update user role if determined from courses
-    if (userRole !== user.role) {
-      await db.query(
-        'UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2',
-        [userRole, user.id]
-      );
-      user.role = userRole;
-    }
-    
-    // Generate JWT token
-    const jwtToken = oauthService.generateJWT(user);
-    
-    // Redirect to frontend with token
-    const frontendUrl = process.env.FRONTEND_URL || 'https://attendance-ml.duckdns.org';
-    res.redirect(`${frontendUrl}/auth/callback?token=${jwtToken}&user=${encodeURIComponent(JSON.stringify({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      name: user.name,
-      role: user.role
-    }))}`);
-    
-  } catch (error) {
-    console.error('OAuth callback error:', error);
-    const frontendUrl = process.env.FRONTEND_URL || 'https://attendance-ml.duckdns.org';
-    res.redirect(`${frontendUrl}/auth/error?message=${encodeURIComponent(error.message)}`);
-  }
-});
-
-// Get current user info
+// Get current user info (protected)
 router.get('/me', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];
@@ -171,9 +141,9 @@ router.get('/me', async (req, res) => {
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret_change_this');
     
-    // Get fresh user data from database
+    // Get fresh user data from Moodle database
     const result = await db.query(
-      'SELECT id, lms_id, username, email, name, role, created_at FROM users WHERE id = $1',
+      'SELECT id, username, email, firstname, lastname FROM mdl_user WHERE id = $1 AND deleted = 0',
       [decoded.id]
     );
     
@@ -181,7 +151,26 @@ router.get('/me', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json({ user: result.rows[0] });
+    // Get user role
+    const roleResult = await db.query(`
+      SELECT r.shortname, c.id as course_id, c.fullname as course_name
+      FROM mdl_role_assignments ra
+      JOIN mdl_role r ON ra.roleid = r.id
+      JOIN mdl_context ctx ON ra.contextid = ctx.id
+      JOIN mdl_course c ON ctx.instanceid = c.id
+      WHERE ra.userid = $1 
+      AND ctx.contextlevel = 50
+      AND r.shortname IN ('editingteacher', 'teacher', 'manager')
+      LIMIT 1
+    `, [decoded.id]);
+    
+    const user = result.rows[0];
+    user.role = roleResult.rows.length > 0 ? roleResult.rows[0].shortname : 'student';
+    user.course_id = roleResult.rows.length > 0 ? roleResult.rows[0].course_id : null;
+    user.course_name = roleResult.rows.length > 0 ? roleResult.rows[0].course_name : null;
+    user.name = `${user.firstname} ${user.lastname}`;
+    
+    res.json({ user });
   } catch (error) {
     console.error('Get user info error:', error);
     res.status(401).json({ error: 'Invalid token' });

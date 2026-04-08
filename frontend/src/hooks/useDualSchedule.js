@@ -26,27 +26,43 @@ export const useDualSchedule = (classId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch Moodle schedule from backend
-  const fetchMoodleSchedule = useCallback(async () => {
-    try {
-      const response = await api.get('/moodle-schedule');
+  // Initialize schedule with exact merge logic
+  useEffect(() => {
+    const initializeSchedule = async () => {
+      setLoading(true);
+      setError(null);
       
-      if (response.data.success && response.data.data.length > 0) {
-        // Format Moodle data using exact formatSession function
-        const formattedSchedule = response.data.data.map(formatSession);
+      try {
+        // Fetch Moodle schedule from backend with auth
+        const response = await api.get('/moodle-schedule', {
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}` 
+          }
+        });
         
-        setSchedule(formattedSchedule);
-        setSource("moodle");
-        setError(null);
-        return true;
-      } else {
-        return false;
+        if (response.data.success && response.data.data.length > 0) {
+          // Format Moodle data using exact formatSession function
+          const formattedSchedule = response.data.data.map(formatSession);
+          
+          setSchedule(formattedSchedule);
+          setSource("moodle");
+          console.log('✓ Using Moodle schedule:', formattedSchedule.length, 'sessions');
+        } else {
+          // Fallback to manual schedule
+          console.log('✗ Moodle schedule empty, using manual fallback');
+          await fetchManualSchedule();
+        }
+      } catch (err) {
+        console.warn('Moodle schedule fetch failed:', err);
+        // Fallback to manual schedule
+        await fetchManualSchedule();
       }
-    } catch (err) {
-      console.warn('Moodle schedule fetch failed:', err);
-      return false;
-    }
-  }, []);
+      
+      setLoading(false);
+    };
+
+    initializeSchedule();
+  }, [classId]);
 
   // Fetch manual schedule
   const fetchManualSchedule = useCallback(async () => {
@@ -68,31 +84,12 @@ export const useDualSchedule = (classId) => {
       
       setSchedule(formattedSchedule);
       setSource("manual");
-      setError(null);
+      console.log('✓ Using manual schedule:', formattedSchedule.length, 'sessions');
     } catch (err) {
       console.error('Manual schedule fetch failed:', err);
       setError(err.response?.data?.error || 'Failed to fetch manual schedule');
     }
   }, [classId]);
-
-  // Initialize schedule with exact merge logic
-  useEffect(() => {
-    const initializeSchedule = async () => {
-      setLoading(true);
-      
-      // Try to fetch Moodle schedule first
-      const moodleSuccess = await fetchMoodleSchedule();
-      
-      if (!moodleSuccess) {
-        // Fallback to manual schedule
-        await fetchManualSchedule();
-      }
-      
-      setLoading(false);
-    };
-
-    initializeSchedule();
-  }, [classId, fetchMoodleSchedule, fetchManualSchedule]);
 
   // Refresh schedule
   const refreshSchedule = useCallback(async () => {
@@ -100,8 +97,22 @@ export const useDualSchedule = (classId) => {
     setError(null);
     
     if (source === "moodle") {
-      const moodleSuccess = await fetchMoodleSchedule();
-      if (!moodleSuccess) {
+      try {
+        const response = await api.get('/moodle-schedule', {
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}` 
+          }
+        });
+        
+        if (response.data.success && response.data.data.length > 0) {
+          const formattedSchedule = response.data.data.map(formatSession);
+          setSchedule(formattedSchedule);
+          console.log('✓ Refreshed Moodle schedule:', formattedSchedule.length, 'sessions');
+        } else {
+          await fetchManualSchedule();
+        }
+      } catch (err) {
+        console.warn('Moodle refresh failed:', err);
         await fetchManualSchedule();
       }
     } else {
@@ -109,23 +120,39 @@ export const useDualSchedule = (classId) => {
     }
     
     setLoading(false);
-  }, [source, fetchMoodleSchedule, fetchManualSchedule]);
+  }, [source, classId, fetchManualSchedule]);
 
   // Toggle between Moodle and Manual
   const toggleSource = useCallback(async () => {
     setLoading(true);
+    setError(null);
     
     if (source === "moodle") {
       await fetchManualSchedule();
     } else {
-      const moodleSuccess = await fetchMoodleSchedule();
-      if (!moodleSuccess) {
+      try {
+        const response = await api.get('/moodle-schedule', {
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('token')}` 
+          }
+        });
+        
+        if (response.data.success && response.data.data.length > 0) {
+          const formattedSchedule = response.data.data.map(formatSession);
+          setSchedule(formattedSchedule);
+          setSource("moodle");
+          console.log('✓ Switched to Moodle schedule:', formattedSchedule.length, 'sessions');
+        } else {
+          await fetchManualSchedule();
+        }
+      } catch (err) {
+        console.warn('Moodle switch failed:', err);
         await fetchManualSchedule();
       }
     }
     
     setLoading(false);
-  }, [source, fetchMoodleSchedule, fetchManualSchedule]);
+  }, [source, classId, fetchManualSchedule]);
 
   return {
     schedule,
@@ -134,7 +161,6 @@ export const useDualSchedule = (classId) => {
     error,
     refreshSchedule,
     toggleSource,
-    fetchMoodleSchedule,
     fetchManualSchedule
   };
 };
