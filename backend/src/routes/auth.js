@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const db = require('../db');
 const oauthService = require('../services/oauth');
 
@@ -55,8 +56,18 @@ router.post('/login', async (req, res) => {
     
     const moodleUser = moodleResult.rows[0];
     
-    // Verify password using Moodle's password hash
-    const valid = await bcrypt.compare(password, moodleUser.password);
+    // Verify password using Moodle's MD5 hash
+    const verifyPassword = (input, hash) => {
+      // Check if it's an MD5 hash (starts with $ and is 32 chars)
+      if (!hash || !hash.startsWith('$') || hash.length !== 32) {
+        return false;
+      }
+      
+      const inputHash = crypto.createHash('md5').update(input).digest('hex');
+      return inputHash === hash.toLowerCase();
+    };
+    
+    const valid = verifyPassword(password, moodleUser.password);
     
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials' });

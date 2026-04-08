@@ -59,18 +59,19 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Authentication required' });
     }
     
-    // Query teacher's Moodle sessions with course filtering
+    // Query teacher's Moodle sessions with correct Moodle context
     const query = `
       SELECT 
         s.id AS sessionId,
         s.sessdate,
         s.duration,
-        a.course
+        c.fullname AS course
       FROM mdl_attendance_sessions s
       JOIN mdl_attendance a ON a.id = s.attendanceid
       JOIN mdl_course c ON c.id = a.course
       WHERE EXISTS (
-        SELECT 1 FROM mdl_role_assignments ra
+        SELECT 1 
+        FROM mdl_role_assignments ra
         JOIN mdl_context ctx ON ra.contextid = ctx.id
         WHERE ra.userid = ? 
         AND ctx.contextlevel = 50
