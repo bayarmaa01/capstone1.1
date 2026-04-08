@@ -151,4 +151,221 @@ router.get('/test', async (req, res) => {
     }
 });
 
+// 🎓 Get attendance records from Moodle
+router.get('/attendance/:courseId', async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        
+        console.log(`🎓 API: Fetching Moodle attendance for course ${courseId}...`);
+        
+        const attendance = await moodleApi.getAttendance(courseId);
+        
+        res.json({
+            success: true,
+            data: attendance,
+            total: attendance.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching Moodle attendance:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch Moodle attendance'
+        });
+    }
+});
+
+// ✅ Take attendance in Moodle
+router.post('/attendance/take', async (req, res) => {
+    try {
+        const { sessionId, studentId, status } = req.body;
+        
+        console.log('✅ API: Taking Moodle attendance:', { sessionId, studentId, status });
+        
+        const result = await moodleApi.takeAttendance(sessionId, studentId, status);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Attendance recorded in Moodle'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error taking Moodle attendance:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to record Moodle attendance'
+        });
+    }
+});
+
+// 🔄 Update attendance in Moodle
+router.put('/attendance/:attendanceId', async (req, res) => {
+    try {
+        const { attendanceId } = req.params;
+        const { status } = req.body;
+        
+        console.log('🔄 API: Updating Moodle attendance:', { attendanceId, status });
+        
+        const result = await moodleApi.updateAttendance(attendanceId, status);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Moodle attendance updated'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error updating Moodle attendance:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to update Moodle attendance'
+        });
+    }
+});
+
+// 📅 Get attendance sessions from Moodle
+router.get('/sessions/:courseId', async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        
+        console.log(`📅 API: Fetching Moodle sessions for course ${courseId}...`);
+        
+        const sessions = await moodleApi.getSessions(courseId);
+        
+        res.json({
+            success: true,
+            data: sessions,
+            total: sessions.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching Moodle sessions:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch Moodle sessions'
+        });
+    }
+});
+
+// ➕ Create attendance session in Moodle
+router.post('/sessions', async (req, res) => {
+    try {
+        const { courseId, sessionId, description } = req.body;
+        
+        console.log('➕ API: Creating Moodle session:', { courseId, sessionId, description });
+        
+        const result = await moodleApi.createSession(courseId, sessionId, description);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Moodle session created'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error creating Moodle session:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to create Moodle session'
+        });
+    }
+});
+
+// 🗑️ Delete attendance session in Moodle
+router.delete('/sessions/:sessionId', async (req, res) => {
+    try {
+        const { sessionId } = req.params;
+        
+        console.log(`🗑️ API: Deleting Moodle session ${sessionId}...`);
+        
+        const result = await moodleApi.deleteSession(sessionId);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Moodle session deleted'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error deleting Moodle session:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to delete Moodle session'
+        });
+    }
+});
+
+// 👤 Get user attendance from Moodle
+router.get('/user-attendance/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        
+        console.log(`👤 API: Fetching Moodle user attendance for ${userId}...`);
+        
+        const attendance = await moodleApi.getUserAttendance(userId);
+        
+        res.json({
+            success: true,
+            data: attendance,
+            total: attendance.length
+        });
+        
+    } catch (error) {
+        console.error('❌ Error fetching Moodle user attendance:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch Moodle user attendance'
+        });
+    }
+});
+
+// ✅ Mark multiple users as present in Moodle
+router.post('/attendance/mark-present', async (req, res) => {
+    try {
+        const { sessionId, userIds } = req.body;
+        
+        console.log('✅ API: Marking users present in Moodle:', { sessionId, userIds });
+        
+        const result = await moodleApi.markUsersPresent(sessionId, userIds);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Users marked present in Moodle'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error marking users present in Moodle:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark users present in Moodle'
+        });
+    }
+});
+
+// ❌ Mark multiple users as absent in Moodle
+router.post('/attendance/mark-absent', async (req, res) => {
+    try {
+        const { sessionId, userIds } = req.body;
+        
+        console.log('❌ API: Marking users absent in Moodle:', { sessionId, userIds });
+        
+        const result = await moodleApi.markUsersAbsent(sessionId, userIds);
+        
+        res.json({
+            success: true,
+            data: result,
+            message: 'Users marked absent in Moodle'
+        });
+        
+    } catch (error) {
+        console.error('❌ Error marking users absent in Moodle:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to mark users absent in Moodle'
+        });
+    }
+});
+
 module.exports = router;

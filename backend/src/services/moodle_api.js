@@ -131,6 +131,239 @@ class MoodleAPIService {
             return false;
         }
     }
+
+    // 🎓 ATTENDANCE FUNCTIONS
+    async getAttendance(courseId) {
+        try {
+            console.log(`🎓 Fetching Moodle attendance for course ${courseId}...`);
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_get_attendance',
+                moodlewsrestformat: this.restFormat,
+                courseid: courseId
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data || [];
+        } catch (error) {
+            console.error('❌ Error fetching attendance:', error.message);
+            return [];
+        }
+    }
+
+    async takeAttendance(sessionId, studentId, status) {
+        try {
+            console.log('✅ Taking Moodle attendance:', { sessionId, studentId, status });
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_take_attendance',
+                moodlewsrestformat: this.restFormat,
+                sessionid: sessionId,
+                studentid: studentId,
+                status: status // 1 = present, 0 = absent
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ Error taking attendance:', error.message);
+            throw error;
+        }
+    }
+
+    async updateAttendance(attendanceId, status) {
+        try {
+            console.log('🔄 Updating Moodle attendance:', { attendanceId, status });
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_update_attendance',
+                moodlewsrestformat: this.restFormat,
+                attendanceid: attendanceId,
+                status: status
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ Error updating attendance:', error.message);
+            throw error;
+        }
+    }
+
+    async getSessions(courseId) {
+        try {
+            console.log(`📅 Fetching Moodle sessions for course ${courseId}...`);
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_get_sessions',
+                moodlewsrestformat: this.restFormat,
+                courseid: courseId
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data || [];
+        } catch (error) {
+            console.error('❌ Error fetching sessions:', error.message);
+            return [];
+        }
+    }
+
+    async createSession(courseId, sessionId, description) {
+        try {
+            console.log('➕ Creating Moodle session:', { courseId, sessionId, description });
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_create_session',
+                moodlewsrestformat: this.restFormat,
+                courseid: courseId,
+                sessionid: sessionId,
+                description: description
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ Error creating session:', error.message);
+            throw error;
+        }
+    }
+
+    async deleteSession(sessionId) {
+        try {
+            console.log(`🗑️ Deleting Moodle session ${sessionId}...`);
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_delete_session',
+                moodlewsrestformat: this.restFormat,
+                sessionid: sessionId
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ Error deleting session:', error.message);
+            throw error;
+        }
+    }
+
+    async getUserAttendance(userId) {
+        try {
+            console.log(`👤 Fetching Moodle user attendance for ${userId}...`);
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_get_user_attendance',
+                moodlewsrestformat: this.restFormat,
+                userid: userId
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data || [];
+        } catch (error) {
+            console.error('❌ Error fetching user attendance:', error.message);
+            return [];
+        }
+    }
+
+    async markUsersPresent(sessionId, userIds) {
+        try {
+            console.log('✅ Marking users present in Moodle:', { sessionId, userIds });
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_mark_users_present',
+                moodlewsrestformat: this.restFormat,
+                sessionid: sessionId,
+                userids: Array.isArray(userIds) ? userIds.join(',') : userIds
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ Error marking users present:', error.message);
+            throw error;
+        }
+    }
+
+    async markUsersAbsent(sessionId, userIds) {
+        try {
+            console.log('❌ Marking users absent in Moodle:', { sessionId, userIds });
+            
+            const params = {
+                wstoken: this.token,
+                wsfunction: 'mod_attendance_mark_users_absent',
+                moodlewsrestformat: this.restFormat,
+                sessionid: sessionId,
+                userids: Array.isArray(userIds) ? userIds.join(',') : userIds
+            };
+
+            const response = await axios.post(this.baseUrl, params, {
+                timeout: 10000,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('❌ Error marking users absent:', error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = new MoodleAPIService();
