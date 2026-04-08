@@ -367,13 +367,13 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
                     {s.source === 'manual' && (
                       <>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleEdit(s); }} 
+                          onClick={(e) => { e.stopPropagation(); handleEdit(s); }}
                           style={btnEdit}
                         >
                           Edit
                         </button>
                         <button 
-                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} 
+                          onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }}
                           style={btnDel}
                         >
                           Delete

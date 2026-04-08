@@ -58,7 +58,7 @@ function App() {
           element={user ? <Dashboard user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />} 
         />
         <Route 
-          path="/class/:id" 
+          path="/class/:classId" 
           element={user ? <ClassScheduleClean classId={classId} /> : <Navigate to="/login" replace />} 
         />
         <Route 
