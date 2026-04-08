@@ -22,12 +22,11 @@ function formatSession(s) {
 
 export const useDualSchedule = (classId) => {
   const [schedule, setSchedule] = useState([]);
-  const [useMoodle, setUseMoodle] = useState(false);
+  const [source, setSource] = useState("manual");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [moodleHealth, setMoodleHealth] = useState(null);
 
-  // Fetch Moodle schedule
+  // Fetch Moodle schedule from backend
   const fetchMoodleSchedule = useCallback(async () => {
     try {
       const response = await api.get('/moodle-schedule');
@@ -37,7 +36,7 @@ export const useDualSchedule = (classId) => {
         const formattedSchedule = response.data.data.map(formatSession);
         
         setSchedule(formattedSchedule);
-        setUseMoodle(true);
+        setSource("moodle");
         setError(null);
         return true;
       } else {
@@ -68,7 +67,7 @@ export const useDualSchedule = (classId) => {
       }));
       
       setSchedule(formattedSchedule);
-      setUseMoodle(false);
+      setSource("manual");
       setError(null);
     } catch (err) {
       console.error('Manual schedule fetch failed:', err);
@@ -76,36 +75,16 @@ export const useDualSchedule = (classId) => {
     }
   }, [classId]);
 
-  // Check Moodle health
-  const checkMoodleHealth = useCallback(async () => {
-    try {
-      const response = await api.get('/moodle-schedule/health');
-      setMoodleHealth(response.data.success);
-      return response.data.success;
-    } catch (err) {
-      setMoodleHealth(false);
-      return false;
-    }
-  }, []);
-
   // Initialize schedule with exact merge logic
   useEffect(() => {
     const initializeSchedule = async () => {
       setLoading(true);
       
-      // First check Moodle health
-      const moodleIsHealthy = await checkMoodleHealth();
+      // Try to fetch Moodle schedule first
+      const moodleSuccess = await fetchMoodleSchedule();
       
-      if (moodleIsHealthy) {
-        // Try to fetch Moodle schedule
-        const moodleSuccess = await fetchMoodleSchedule();
-        
-        if (!moodleSuccess) {
-          // Fallback to manual schedule
-          await fetchManualSchedule();
-        }
-      } else {
-        // Moodle not healthy, use manual schedule
+      if (!moodleSuccess) {
+        // Fallback to manual schedule
         await fetchManualSchedule();
       }
       
@@ -113,14 +92,14 @@ export const useDualSchedule = (classId) => {
     };
 
     initializeSchedule();
-  }, [classId, fetchMoodleSchedule, fetchManualSchedule, checkMoodleHealth]);
+  }, [classId, fetchMoodleSchedule, fetchManualSchedule]);
 
   // Refresh schedule
   const refreshSchedule = useCallback(async () => {
     setLoading(true);
     setError(null);
     
-    if (useMoodle) {
+    if (source === "moodle") {
       const moodleSuccess = await fetchMoodleSchedule();
       if (!moodleSuccess) {
         await fetchManualSchedule();
@@ -130,13 +109,13 @@ export const useDualSchedule = (classId) => {
     }
     
     setLoading(false);
-  }, [useMoodle, fetchMoodleSchedule, fetchManualSchedule]);
+  }, [source, fetchMoodleSchedule, fetchManualSchedule]);
 
   // Toggle between Moodle and Manual
   const toggleSource = useCallback(async () => {
     setLoading(true);
     
-    if (useMoodle) {
+    if (source === "moodle") {
       await fetchManualSchedule();
     } else {
       const moodleSuccess = await fetchMoodleSchedule();
@@ -146,14 +125,13 @@ export const useDualSchedule = (classId) => {
     }
     
     setLoading(false);
-  }, [useMoodle, fetchMoodleSchedule, fetchManualSchedule]);
+  }, [source, fetchMoodleSchedule, fetchManualSchedule]);
 
   return {
     schedule,
-    useMoodle,
+    source,
     loading,
     error,
-    moodleHealth,
     refreshSchedule,
     toggleSource,
     fetchMoodleSchedule,

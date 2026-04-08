@@ -14,10 +14,9 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
   // Use dual schedule hook
   const {
     schedule,
-    useMoodle,
+    source,
     loading,
     error,
-    moodleHealth,
     refreshSchedule,
     toggleSource
   } = useDualSchedule(classId);
@@ -209,43 +208,41 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
               borderRadius: '4px',
               fontSize: '12px',
               fontWeight: '600',
-              background: useMoodle ? '#d4edda' : '#fff3cd',
-              color: useMoodle ? '#155724' : '#856404'
+              background: source === 'moodle' ? '#d4edda' : '#fff3cd',
+              color: source === 'moodle' ? '#155724' : '#856404'
             }}>
-              {useMoodle ? 'Source: Moodle' : 'Source: Manual'}
+              {source === 'moodle' ? 'Synced' : 'Manual'}
             </span>
-            {moodleHealth !== null && (
+            {schedule.length === 0 && !loading && (
               <span style={{
                 padding: '4px 8px',
                 borderRadius: '4px',
                 fontSize: '12px',
                 fontWeight: '600',
-                background: moodleHealth ? '#d1ecf1' : '#f8d7da',
-                color: moodleHealth ? '#0c5460' : '#721c24'
+                background: '#f8d7da',
+                color: '#721c24'
               }}>
-                Moodle: {moodleHealth ? 'Connected' : 'Offline'}
+                No sessions available
               </span>
             )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          {moodleHealth && (
-            <button 
-              onClick={toggleSource}
-              style={{
-                background: '#17a2b8',
-                color: 'white',
-                border: 'none',
-                padding: '8px 14px',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontWeight: '600',
-                fontSize: '14px'
-              }}
-            >
-              Switch to {useMoodle ? 'Manual' : 'Moodle'}
-            </button>
-          )}
+          <button 
+            onClick={toggleSource}
+            style={{
+              background: '#17a2b8',
+              color: 'white',
+              border: 'none',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}
+          >
+            Switch to {source === 'moodle' ? 'Manual' : 'Synced'}
+          </button>
           <button onClick={() => setShowForm(true)} style={{
             background: '#28a745',
             color: 'white',
@@ -333,7 +330,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
                     background: s.source === 'moodle' ? '#28a745' : '#ffc107',
                     color: 'white'
                   }}>
-                    {s.source === 'moodle' ? 'Synced' : 'Fallback'}
+                    {s.source === 'moodle' ? 'Synced' : 'Manual'}
                   </span>
                 </td>
                 <td style={cell}>
@@ -371,6 +368,18 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
               </tr>
             );
           })}
+          {schedule.length === 0 && !loading && (
+            <tr>
+              <td colSpan="7" style={{ 
+                textAlign: 'center', 
+                padding: '40px', 
+                color: '#999',
+                fontStyle: 'italic'
+              }}>
+                No sessions available. {source === 'moodle' ? 'Try switching to Manual schedule.' : 'Add a schedule to get started.'}
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
 
