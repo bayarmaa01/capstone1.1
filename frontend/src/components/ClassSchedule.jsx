@@ -248,6 +248,8 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
       {loading && (
         <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
           Loading schedule...
+        </div>
+      )}
 
       {/* Current Time Display */}
       <div style={{ 

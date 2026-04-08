@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import ClassPage from './pages/ClassPage';
 import AttendancePage from './pages/AttendancePage';
 import AttendanceSession from './components/AttendanceSession';
 import ClassScheduleClean from './components/ClassScheduleClean';
+
+function ClassScheduleWrapper() {
+  const { classId } = useParams();
+  return <ClassScheduleClean classId={classId} />;
+}
 
 function App() {
   const [user, setUser] = useState(null);
@@ -59,7 +64,7 @@ function App() {
         />
         <Route 
           path="/class/:classId" 
-          element={user ? <ClassScheduleClean classId={classId} /> : <Navigate to="/login" replace />} 
+          element={user ? <ClassScheduleWrapper /> : <Navigate to="/login" replace />} 
         />
         <Route 
           path="/attendance/:id" 
