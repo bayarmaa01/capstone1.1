@@ -208,6 +208,16 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
             }}>
               {source === 'moodle' ? 'Synced' : 'Manual'}
             </span>
+            <span style={{
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: '600',
+              background: 'transparent',
+              color: source === 'moodle' ? '#28a745' : '#ffc107'
+            }}>
+              {source === 'moodle' ? 'Synced' : 'Manual'}
+            </span>
             {schedule.length === 0 && !loading && (
               <span style={{
                 padding: '4px 8px',
