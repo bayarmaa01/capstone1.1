@@ -46,22 +46,22 @@ const activeConnections = new client.Gauge({
 });
 
 const nodejsHeapSizeUsed = new client.Gauge({
-  name: 'nodejs_heap_size_used_bytes',
+  name: 'app_heap_size_used_bytes',
   help: 'Process heap size used in bytes'
 });
 
 const nodejsHeapSizeTotal = new client.Gauge({
-  name: 'nodejs_heap_size_total_bytes',
+  name: 'app_heap_size_total_bytes',
   help: 'Process heap size total in bytes'
 });
 
 const nodejsExternalMemory = new client.Gauge({
-  name: 'nodejs_external_memory_bytes',
+  name: 'app_external_memory_bytes',
   help: 'Process external memory size in bytes'
 });
 
 const nodejsRssMemory = new client.Gauge({
-  name: 'nodejs_rss_memory_bytes',
+  name: 'app_rss_memory_bytes',
   help: 'Process RSS memory size in bytes'
 });
 
