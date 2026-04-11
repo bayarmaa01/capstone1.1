@@ -141,8 +141,8 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build & Push Docker image
         uses: docker/build-push-action@v5
@@ -154,6 +154,7 @@ jobs:
             ${{ env.IMAGE_NAME }}-${{ matrix.service }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          pull: false
 
 # -----------------------------
 # 🚀 BLUE/GREEN DEPLOYMENT

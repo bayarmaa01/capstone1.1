@@ -1,5 +1,12 @@
 # Single-stage build for face recognition service
-FROM jjanzic/docker-python3-opencv:latest
+FROM python:3.10-slim
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Fix deprecated repositories and install build dependencies
 RUN sed -i 's|http://deb.debian.org|http://archive.debian.org|g' /etc/apt/sources.list && \
