@@ -228,9 +228,9 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date(),
     });
   } catch (error) {
-    // Always return 200 for health checks, but include error info
-    res.json({
-      status: 'ok',
+    // Return 500 if DB is down - reflect real state
+    res.status(500).json({
+      status: 'error',
       service: 'attendance-backend',
       database: 'disconnected',
       error: error.message,
@@ -241,7 +241,12 @@ app.get('/api/health', async (req, res) => {
 
 // Prometheus Metrics Endpoint
 const client = require('prom-client');
-client.collectDefaultMetrics();
+
+// Prevent duplicate collectDefaultMetrics
+if (!global._metricsCollected) {
+  client.collectDefaultMetrics();
+  global._metricsCollected = true;
+}
 
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', client.register.contentType);
