@@ -242,12 +242,6 @@ app.get('/api/health', async (req, res) => {
 // Prometheus Metrics Endpoint
 const client = require('prom-client');
 
-// Prevent duplicate collectDefaultMetrics
-if (!global._metricsCollected) {
-  client.collectDefaultMetrics();
-  global._metricsCollected = true;
-}
-
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', client.register.contentType);
   res.end(await client.register.metrics());
