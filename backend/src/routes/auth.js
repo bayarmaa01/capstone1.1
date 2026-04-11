@@ -62,6 +62,8 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password required' });
     }
     
+    console.log(`🔐 Login attempt - Username: ${username}`);
+    
     // Query Moodle user database
     const moodleResult = await moodlePool.query(
       'SELECT id, username, password, email, firstname, lastname FROM mdl_user WHERE username = ? AND deleted = 0',
@@ -69,25 +71,31 @@ router.post('/login', async (req, res) => {
     );
     
     if (moodleResult.length === 0) {
+      console.log(`❌ Login failed - User not found: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
     const moodleUser = moodleResult[0];
+    console.log(`👤 User found - ID: ${moodleUser.id}, Username: ${moodleUser.username}`);
     
     // Verify password using Moodle's MD5 hash
     const verifyPassword = (input, hash) => {
       // Check if it's an MD5 hash (starts with $ and is 32 chars)
       if (!hash || !hash.startsWith('$') || hash.length !== 32) {
+        console.log(`⚠️ Invalid password hash format: ${hash}`);
         return false;
       }
       
       const inputHash = crypto.createHash('md5').update(input).digest('hex');
-      return inputHash === hash.toLowerCase();
+      const isValid = inputHash === hash.toLowerCase();
+      console.log(`🔑 Password verification: ${isValid ? 'SUCCESS' : 'FAILED'}`);
+      return isValid;
     };
     
     const valid = verifyPassword(password, moodleUser.password);
     
     if (!valid) {
+      console.log(`❌ Login failed - Password mismatch for user: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
