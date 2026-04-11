@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require('fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const metrics = require('./metrics');
 
 // Trust proxy for nginx reverse proxy
 const app = express();
@@ -84,6 +85,74 @@ if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
 // }
 
 // =======================================
+// Metrics Collection
+// =======================================
+metrics.collectDefaultMetrics();
+
+// Update metrics periodically
+setInterval(() => {
+  metrics.updateMemoryMetrics();
+  metrics.updateEventLoopLag();
+}, 5000);
+
+// Metrics middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  
+  res.on('finish', () => {
+    const duration = (Date.now() - start) / 1000;
+    const route = req.route ? req.route.path : req.path;
+    const method = req.method;
+    const status = res.statusCode;
+    
+    metrics.httpRequestDuration
+      .labels(method, route, status)
+      .observe(duration);
+    
+    metrics.httpRequestTotal
+      .labels(method, route, status)
+      .inc();
+    
+    metrics.httpRequestSize
+      .labels(method, route, status)
+      .observe(req.get('content-length') || 0);
+    
+    metrics.httpResponseSize
+      .labels(method, route, status)
+      .observe(res.get('content-length') || 0);
+    
+    // Update connection count
+    metrics.activeConnections.inc();
+    
+    // Update attendance submission metrics
+    if (route === '/api/attendance/record' && status === 200) {
+      metrics.attendanceSubmissions
+        .labels(req.body.class_id || 'unknown', 'success')
+        .inc();
+    }
+    
+    // Update face recognition metrics
+    if (route === '/api/face/recognize' && status === 200) {
+      const confidence = req.body.confidence || 0;
+      if (confidence > 0.6) {
+        metrics.faceRecognitionSuccess
+          .labels(req.body.user_id || 'unknown', confidence > 0.8 ? 'high' : 'medium')
+          .inc();
+      } else {
+        metrics.faceRecognitionFailure
+          .labels('low_confidence', req.body.user_id || 'unknown')
+          .inc();
+      }
+    }
+    
+    // Decrease connection count
+    metrics.activeConnections.dec();
+  });
+  
+  next();
+});
+
+// =======================================
 // Middleware Setup
 // =======================================
 
@@ -153,6 +222,12 @@ app.get('/api/health', (req, res) => {
     service: 'attendance-backend',
     timestamp: new Date(),
   });
+});
+
+// Prometheus Metrics Endpoint
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', metrics.register.metrics.contentType);
+  res.end(metrics.register.metrics());
 });
 
 // Debug route to test routing
