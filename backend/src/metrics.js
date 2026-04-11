@@ -1,15 +1,16 @@
 const client = require('prom-client');
 
+// Safe singleton pattern for metrics initialization
 const collectDefaultMetrics = () => {
-  // Clear registry to prevent duplicate registration
-  client.register.clear();
-  
-  const collectDefaultMetrics = require('prom-client').collectDefaultMetrics;
-  collectDefaultMetrics({
-    timeout: 5000,
-    gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
-    gctimeBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
-  });
+  if (!global._metricsInitialized) {
+    const collectDefaultMetrics = require('prom-client').collectDefaultMetrics;
+    collectDefaultMetrics({
+      timeout: 5000,
+      gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
+      gctimeBuckets: [0.001, 0.01, 0.1, 1, 2, 5]
+    });
+    global._metricsInitialized = true;
+  }
 };
 
 const httpRequestDuration = new client.Histogram({
