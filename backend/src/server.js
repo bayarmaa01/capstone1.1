@@ -115,11 +115,11 @@ app.use((req, res, next) => {
     
     metrics.httpRequestSize
       .labels(method, route, status)
-      .observe(req.get('content-length') || 0);
+      .observe(parseFloat(req.get('content-length')) || 0);
     
     metrics.httpResponseSize
       .labels(method, route, status)
-      .observe(res.get('content-length') || 0);
+      .observe(parseFloat(res.get('content-length')) || 0);
     
     // Update connection count
     metrics.activeConnections.inc();
