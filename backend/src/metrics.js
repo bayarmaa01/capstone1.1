@@ -66,8 +66,8 @@ const nodejsRssMemory = new client.Gauge({
 });
 
 const eventLoopLag = new client.Gauge({
-  name: 'nodejs_eventloop_lag_seconds',
-  help: 'Event loop lag in seconds'
+  name: 'app_eventloop_lag_seconds',
+  help: 'Application event loop lag in seconds'
 });
 
 const attendanceSubmissions = new client.Counter({
