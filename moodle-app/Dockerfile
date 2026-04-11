@@ -46,12 +46,13 @@ RUN mkdir -p /var/www/moodledata && \
     chown www-data:www-data /var/www/moodledata && \
     chmod 755 /var/www/moodledata
 
+# Set PHP configuration before switching user
+RUN echo "max_input_vars=5000" >> /usr/local/etc/php/conf.d/custom.ini
+
 # Set proper ownership and switch to non-root user
 RUN chown -R www-data:www-data /var/www/html && \
     chsh -s /bin/bash www-data
 USER www-data
-
-RUN echo "max_input_vars=5000" >> /usr/local/etc/php/conf.d/custom.ini
 # Expose port
 EXPOSE 80
 
