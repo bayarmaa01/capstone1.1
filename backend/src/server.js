@@ -216,22 +216,36 @@ app.get('/health', (req, res) => {
 });
 
 // API Health Check Endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'attendance-backend',
-    timestamp: new Date(),
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Test database connection
+    await db.query('SELECT 1');
+    
+    res.json({
+      status: 'ok',
+      service: 'attendance-backend',
+      database: 'connected',
+      timestamp: new Date(),
+    });
+  } catch (error) {
+    // Always return 200 for health checks, but include error info
+    res.json({
+      status: 'ok',
+      service: 'attendance-backend',
+      database: 'disconnected',
+      error: error.message,
+      timestamp: new Date(),
+    });
+  }
 });
 
 // Prometheus Metrics Endpoint
 const client = require('prom-client');
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
+client.collectDefaultMetrics();
 
 app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
+  res.set('Content-Type', client.register.contentType);
+  res.end(await client.register.metrics());
 });
 
 // Debug route to test routing

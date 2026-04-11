@@ -42,7 +42,10 @@ export default function LoginPage() {
     } catch (err) {
       console.error('LOGIN ERROR:', err);
       console.error('LOGIN ERROR RESPONSE:', err?.response?.data);
-      setError(err?.response?.data?.error || err?.message || 'Login failed');
+      const errorMessage = err?.response?.data?.error || err?.message || 'Login failed';
+      setError(errorMessage);
+      // Always show alert for critical errors
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }

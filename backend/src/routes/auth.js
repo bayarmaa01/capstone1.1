@@ -156,13 +156,13 @@ router.post('/login', async (req, res) => {
         email: moodleUser.email,
         name: `${moodleUser.firstname} ${moodleUser.lastname}`,
         role: userRole,
-        course_id: roleResult.rows[0].course_id,
-        course_name: roleResult.rows[0].course_name
+        course_id: roleResult[0].course_id,
+        course_name: roleResult[0].course_name
       }
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
