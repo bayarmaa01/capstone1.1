@@ -14,7 +14,6 @@
     "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "dependencies": {
-    "@azure/storage-blob": "^12.17.0",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -31,7 +30,7 @@
     "prom-client": "^14.2.0"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.20.8"
   },
   "devDependencies": {
     "nodemon": "^2.0.22",
