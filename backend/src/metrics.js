@@ -1,6 +1,9 @@
 const client = require('prom-client');
 
 const collectDefaultMetrics = () => {
+  // Clear registry to prevent duplicate registration
+  client.register.clear();
+  
   const collectDefaultMetrics = require('prom-client').collectDefaultMetrics;
   collectDefaultMetrics({
     timeout: 5000,

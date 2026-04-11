@@ -1,10 +1,46 @@
 global:
   scrape_interval: 5s
+  evaluation_interval: 5s
 
 scrape_configs:
   - job_name: 'backend'
     static_configs:
-      - targets: ['blue_backend:4000']
-  - job_name: 'green_backend'
+      - targets: ['blue_backend:4000', 'green_backend:4000']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'nginx'
     static_configs:
-      - targets: ['green_backend:4000']
+      - targets: ['nginx-exporter:9113']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    metrics_path: '/metrics'
+    scrape_interval: 5s
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
