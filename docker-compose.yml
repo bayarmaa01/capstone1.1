@@ -194,9 +194,14 @@ services:
       - "8081:80"
     volumes:
       - moodle_data:/var/www/moodledata
+      - ./moodle/mod:/var/www/html/mod:ro
     environment:
-      - MOODLE_WWWROOT=http://40.90.174.78:8081
-      - MOODLE_REVERSEPROXY=false
+      - MOODLE_DB_HOST=moodle-db
+      - MOODLE_DB_USER=moodle
+      - MOODLE_DB_PASSWORD=moodle_secret
+      - MOODLE_DB_NAME=moodle
+      - MOODLE_DB_PORT=3306
+      - MOODLE_WWWROOT=https://attendance-ml.duckdns.org/moodle
       - MOODLE_SSLPROXY=false
     networks:
       - app_network

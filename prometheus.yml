@@ -4,4 +4,7 @@ global:
 scrape_configs:
   - job_name: 'backend'
     static_configs:
-      - targets: ['capstone11-blue_backend-1:4000']
+      - targets: ['blue_backend:4000']
+  - job_name: 'green_backend'
+    static_configs:
+      - targets: ['green_backend:4000']

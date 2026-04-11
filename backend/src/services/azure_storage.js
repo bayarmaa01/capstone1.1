@@ -1,15 +1,36 @@
-const { BlobServiceClient } = require('@azure/storage-blob');
 const crypto = require('crypto');
+
+// Try to load Azure Storage, but don't fail if not available
+let BlobServiceClient;
+try {
+  BlobServiceClient = require('@azure/storage-blob');
+} catch (error) {
+  console.log('⚠️ Azure Storage SDK not available - using local storage fallback');
+  BlobServiceClient = null;
+}
 
 class AzureStorageService {
   constructor() {
     this.connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
     this.containerName = process.env.AZURE_STORAGE_CONTAINER || 'face-images';
-    this.blobServiceClient = BlobServiceClient.fromConnectionString(this.connectionString);
-    this.containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+    
+    // Only initialize Azure if SDK is available
+    if (BlobServiceClient) {
+      this.blobServiceClient = BlobServiceClient.fromConnectionString(this.connectionString);
+      this.containerClient = this.blobServiceClient.getContainerClient(this.containerName);
+    } else {
+      console.log('🔄 Azure Storage not available - using local storage fallback');
+      this.blobServiceClient = null;
+      this.containerClient = null;
+    }
   }
 
   async initializeContainer() {
+    if (!this.containerClient) {
+      console.log('📁 Using local storage - Azure Storage not available');
+      return;
+    }
+    
     try {
       await this.containerClient.createIfNotExists();
       console.log('✅ Azure Storage container initialized');
