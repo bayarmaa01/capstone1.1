@@ -225,9 +225,13 @@ app.get('/api/health', (req, res) => {
 });
 
 // Prometheus Metrics Endpoint
-app.get('/metrics', (req, res) => {
-  res.set('Content-Type', metrics.register.metrics.contentType);
-  res.end(metrics.register.metrics());
+const client = require('prom-client');
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
 });
 
 // Debug route to test routing

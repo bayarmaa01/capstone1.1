@@ -24,7 +24,9 @@ export default function LoginPage() {
     setError('');
 
     try {
+      console.log('LOGIN ATTEMPT:', formData);
       const response = await api.post('/auth/login', formData);
+      console.log('LOGIN RESPONSE:', response.data);
       
       if (response.data.success) {
         // Save JWT to localStorage
@@ -34,10 +36,13 @@ export default function LoginPage() {
         // Redirect to dashboard
         navigate('/dashboard');
       } else {
+        console.error('LOGIN FAILED:', response.data);
         setError(response.data.error || 'Login failed');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      console.error('LOGIN ERROR:', err);
+      console.error('LOGIN ERROR RESPONSE:', err?.response?.data);
+      setError(err?.response?.data?.error || err?.message || 'Login failed');
     } finally {
       setLoading(false);
     }

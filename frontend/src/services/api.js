@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create centralized API client
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || '/api',
+  baseURL: process.env.REACT_APP_API_URL || 'https://attendance-ml.duckdns.org/api',
   headers: {
     'Content-Type': 'application/json',
   },
