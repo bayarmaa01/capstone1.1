@@ -48,7 +48,7 @@ RUN mkdir -p /var/www/moodledata && \
 
 # Set proper ownership and switch to non-root user
 RUN chown -R www-data:www-data /var/www/html && \
-    usermod -u www-data -s /bin/bash www-data
+    chsh -s /bin/bash www-data
 USER www-data
 
 RUN echo "max_input_vars=5000" >> /usr/local/etc/php/conf.d/custom.ini
