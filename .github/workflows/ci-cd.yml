@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: docker.io
-  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ghcr.io/${{ secrets.DOCKERHUB_USERNAME }}/capstone1.1
 
 jobs:
 
