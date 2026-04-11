@@ -80,6 +80,8 @@ services:
       - FACE_SERVICE_URL=http://green_face:5001
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./backend/uploads:/app/uploads
     networks:
       - app_network
     depends_on:
@@ -88,11 +90,11 @@ services:
       redis:
         condition: service_started
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 10s
-      timeout: 3s
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 15s
+      timeout: 10s
       retries: 3
-      start_period: 20s
+      start_period: 30s
 
   green_frontend:
     build:
@@ -269,6 +271,7 @@ services:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     networks:
       - app_network
@@ -279,6 +282,7 @@ services:
       - '--web.console.templates=/etc/prometheus/consoles'
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
+      - '--alertmanager.notification-queue-capacity=10000'
 
   grafana:
     image: grafana/grafana:latest
