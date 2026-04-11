@@ -10,6 +10,8 @@ const fs = require('fs');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const metrics = require('./metrics');
+const azureStorageService = require('./services/azure_storage');
+const db = require('./db');
 
 // Trust proxy for nginx reverse proxy
 const app = express();
@@ -17,7 +19,6 @@ app.set('trust proxy', 1);
 
 // const { startAutoAbsentJob } = require('./autoAbsentJob');
 // const lmsSyncService = require('./services/lms_sync');
-const azureStorageService = require('./services/azure_storage');
 
 // Initialize database schema on startup
 const initializeDatabase = async () => {

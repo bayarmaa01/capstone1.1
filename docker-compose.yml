@@ -250,8 +250,6 @@ services:
     depends_on:
       blue_backend:
         condition: service_healthy
-      green_backend:
-        condition: service_healthy
       blue_frontend:
         condition: service_started
       blue_face:
