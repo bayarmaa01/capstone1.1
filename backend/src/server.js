@@ -105,21 +105,44 @@ app.use((req, res, next) => {
     const method = req.method;
     const status = res.statusCode;
     
-    metrics.httpRequestDuration
-      .labels(method, route, status)
-      .observe(duration);
+    // Convert to seconds and ensure number with safety check
+    const durationSec = Number(duration) / 1000;
+    
+    try {
+      if (!isNaN(durationSec) && isFinite(durationSec)) {
+        metrics.httpRequestDuration
+          .labels(method, route, status)
+          .observe(durationSec);
+      }
+    } catch (err) {
+      console.error('Metrics duration observe error:', err.message);
+    }
     
     metrics.httpRequestTotal
       .labels(method, route, status)
       .inc();
     
-    metrics.httpRequestSize
-      .labels(method, route, status)
-      .observe(parseFloat(req.get('content-length')) || 0);
+    try {
+      const requestSize = parseFloat(req.get('content-length')) || 0;
+      if (!isNaN(requestSize) && isFinite(requestSize)) {
+        metrics.httpRequestSize
+          .labels(method, route, status)
+          .observe(requestSize);
+      }
+    } catch (err) {
+      console.error('Metrics request size observe error:', err.message);
+    }
     
-    metrics.httpResponseSize
-      .labels(method, route, status)
-      .observe(parseFloat(res.get('content-length')) || 0);
+    try {
+      const responseSize = parseFloat(res.get('content-length')) || 0;
+      if (!isNaN(responseSize) && isFinite(responseSize)) {
+        metrics.httpResponseSize
+          .labels(method, route, status)
+          .observe(responseSize);
+      }
+    } catch (err) {
+      console.error('Metrics response size observe error:', err.message);
+    }
     
     // Update connection count
     metrics.activeConnections.inc();
