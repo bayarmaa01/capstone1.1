@@ -252,11 +252,16 @@ services:
         condition: service_healthy
       green_backend:
         condition: service_healthy
-      - blue_frontend
-      - blue_face
-      - green_frontend
-      - green_face
-      - moodle
+      blue_frontend:
+        condition: service_started
+      blue_face:
+        condition: service_healthy
+      green_frontend:
+        condition: service_started
+      green_face:
+        condition: service_healthy
+      moodle:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
