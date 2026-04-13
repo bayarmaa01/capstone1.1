@@ -12,7 +12,8 @@ export default function ClassDashboard() {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showStudentProfile, setShowStudentProfile] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
-  const [attendanceMode, setAttendanceMode] = useState('face'); // 'face' or 'qr'
+  const [attendanceMode, setAttendanceMode] = useState('face');
+  const [selectedSession, setSelectedSession] = useState(null);
 
   useEffect(() => {
     loadClassData();
@@ -51,9 +52,29 @@ export default function ClassDashboard() {
     setShowStudentProfile(true);
   };
 
-  const handleTakeAttendance = (mode) => {
+  const handleTakeAttendance = (session, mode) => {
+    setSelectedSession(session);
     setAttendanceMode(mode);
     setShowAttendanceModal(true);
+  };
+
+  const isSessionActive = (session) => {
+    const now = new Date();
+    const sessionDate = new Date(session.session_date || session.scheduled_date);
+    const startTime = session.start_time ? new Date(`${sessionDate.toDateString()} ${session.start_time}`) : null;
+    const endTime = session.end_time ? new Date(`${sessionDate.toDateString()} ${session.end_time}`) : null;
+    
+    if (!startTime || !endTime) return false;
+    
+    const timeDiff = Math.abs(now - startTime);
+    const tenMinutes = 10 * 60 * 1000;
+    
+    return timeDiff <= tenMinutes && now <= endTime;
+  };
+
+  const formatDayName = (dayOfWeek) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayOfWeek] || 'Unknown';
   };
 
   const handleAddStudent = () => {
@@ -101,47 +122,11 @@ export default function ClassDashboard() {
               {classInfo?.code || 'Course Code'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              onClick={() => handleTakeAttendance('face')}
-              style={{
-                padding: '12px 24px',
-                background: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <span>Face Scan</span>
-            </button>
-            <button
-              onClick={() => handleTakeAttendance('qr')}
-              style={{
-                padding: '12px 24px',
-                background: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <span>QR Scan</span>
-            </button>
-          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' }}>
-        {/* Student List */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+        {/* Students Section */}
         <div style={{
           background: 'white',
           borderRadius: '10px',
@@ -236,74 +221,116 @@ export default function ClassDashboard() {
           </div>
         </div>
 
-        {/* Right Column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          {/* Schedule */}
-          <div style={{
-            background: 'white',
-            borderRadius: '10px',
-            padding: '20px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', fontSize: '20px' }}>
-              Schedule
-            </h2>
+        {/* Schedule/Timetable Section */}
+        <div style={{
+          background: 'white',
+          borderRadius: '10px',
+          padding: '20px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', fontSize: '20px' }}>
+            Schedule / Timetable
+          </h2>
+          
+          {schedule.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '40px',
+              color: '#6c757d'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>Schedule</div>
+              <div>No schedule available</div>
+            </div>
+          ) : (
             <div style={{ display: 'grid', gap: '10px' }}>
-              {schedule.map((session, index) => (
-                <div
-                  key={index}
-                  style={{
-                    padding: '12px',
-                    background: '#f8f9fa',
-                    borderRadius: '6px',
-                    borderLeft: '4px solid #007bff'
-                  }}
-                >
-                  <div style={{ fontWeight: 'bold', color: '#2c3e50' }}>
-                    {session.day}
+              {schedule.map((session, index) => {
+                const isActive = isSessionActive(session);
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      padding: '15px',
+                      background: isActive ? '#e8f5e8' : '#f8f9fa',
+                      borderRadius: '8px',
+                      borderLeft: `4px solid ${isActive ? '#28a745' : '#007bff'}`,
+                      position: 'relative'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 'bold', color: '#2c3e50', marginBottom: '5px' }}>
+                          {session.scheduled_date ? 
+                            new Date(session.scheduled_date).toLocaleDateString('en-US', { 
+                              weekday: 'long', 
+                              month: 'short', 
+                              day: 'numeric' 
+                            }) : 
+                            formatDayName(session.day_of_week)
+                          }
+                        </div>
+                        <div style={{ color: '#6c757d', fontSize: '14px', marginBottom: '5px' }}>
+                          {session.start_time && session.end_time ? 
+                            `${session.start_time} - ${session.end_time}` : 
+                            'All day'
+                          }
+                        </div>
+                        {session.room_number && (
+                          <div style={{ color: '#007bff', fontSize: '14px' }}>
+                            Room: {session.room_number}
+                          </div>
+                        )}
+                        <div style={{ marginTop: '5px' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            background: session.source === 'scheduled' ? '#28a745' : '#6c757d',
+                            color: 'white'
+                          }}>
+                            {session.source === 'scheduled' ? 'Synced' : 'Manual'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {isActive && (
+                        <div style={{ display: 'flex', gap: '5px', marginLeft: '10px' }}>
+                          <button
+                            onClick={() => handleTakeAttendance(session, 'face')}
+                            style={{
+                              padding: '6px 12px',
+                              background: '#007bff',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Face
+                          </button>
+                          <button
+                            onClick={() => handleTakeAttendance(session, 'qr')}
+                            style={{
+                              padding: '6px 12px',
+                              background: '#28a745',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            QR
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ color: '#6c757d', fontSize: '14px' }}>
-                    {session.time}
-                  </div>
-                  <div style={{ color: '#007bff', fontSize: '14px', marginTop: '4px' }}>
-                    {session.course}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div style={{
-            background: 'white',
-            borderRadius: '10px',
-            padding: '20px',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-          }}>
-            <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', fontSize: '20px' }}>
-              Overview
-            </h2>
-            <div style={{ display: 'grid', gap: '15px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#6c757d' }}>Total Students</span>
-                <span style={{ fontWeight: 'bold', color: '#2c3e50' }}>
-                  {students.length}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#6c757d' }}>At Risk</span>
-                <span style={{ fontWeight: 'bold', color: '#dc3545' }}>
-                  {students.filter(s => (s.attendance_percentage || 0) < 75).length}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#6c757d' }}>Good Standing</span>
-                <span style={{ fontWeight: 'bold', color: '#28a745' }}>
-                  {students.filter(s => (s.attendance_percentage || 0) >= 75).length}
-                </span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -408,7 +435,7 @@ export default function ClassDashboard() {
       )}
 
       {/* Attendance Modal */}
-      {showAttendanceModal && (
+      {showAttendanceModal && selectedSession && (
         <div style={{
           position: 'fixed',
           top: 0,
@@ -432,6 +459,26 @@ export default function ClassDashboard() {
             <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>
               {attendanceMode === 'face' ? 'Face Scanning' : 'QR Code Scanning'}
             </h2>
+            
+            <div style={{
+              marginBottom: '20px',
+              padding: '15px',
+              background: '#f8f9fa',
+              borderRadius: '8px'
+            }}>
+              <div style={{ color: '#6c757d', fontSize: '14px' }}>
+                Session: {selectedSession.scheduled_date ? 
+                  new Date(selectedSession.scheduled_date).toLocaleDateString() : 
+                  formatDayName(selectedSession.day_of_week)
+                }
+              </div>
+              <div style={{ color: '#6c757d', fontSize: '14px' }}>
+                Time: {selectedSession.start_time && selectedSession.end_time ? 
+                  `${selectedSession.start_time} - ${selectedSession.end_time}` : 
+                  'All day'
+                }
+              </div>
+            </div>
             
             <div style={{
               width: '300px',
