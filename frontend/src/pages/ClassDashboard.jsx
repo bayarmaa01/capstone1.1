@@ -25,20 +25,35 @@ export default function ClassDashboard() {
     try {
       setLoading(true);
       
+      console.log('Loading class data for classId:', classId);
+      
       // Load class information
+      console.log('Fetching class info...');
       const classResponse = await api.get(`/classes/${classId}`);
+      console.log('Class info response:', classResponse.data);
       setClassInfo(classResponse.data);
       
       // Load students
+      console.log('Fetching students...');
       const studentsResponse = await api.get(`/classes/${classId}/students`);
+      console.log('Students response:', studentsResponse.data);
       setStudents(studentsResponse.data);
       
       // Load schedule
+      console.log('Fetching schedule...');
       const scheduleResponse = await api.get(`/classes/${classId}/schedule`);
+      console.log('Schedule response:', scheduleResponse.data);
       setSchedule(scheduleResponse.data);
       
     } catch (error) {
       console.error('Error loading class data:', error);
+      console.error('Error details:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      // Set empty data on error to prevent loading state
+      setClassInfo(null);
+      setStudents([]);
+      setSchedule([]);
     } finally {
       setLoading(false);
     }
@@ -80,8 +95,33 @@ export default function ClassDashboard() {
   };
 
   const handleAddStudent = () => {
-    // TODO: Implement add student modal
-    console.log('Add student clicked');
+    // Simple prompt for now - can be enhanced to a modal later
+    const studentId = prompt('Enter Student ID:');
+    if (studentId) {
+      enrollStudent(studentId);
+    }
+  };
+
+  const enrollStudent = async (studentId) => {
+    try {
+      await api.post(`/classes/${classId}/enroll`, { student_id: studentId });
+      // Refresh student data
+      const studentsResponse = await api.get(`/classes/${classId}/students`);
+      setStudents(studentsResponse.data);
+      
+      // Show success notification
+      const note = document.createElement('div');
+      note.style.cssText = `
+        position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
+        color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
+      `;
+      note.innerHTML = `Student ${studentId} enrolled successfully`;
+      document.body.appendChild(note);
+      setTimeout(() => note.remove(), 3000);
+    } catch (error) {
+      console.error('Error enrolling student:', error);
+      alert('Error enrolling student. Please check the student ID and try again.');
+    }
   };
 
   const markAttendance = async (studentId, method) => {
