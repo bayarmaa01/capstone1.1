@@ -76,19 +76,20 @@ router.post('/login', async (req, res) => {
     }
     
     // Query Moodle user database
-    const moodleResult = await moodlePool.query(
+    const [moodleRows] = await moodlePool.query(
       'SELECT id, username, password, email, firstname, lastname FROM mdl_user WHERE username = ? AND deleted = 0',
       [username]
     );
     
-    console.log('MOODLE QUERY RESULT:', moodleResult.length, 'rows found');
+    console.log('MOODLE QUERY RESULT:', moodleRows.length, 'rows found');
+    console.log('MOODLE ROWS:', JSON.stringify(moodleRows, null, 2));
     
-    if (moodleResult.length === 0) {
+    if (moodleRows.length === 0) {
       console.log(` Login failed - User not found: ${username}`);
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
-    const moodleUser = moodleResult[0];
+    const moodleUser = moodleRows[0];
     console.log(` User found - ID: ${moodleUser.id}, Username: ${moodleUser.username}`);
     
     // Verify password using Moodle's bcrypt hash
@@ -128,7 +129,7 @@ router.post('/login', async (req, res) => {
     }
     
     // Check if user is a teacher using Moodle role assignments
-    const roleResult = await moodlePool.query(`
+    const [roleRows] = await moodlePool.query(`
       SELECT ra.roleid, r.shortname, c.id as course_id, c.fullname as course_name
       FROM mdl_role_assignments ra
       JOIN mdl_role r ON ra.roleid = r.id
@@ -140,11 +141,11 @@ router.post('/login', async (req, res) => {
       LIMIT 1
     `, [moodleUser.id]);
     
-    if (roleResult.length === 0) {
+    if (roleRows.length === 0) {
       return res.status(403).json({ error: 'Access denied. Teacher role required.' });
     }
     
-    const userRole = roleResult[0].shortname;
+    const userRole = roleRows[0].shortname;
     
     // Generate JWT token
     const token = jwt.sign(
@@ -154,8 +155,8 @@ router.post('/login', async (req, res) => {
         email: moodleUser.email,
         name: `${moodleUser.firstname} ${moodleUser.lastname}`,
         role: userRole,
-        course_id: roleResult[0].course_id,
-        course_name: roleResult[0].course_name
+        course_id: roleRows[0].course_id,
+        course_name: roleRows[0].course_name
       },
       process.env.JWT_SECRET || 'default_secret_change_this',
       { expiresIn: '24h' }
@@ -171,8 +172,8 @@ router.post('/login', async (req, res) => {
         email: moodleUser.email,
         name: `${moodleUser.firstname} ${moodleUser.lastname}`,
         role: userRole,
-        course_id: roleResult[0].course_id,
-        course_name: roleResult[0].course_name
+        course_id: roleRows[0].course_id,
+        course_name: roleRows[0].course_name
       }
     });
   } catch (error) {
