@@ -18,13 +18,18 @@ if [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem" ]; then
     ls -la /etc/letsencrypt/live/attendance-ml.duckdns.org/
     echo "Certificate expiration:"
     openssl x509 -in /etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem -noout -dates
+    echo "Using existing SSL certificate"
 else
     echo "SSL certificate not found - creating new certificate..."
     echo "Stopping nginx to free port 80 for certbot..."
     docker compose stop nginx || echo "Nginx already stopped"
     
     echo "Creating SSL certificate with certbot..."
-    sudo certbot certonly --standalone -d attendance-ml.duckdns.org --email admin@attendance-ml.duckdns.org --agree-tos --no-eff-email
+    # Use non-interactive flags to avoid prompts
+    sudo certbot certonly --standalone --non-interactive --agree-tos --no-eff-email \
+        --email admin@attendance-ml.duckdns.org \
+        -d attendance-ml.duckdns.org \
+        --force-renewal
     
     if [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem" ]; then
         echo "SSL certificate created successfully!"
