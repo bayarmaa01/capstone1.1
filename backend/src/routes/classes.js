@@ -123,7 +123,7 @@ router.get('/:classId/schedule', async (req, res) => {
   try {
     let scheduleData = [];
     
-    // First try to get from Moodle
+    // Try to get from Moodle first
     try {
       const mysql = require('mysql2/promise');
       const moodleDbConfig = {
@@ -136,6 +136,7 @@ router.get('/:classId/schedule', async (req, res) => {
       const moodlePool = mysql.createPool(moodleDbConfig);
       const connection = await moodlePool.getConnection();
       
+      // Simplified query - get all Moodle sessions
       const [moodleRows] = await connection.execute(`
         SELECT 
           s.id AS sessionId,
@@ -151,9 +152,10 @@ router.get('/:classId/schedule', async (req, res) => {
         FROM mdl_attendance_sessions s
         JOIN mdl_attendance a ON a.id = s.attendanceid
         JOIN mdl_course c ON c.id = a.course
-        WHERE c.idnumber = (SELECT code FROM classes WHERE id = ?)
         ORDER BY s.sessdate ASC
-      `, [req.params.classId]);
+      `);
+      
+      console.log("Moodle sessions:", moodleRows.length);
       
       if (moodleRows.length > 0) {
         scheduleData = moodleRows.map(session => ({
@@ -162,48 +164,36 @@ router.get('/:classId/schedule', async (req, res) => {
           start_time: session.start_time_formatted,
           end_time: session.end_time_formatted,
           scheduled_date: session.session_date,
+          room_number: 'TBD',
+          is_active: true,
           source: 'moodle'
         }));
         console.log('Using Moodle schedule:', scheduleData.length, 'sessions');
+        res.json(scheduleData);
+        return;
       }
       
       connection.release();
     } catch (moodleError) {
-      console.log('Moodle schedule failed, using local schedule');
+      console.error('Moodle schedule error:', moodleError);
     }
 
-    // Fallback to local schedule if Moodle fails or empty
-    if (scheduleData.length === 0) {
+    // Only fallback to local schedule if Moodle query fails
+    try {
       const scheduleResult = await db.query(`
         SELECT cs.id, cs.day_of_week, cs.start_time, cs.end_time, cs.scheduled_date, cs.room_number, cs.is_active,
-               'scheduled' as source
+               'manual' as source
         FROM class_schedules cs 
         WHERE cs.class_id = $1 AND cs.is_active = true
         ORDER BY cs.day_of_week, cs.start_time
       `, [req.params.classId]);
       
       if (scheduleResult.rows.length > 0) {
-        scheduleData = scheduleResult.rows.map(session => ({
-          ...session,
-          source: 'manual'
-        }));
+        scheduleData = scheduleResult.rows;
         console.log('Using local schedule:', scheduleData.length, 'sessions');
       }
-    }
-
-    // If still no schedule, fallback to attendance sessions
-    if (scheduleData.length === 0) {
-      const attendanceResult = await db.query(`
-        SELECT DISTINCT session_date, start_time, end_time,
-               (SELECT COUNT(*) FROM attendance a2 WHERE a2.session_date = a1.session_date AND a2.class_id = $1 AND a2.present = true) as attendance_count,
-               'attendance' as source
-        FROM attendance a1 
-        WHERE a1.class_id = $1 
-        ORDER BY session_date
-      `, [req.params.classId]);
-      
-      scheduleData = attendanceResult.rows;
-      console.log('Using attendance sessions:', scheduleData.length, 'sessions');
+    } catch (localError) {
+      console.error('Local schedule error:', localError);
     }
     
     res.json(scheduleData);
