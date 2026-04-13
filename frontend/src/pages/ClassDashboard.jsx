@@ -118,14 +118,19 @@ export default function ClassDashboard() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8f9fa', padding: '20px' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    }}>
       {/* Header */}
       <div style={{
         background: 'white',
-        borderRadius: '10px',
-        padding: '20px',
-        marginBottom: '20px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        borderRadius: '15px',
+        padding: '30px',
+        marginBottom: '25px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+        border: '1px solid rgba(255,255,255,0.2)'
       }}>
         <div style={{
           display: 'flex',
@@ -134,150 +139,329 @@ export default function ClassDashboard() {
           marginBottom: '10px'
         }}>
           <div>
-            <h1 style={{ margin: 0, color: '#2c3e50', fontSize: '28px' }}>
+            <h1 style={{ 
+              margin: 0, 
+              color: '#1a202c', 
+              fontSize: '32px',
+              fontWeight: '700',
+              letterSpacing: '-0.5px'
+            }}>
               {classInfo?.name || 'Class Dashboard'}
             </h1>
-            <p style={{ margin: '5px 0 0 0', color: '#6c757d', fontSize: '16px' }}>
+            <p style={{ 
+              margin: '8px 0 0 0', 
+              color: '#718096', 
+              fontSize: '18px',
+              fontWeight: '500'
+            }}>
               {classInfo?.code || 'Course Code'}
             </p>
+            <div style={{
+              display: 'flex',
+              gap: '15px',
+              marginTop: '15px'
+            }}>
+              <span style={{
+                padding: '6px 12px',
+                background: '#edf2f7',
+                color: '#4a5568',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}>
+                {students.length} Students
+              </span>
+              <span style={{
+                padding: '6px 12px',
+                background: '#edf2f7',
+                color: '#4a5568',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: '600'
+              }}>
+                {schedule.length} Sessions
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '25px' }}>
         {/* Students Section */}
         <div style={{
           background: 'white',
-          borderRadius: '10px',
-          padding: '20px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          borderRadius: '15px',
+          padding: '25px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+          border: '1px solid rgba(255,255,255,0.2)'
         }}>
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '20px'
+            marginBottom: '25px'
           }}>
-            <h2 style={{ margin: 0, color: '#2c3e50', fontSize: '20px' }}>
-              Students ({students.length})
-            </h2>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                color: '#1a202c', 
+                fontSize: '22px',
+                fontWeight: '700',
+                letterSpacing: '-0.3px'
+              }}>
+                Students
+              </h2>
+              <p style={{ 
+                margin: '5px 0 0 0', 
+                color: '#718096', 
+                fontSize: '14px' 
+              }}>
+                {students.length} enrolled students
+              </p>
+            </div>
             <button
               onClick={handleAddStudent}
               style={{
-                padding: '8px 16px',
-                background: '#6c757d',
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '8px',
                 fontSize: '14px',
-                cursor: 'pointer'
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
               }}
+              onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
             >
               + Add Student
             </button>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #e9ecef' }}>
-                  <th style={{ padding: '12px', textAlign: 'left', color: '#495057' }}>Name</th>
-                  <th style={{ padding: '12px', textAlign: 'left', color: '#495057' }}>ID</th>
-                  <th style={{ padding: '12px', textAlign: 'left', color: '#495057' }}>Email</th>
-                  <th style={{ padding: '12px', textAlign: 'center', color: '#495057' }}>Attendance</th>
-                  <th style={{ padding: '12px', textAlign: 'center', color: '#495057' }}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((student) => {
-                  const attendanceStatus = getAttendanceStatus(student.attendance_percentage || 0);
-                  return (
-                    <tr
-                      key={student.id}
-                      onClick={() => handleStudentClick(student)}
-                      style={{
-                        borderBottom: '1px solid #e9ecef',
-                        cursor: 'pointer',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                    >
-                      <td style={{ padding: '12px', color: '#2c3e50' }}>
-                        {student.name}
-                      </td>
-                      <td style={{ padding: '12px', color: '#6c757d' }}>
-                        {student.student_id}
-                      </td>
-                      <td style={{ padding: '12px', color: '#6c757d' }}>
-                        {student.email}
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{
-                          fontWeight: 'bold',
-                          color: attendanceStatus.color
-                        }}>
-                          {student.attendance_percentage || 0}%
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          background: attendanceStatus.color,
-                          color: 'white'
-                        }}>
-                          {attendanceStatus.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {students.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#718096'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '15px' }}>Students</div>
+              <div style={{ fontSize: '16px', marginBottom: '20px' }}>No students enrolled yet</div>
+              <button
+                onClick={handleAddStudent}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Enroll First Student
+              </button>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                    <th style={{ 
+                      padding: '15px 12px', 
+                      textAlign: 'left', 
+                      color: '#4a5568', 
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Student
+                    </th>
+                    <th style={{ 
+                      padding: '15px 12px', 
+                      textAlign: 'center', 
+                      color: '#4a5568', 
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Attendance
+                    </th>
+                    <th style={{ 
+                      padding: '15px 12px', 
+                      textAlign: 'center', 
+                      color: '#4a5568', 
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((student) => {
+                    const attendanceStatus = getAttendanceStatus(student.attendance_percentage || 0);
+                    return (
+                      <tr
+                        key={student.id}
+                        onClick={() => handleStudentClick(student)}
+                        style={{
+                          borderBottom: '1px solid #e2e8f0',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f7fafc';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'white';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                        }}
+                      >
+                        <td style={{ padding: '15px 12px' }}>
+                          <div>
+                            <div style={{ 
+                              color: '#2d3748', 
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              marginBottom: '2px'
+                            }}>
+                              {student.name}
+                            </div>
+                            <div style={{ 
+                              color: '#718096', 
+                              fontSize: '12px' 
+                            }}>
+                              {student.student_id}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                          <div style={{
+                            fontWeight: '700',
+                            fontSize: '16px',
+                            color: attendanceStatus.color
+                          }}>
+                            {student.attendance_percentage || 0}%
+                          </div>
+                        </td>
+                        <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '6px 12px',
+                            borderRadius: '20px',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            background: attendanceStatus.color,
+                            color: 'white'
+                          }}>
+                            {attendanceStatus.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Schedule/Timetable Section */}
         <div style={{
           background: 'white',
-          borderRadius: '10px',
-          padding: '20px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          borderRadius: '15px',
+          padding: '25px',
+          boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+          border: '1px solid rgba(255,255,255,0.2)'
         }}>
-          <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50', fontSize: '20px' }}>
-            Schedule / Timetable
-          </h2>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '25px'
+          }}>
+            <div>
+              <h2 style={{ 
+                margin: 0, 
+                color: '#1a202c', 
+                fontSize: '22px',
+                fontWeight: '700',
+                letterSpacing: '-0.3px'
+              }}>
+                Schedule
+              </h2>
+              <p style={{ 
+                margin: '5px 0 0 0', 
+                color: '#718096', 
+                fontSize: '14px' 
+              }}>
+                Class timetable & sessions
+              </p>
+            </div>
+          </div>
           
           {schedule.length === 0 ? (
             <div style={{
               textAlign: 'center',
-              padding: '40px',
-              color: '#6c757d'
+              padding: '60px 20px',
+              color: '#718096'
             }}>
-              <div style={{ fontSize: '48px', marginBottom: '10px' }}>Schedule</div>
-              <div>No schedule available</div>
+              <div style={{ fontSize: '48px', marginBottom: '15px' }}>Schedule</div>
+              <div style={{ fontSize: '16px', marginBottom: '20px' }}>No schedule available</div>
+              <div style={{ fontSize: '14px', color: '#a0aec0' }}>
+                Add class schedule or sync from Moodle
+              </div>
             </div>
           ) : (
-            <div style={{ display: 'grid', gap: '10px' }}>
+            <div style={{ display: 'grid', gap: '15px' }}>
               {schedule.map((session, index) => {
                 const isActive = isSessionActive(session);
                 return (
                   <div
                     key={index}
                     style={{
-                      padding: '15px',
-                      background: isActive ? '#e8f5e8' : '#f8f9fa',
-                      borderRadius: '8px',
-                      borderLeft: `4px solid ${isActive ? '#28a745' : '#007bff'}`,
-                      position: 'relative'
+                      padding: '20px',
+                      background: isActive ? 
+                        'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' : 
+                        'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
+                      borderRadius: '12px',
+                      borderLeft: `4px solid ${isActive ? '#2f855a' : '#667eea'}`,
+                      position: 'relative',
+                      transition: 'all 0.3s',
+                      boxShadow: isActive ? 
+                        '0 8px 25px rgba(72, 187, 120, 0.3)' : 
+                        '0 4px 15px rgba(0,0,0,0.05)'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.2)';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)';
+                      }
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 'bold', color: '#2c3e50', marginBottom: '5px' }}>
+                        <div style={{ 
+                          fontWeight: '700', 
+                          color: isActive ? 'white' : '#2d3748', 
+                          fontSize: '16px',
+                          marginBottom: '8px'
+                        }}>
                           {session.scheduled_date ? 
                             new Date(session.scheduled_date).toLocaleDateString('en-US', { 
                               weekday: 'long', 
@@ -287,25 +471,40 @@ export default function ClassDashboard() {
                             formatDayName(session.day_of_week)
                           }
                         </div>
-                        <div style={{ color: '#6c757d', fontSize: '14px', marginBottom: '5px' }}>
+                        <div style={{ 
+                          color: isActive ? 'rgba(255,255,255,0.9)' : '#718096', 
+                          fontSize: '14px',
+                          marginBottom: '8px',
+                          fontWeight: '500'
+                        }}>
                           {session.start_time && session.end_time ? 
                             `${session.start_time} - ${session.end_time}` : 
                             'All day'
                           }
                         </div>
                         {session.room_number && (
-                          <div style={{ color: '#007bff', fontSize: '14px' }}>
+                          <div style={{ 
+                            color: isActive ? 'rgba(255,255,255,0.8)' : '#667eea', 
+                            fontSize: '13px',
+                            fontWeight: '600'
+                          }}>
                             Room: {session.room_number}
                           </div>
                         )}
-                        <div style={{ marginTop: '5px' }}>
+                        <div style={{ marginTop: '10px' }}>
                           <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            background: session.source === 'scheduled' ? '#28a745' : '#6c757d',
-                            color: 'white'
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.5px',
+                            background: session.source === 'scheduled' ? 
+                              (isActive ? 'rgba(255,255,255,0.2)' : '#48bb78') : 
+                              (isActive ? 'rgba(255,255,255,0.2)' : '#718096'),
+                            color: session.source === 'scheduled' ? 
+                              (isActive ? 'white' : 'white') : 
+                              (isActive ? 'white' : 'white')
                           }}>
                             {session.source === 'scheduled' ? 'Synced' : 'Manual'}
                           </span>
@@ -313,17 +512,28 @@ export default function ClassDashboard() {
                       </div>
                       
                       {isActive && (
-                        <div style={{ display: 'flex', gap: '5px', marginLeft: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', marginLeft: '15px' }}>
                           <button
                             onClick={() => handleTakeAttendance(session, 'face')}
                             style={{
-                              padding: '6px 12px',
-                              background: '#007bff',
-                              color: 'white',
+                              padding: '8px 16px',
+                              background: 'rgba(255,255,255,0.9)',
+                              color: '#2d3748',
                               border: 'none',
-                              borderRadius: '4px',
+                              borderRadius: '8px',
                               fontSize: '12px',
-                              cursor: 'pointer'
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                            }}
+                            onMouseOver={(e) => {
+                              e.target.style.background = 'white';
+                              e.target.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.background = 'rgba(255,255,255,0.9)';
+                              e.target.style.transform = 'translateY(0)';
                             }}
                           >
                             Face
@@ -331,13 +541,24 @@ export default function ClassDashboard() {
                           <button
                             onClick={() => handleTakeAttendance(session, 'qr')}
                             style={{
-                              padding: '6px 12px',
-                              background: '#28a745',
-                              color: 'white',
+                              padding: '8px 16px',
+                              background: 'rgba(255,255,255,0.9)',
+                              color: '#2d3748',
                               border: 'none',
-                              borderRadius: '4px',
+                              borderRadius: '8px',
                               fontSize: '12px',
-                              cursor: 'pointer'
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                            }}
+                            onMouseOver={(e) => {
+                              e.target.style.background = 'white';
+                              e.target.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseOut={(e) => {
+                              e.target.style.background = 'rgba(255,255,255,0.9)';
+                              e.target.style.transform = 'translateY(0)';
                             }}
                           >
                             QR
