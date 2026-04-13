@@ -29,11 +29,30 @@ echo
 
 # STEP 3: Check SSL certificates
 echo "3. Checking SSL certificates..."
+
+# Check for certificate in standard Let's Encrypt locations
 if [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem" ]; then
     echo "SSL certificate found: /etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem"
     sudo ls -la /etc/letsencrypt/live/attendance-ml.duckdns.org/
+elif [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/cert.pem" ]; then
+    echo "SSL certificate found: /etc/letsencrypt/live/attendance-ml.duckdns.org/cert.pem"
+    sudo ls -la /etc/letsencrypt/live/attendance-ml.duckdns.org/
+elif [ -f "/etc/letsencrypt/renewal/attendance-ml.duckdns.org.conf" ]; then
+    echo "SSL certificate renewal configuration found, checking actual cert location..."
+    # Extract certificate path from renewal config
+    CERT_PATH=$(grep "cert" /etc/letsencrypt/renewal/attendance-ml.duckdns.org.conf | head -1 | cut -d'=' -f2 | tr -d ' ')
+    if [ -f "$CERT_PATH" ]; then
+        echo "SSL certificate found at: $CERT_PATH"
+        sudo ls -la "$(dirname "$CERT_PATH")/"
+    else
+        echo "ERROR: Certificate path found in config but file not found: $CERT_PATH"
+        echo "Please run: sudo certbot --nginx -d attendance-ml.duckdns.org"
+        exit 1
+    fi
 else
-    echo "ERROR: SSL certificate not found!"
+    echo "ERROR: SSL certificate not found in any standard location!"
+    echo "Checking all Let's Encrypt directories..."
+    sudo find /etc/letsencrypt -name "*attendance-ml*" -type f 2>/dev/null || echo "No Let's Encrypt files found"
     echo "Please run: sudo certbot --nginx -d attendance-ml.duckdns.org"
     exit 1
 fi
