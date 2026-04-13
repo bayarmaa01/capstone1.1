@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import CameraCapture from '../components/CameraCapture';
+import QRScanner from '../components/QRScanner';
 
 export default function ClassDashboard() {
   const { classId } = useParams();
@@ -80,6 +82,23 @@ export default function ClassDashboard() {
   const handleAddStudent = () => {
     // TODO: Implement add student modal
     console.log('Add student clicked');
+  };
+
+  const markAttendance = async (studentId, method) => {
+    try {
+      const sessionDate = selectedSession.scheduled_date || new Date().toISOString().split('T')[0];
+      await api.post('/attendance/record', {
+        class_id: classId,
+        student_id: studentId,
+        session_date: sessionDate,
+        method: method
+      });
+      
+      // Refresh student data to update attendance percentages
+      loadClassData();
+    } catch (error) {
+      console.error('Error marking attendance:', error);
+    }
   };
 
   if (loading) {
@@ -452,13 +471,33 @@ export default function ClassDashboard() {
             background: 'white',
             borderRadius: '10px',
             padding: '30px',
-            maxWidth: '500px',
+            maxWidth: '800px',
             width: '90%',
-            textAlign: 'center'
+            maxHeight: '90vh',
+            overflowY: 'auto'
           }}>
-            <h2 style={{ margin: '0 0 20px 0', color: '#2c3e50' }}>
-              {attendanceMode === 'face' ? 'Face Scanning' : 'QR Code Scanning'}
-            </h2>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px'
+            }}>
+              <h2 style={{ margin: 0, color: '#2c3e50' }}>
+                {attendanceMode === 'face' ? 'Face Scanning' : 'QR Code Scanning'}
+              </h2>
+              <button
+                onClick={() => setShowAttendanceModal(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  color: '#6c757d'
+                }}
+              >
+                ×
+              </button>
+            </div>
             
             <div style={{
               marginBottom: '20px',
@@ -480,59 +519,47 @@ export default function ClassDashboard() {
               </div>
             </div>
             
-            <div style={{
-              width: '300px',
-              height: '300px',
-              background: '#f8f9fa',
-              border: '2px dashed #dee2e6',
-              borderRadius: '10px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '20px auto'
-            }}>
-              <div style={{ textAlign: 'center', color: '#6c757d' }}>
-                <div style={{ fontSize: '48px', marginBottom: '10px' }}>
-                  {attendanceMode === 'face' ? 'Face' : 'QR'}
-                </div>
-                <div>
-                  {attendanceMode === 'face' 
-                    ? 'Camera will open for face scanning' 
-                    : 'Camera will open for QR code scanning'
-                  }
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button
-                onClick={() => setShowAttendanceModal(false)}
-                style={{
-                  padding: '12px 24px',
-                  background: '#6c757d',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
+            {attendanceMode === 'face' ? (
+              <CameraCapture
+                classId={classId}
+                sessionDate={selectedSession.scheduled_date || new Date().toISOString().split('T')[0]}
+                onRecognized={(student) => {
+                  console.log('Face recognized:', student);
+                  // Show success notification
+                  const note = document.createElement('div');
+                  note.style.cssText = `
+                    position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
+                    color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
+                  `;
+                  note.innerHTML = `Attendance marked for ${student.name}`;
+                  document.body.appendChild(note);
+                  setTimeout(() => note.remove(), 3000);
                 }}
-              >
-                Cancel
-              </button>
-              <button
-                style={{
-                  padding: '12px 24px',
-                  background: '#007bff',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  cursor: 'pointer'
+                onError={(error) => {
+                  console.error('Face recognition error:', error);
                 }}
-              >
-                Start Scanning
-              </button>
-            </div>
+              />
+            ) : (
+              <QRScanner
+                onScan={(studentId) => {
+                  console.log('QR scanned:', studentId);
+                  // Mark attendance
+                  markAttendance(studentId, 'qr');
+                  // Show success notification
+                  const note = document.createElement('div');
+                  note.style.cssText = `
+                    position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
+                    color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
+                  `;
+                  note.innerHTML = `Attendance marked for ${studentId}`;
+                  document.body.appendChild(note);
+                  setTimeout(() => note.remove(), 3000);
+                }}
+                onError={(error) => {
+                  console.error('QR scanning error:', error);
+                }}
+              />
+            )}
           </div>
         </div>
       )}
