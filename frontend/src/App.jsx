@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import ClassPage from './pages/ClassPage';
 import AttendancePage from './pages/AttendancePage';
 import ClassDashboard from './pages/ClassDashboard';
+import StudentProfile from './pages/StudentProfile';
 import ClassScheduleClean from './components/ClassScheduleClean';
 
 function ClassScheduleWrapper() {
@@ -84,6 +85,10 @@ function App() {
         <Route 
           path="/attendance/:id" 
           element={user ? <ClassDashboard user={user} /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
+          path="/students/:id" 
+          element={user ? <StudentProfile /> : <Navigate to="/login" replace />} 
         />
         <Route 
           path="/" 

@@ -96,8 +96,32 @@ export default function ClassDashboard() {
   };
 
   const handleStudentClick = (student) => {
-    setSelectedStudent(student);
-    setShowStudentProfile(true);
+    // Navigate to student profile page instead of showing modal
+    navigate(`/students/${student.id}`);
+  };
+
+  const handleEnrollStudent = async (student) => {
+    if (!classId) {
+      console.error('classId is undefined - cannot enroll student');
+      showToast('Error: Class ID not found', 'error');
+      return;
+    }
+
+    try {
+      const response = await api.post(`/classes/${classId}/students`, {
+        studentId: student.id
+      });
+
+      if (response.data.success) {
+        showToast(`Student ${student.name} enrolled successfully!`, 'success');
+        // Refresh student list
+        loadClassData();
+      }
+    } catch (error) {
+      console.error('Error enrolling student:', error);
+      const message = error.response?.data?.error || 'Failed to enroll student';
+      showToast(message, 'error');
+    }
   };
 
   const handleTakeAttendance = (session, mode) => {
@@ -406,7 +430,8 @@ export default function ClassDashboard() {
                       fontSize: '12px',
                       fontWeight: '600',
                       textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
+                      letterSpacing: '0.5px',
+                      minWidth: '200px'
                     }}>
                       Actions
                     </th>
@@ -418,19 +443,8 @@ export default function ClassDashboard() {
                     return (
                       <tr
                         key={student.id}
-                        onClick={() => handleStudentClick(student)}
                         style={{
-                          borderBottom: '1px solid #e2e8f0',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#f7fafc';
-                          e.currentTarget.style.transform = 'translateX(4px)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = 'white';
-                          e.currentTarget.style.transform = 'translateX(0)';
+                          borderBottom: '1px solid #e2e8f0'
                         }}
                       >
                         <td style={{ padding: '15px 12px' }}>
@@ -475,28 +489,68 @@ export default function ClassDashboard() {
                           </span>
                         </td>
                         <td style={{ padding: '15px 12px', textAlign: 'center' }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveStudent(student);
-                            }}
-                            style={{
-                              padding: '6px 12px',
-                              backgroundColor: '#ef4444',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              transition: 'background-color 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
-                            title="Remove student from class"
-                          >
-                            Remove
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => handleStudentClick(student)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#2563eb'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                              title="View student profile"
+                            >
+                              Profile
+                            </button>
+                            <button
+                              onClick={() => handleEnrollStudent(student)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#10b981',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#059669'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#10b981'}
+                              title="Enroll student in class"
+                            >
+                              Enroll
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveStudent(student);
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s'
+                              }}
+                              onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                              onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                              title="Remove student from class"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
