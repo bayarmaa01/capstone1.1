@@ -13,24 +13,15 @@ export default function Dashboard({ user, onLogout }) {
 
   useEffect(() => {
     fetchClasses();
-    fetchStudents();
   }, []);
 
   const fetchClasses = async () => {
     try {
       const response = await api.get('/classes');
+      console.log('Dashboard - Classes API response:', response.data);
       setClasses(response.data);
     } catch (error) {
-      console.error('Error fetching classes:', error);
-    }
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const response = await api.get('/students');
-      setStudents(response.data);
-    } catch (error) {
-      console.error('Error fetching students:', error);
+      console.error('Dashboard - Error fetching classes:', error);
     }
   };
 
