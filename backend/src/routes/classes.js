@@ -64,30 +64,154 @@ router.post('/', async (req, res) => {
 });
 
 // Enroll student in class
-router.post('/:classId/enroll', async (req, res) => {
+router.post('/:classId/students', async (req, res) => {
   try {
-    const { student_id } = req.body;
+    const { studentId } = req.body;
     const { classId } = req.params;
     
-    if (!student_id) {
-      return res.status(400).json({ error: 'student_id required' });
+    if (!studentId) {
+      return res.status(400).json({ error: 'studentId is required' });
+    }
+    
+    // Check if class exists
+    const classCheck = await db.query('SELECT id FROM classes WHERE id = $1', [classId]);
+    if (classCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Class not found' });
     }
     
     // Check if student exists
-    const studentCheck = await db.query('SELECT id FROM students WHERE id = $1', [student_id]);
+    const studentCheck = await db.query('SELECT id, name FROM students WHERE id = $1', [studentId]);
     if (studentCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Student not found' });
     }
     
-    await db.query(
-      'INSERT INTO enrollments (class_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-      [classId, student_id]
+    // Check if already enrolled
+    const enrollmentCheck = await db.query(
+      'SELECT id FROM enrollments WHERE class_id = $1 AND student_id = $2',
+      [classId, studentId]
+    );
+    if (enrollmentCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'Student already enrolled in this class' });
+    }
+    
+    // Enroll student
+    const result = await db.query(
+      'INSERT INTO enrollments (class_id, student_id) VALUES ($1, $2) RETURNING *',
+      [classId, studentId]
     );
     
-    console.log(`✓ Student ${student_id} enrolled in class ${classId}`);
-    res.json({ success: true, message: 'Student enrolled successfully' });
+    const studentName = studentCheck.rows[0].name;
+    console.log(`Student ${studentName} (ID: ${studentId}) enrolled in class ${classId}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Student enrolled successfully',
+      enrollment: result.rows[0],
+      student: { id: studentId, name: studentName }
+    });
   } catch (error) {
     console.error('Enrollment error:', error);
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Student already enrolled in this class' });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Remove student from class
+router.delete('/:classId/students/:studentId', async (req, res) => {
+  try {
+    const { classId, studentId } = req.params;
+    
+    // Check if enrollment exists
+    const enrollmentCheck = await db.query(`
+      SELECT e.id, s.name as student_name, c.name as class_name
+      FROM enrollments e
+      JOIN students s ON e.student_id = s.id
+      JOIN classes c ON e.class_id = c.id
+      WHERE e.class_id = $1 AND e.student_id = $2
+    `, [classId, studentId]);
+    
+    if (enrollmentCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Student not enrolled in this class' });
+    }
+    
+    const enrollment = enrollmentCheck.rows[0];
+    
+    // Remove enrollment
+    await db.query('DELETE FROM enrollments WHERE class_id = $1 AND student_id = $2', [classId, studentId]);
+    
+    console.log(`Student ${enrollment.student_name} (ID: ${studentId}) removed from class ${enrollment.class_name} (ID: ${classId})`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Student removed from class successfully',
+      student: { id: studentId, name: enrollment.student_name }
+    });
+  } catch (error) {
+    console.error('Remove student error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create class schedule
+router.post('/schedule', async (req, res) => {
+  try {
+    const { class_id, day_of_week, start_time, end_time, room_number, scheduled_date } = req.body;
+    
+    if (!class_id || !day_of_week || !start_time || !end_time) {
+      return res.status(400).json({ 
+        error: 'class_id, day_of_week, start_time, and end_time are required' 
+      });
+    }
+    
+    // Validate day_of_week
+    if (day_of_week < 0 || day_of_week > 6) {
+      return res.status(400).json({ error: 'day_of_week must be between 0 (Sunday) and 6 (Saturday)' });
+    }
+    
+    // Validate time format
+    const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(start_time) || !timeRegex.test(end_time)) {
+      return res.status(400).json({ error: 'start_time and end_time must be in HH:MM format' });
+    }
+    
+    // Check if class exists
+    const classCheck = await db.query('SELECT id, name FROM classes WHERE id = $1', [class_id]);
+    if (classCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Class not found' });
+    }
+    
+    // Check for duplicate schedule (same class, day, and time)
+    const duplicateCheck = await db.query(`
+      SELECT id FROM class_schedules 
+      WHERE class_id = $1 AND day_of_week = $2 AND start_time = $3 AND is_active = true
+    `, [class_id, day_of_week, start_time]);
+    
+    if (duplicateCheck.rows.length > 0) {
+      return res.status(409).json({ error: 'Schedule already exists for this day and time' });
+    }
+    
+    // Create schedule
+    const result = await db.query(`
+      INSERT INTO class_schedules 
+      (class_id, day_of_week, start_time, end_time, room_number, scheduled_date, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, true)
+      RETURNING *
+    `, [class_id, day_of_week, start_time, end_time, room_number || null, scheduled_date || null]);
+    
+    const schedule = result.rows[0];
+    const className = classCheck.rows[0].name;
+    
+    console.log(`Schedule created for class ${className} (ID: ${classId}) - Day ${day_of_week}, ${start_time}-${end_time}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Schedule created successfully',
+      schedule: schedule
+    });
+  } catch (error) {
+    console.error('Create schedule error:', error);
     res.status(500).json({ error: error.message });
   }
 });

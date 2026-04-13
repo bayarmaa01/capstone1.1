@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import CameraCapture from '../components/CameraCapture';
 import QRScanner from '../components/QRScanner';
+import EnrollmentModal from '../components/EnrollmentModal';
+import ScheduleModal from '../components/ScheduleModal';
 
 export default function ClassDashboard() {
   const { id: classId } = useParams();
@@ -16,6 +18,8 @@ export default function ClassDashboard() {
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
   const [attendanceMode, setAttendanceMode] = useState('face');
   const [selectedSession, setSelectedSession] = useState(null);
+  const [showEnrollmentModal, setShowEnrollmentModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   useEffect(() => {
     loadClassData();
@@ -121,36 +125,62 @@ export default function ClassDashboard() {
     return days[dayOfWeek] || 'Unknown';
   };
 
-  const handleAddStudent = () => {
-    // Simple prompt for now - can be enhanced to a modal later
-    const studentId = prompt('Enter Student ID:');
-    if (studentId) {
-      enrollStudent(studentId);
-    }
+  const handleEnrollmentSuccess = (student) => {
+    // Refresh student list after successful enrollment
+    loadClassData();
   };
 
-  const enrollStudent = async (studentId) => {
+  const handleScheduleSuccess = (schedule) => {
+    // Refresh schedule data after successful creation
+    loadClassData();
+  };
+
+  const handleRemoveStudent = async (student) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to remove ${student.name} from this class?`
+    );
+    
+    if (!confirmed) return;
+
     try {
-      await api.post(`/classes/${classId}/enroll`, { student_id: studentId });
-      // Refresh student data
-      const studentsResponse = await api.get(`/classes/${classId}/students`);
-      setStudents(studentsResponse.data);
+      const response = await api.delete(`/classes/${classId}/students/${student.id}`);
       
-      // Show success notification
-      const note = document.createElement('div');
-      note.style.cssText = `
-        position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
-        color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
-      `;
-      note.innerHTML = `Student ${studentId} enrolled successfully`;
-      document.body.appendChild(note);
-      setTimeout(() => note.remove(), 3000);
+      if (response.data.success) {
+        showToast(`Student ${student.name} removed from class`, 'success');
+        // Refresh student list
+        loadClassData();
+      }
     } catch (error) {
-      console.error('Error enrolling student:', error);
-      alert('Error enrolling student. Please check the student ID and try again.');
+      console.error('Error removing student:', error);
+      const message = error.response?.data?.error || 'Failed to remove student';
+      showToast(message, 'error');
     }
   };
 
+  const showToast = (message, type = 'info') => {
+    // Simple toast implementation
+    const toast = document.createElement('div');
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+      color: white;
+      border-radius: 8px;
+      z-index: 10000;
+      font-weight: 500;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
+  };
+      
+      
   const markAttendance = async (studentId, method) => {
     try {
       const sessionDate = selectedSession.scheduled_date || new Date().toISOString().split('T')[0];
@@ -287,7 +317,7 @@ export default function ClassDashboard() {
               </p>
             </div>
             <button
-              onClick={handleAddStudent}
+              onClick={() => setShowEnrollmentModal(true)}
               style={{
                 padding: '10px 20px',
                 background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -316,7 +346,7 @@ export default function ClassDashboard() {
               <div style={{ fontSize: '48px', marginBottom: '15px' }}>Students</div>
               <div style={{ fontSize: '16px', marginBottom: '20px' }}>No students enrolled yet</div>
               <button
-                onClick={handleAddStudent}
+                onClick={() => setShowEnrollmentModal(true)}
                 style={{
                   padding: '12px 24px',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -368,6 +398,17 @@ export default function ClassDashboard() {
                       letterSpacing: '0.5px'
                     }}>
                       Status
+                    </th>
+                    <th style={{ 
+                      padding: '15px 12px', 
+                      textAlign: 'center', 
+                      color: '#4a5568', 
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -433,6 +474,30 @@ export default function ClassDashboard() {
                             {attendanceStatus.status}
                           </span>
                         </td>
+                        <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveStudent(student);
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#ef4444',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.target.style.backgroundColor = '#dc2626'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                            title="Remove student from class"
+                          >
+                            Remove
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -474,6 +539,25 @@ export default function ClassDashboard() {
                 Class timetable & sessions
               </p>
             </div>
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'transform 0.2s',
+                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+              }}
+              onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              + Add Schedule
+            </button>
           </div>
           
           {schedule.length === 0 ? (
@@ -851,6 +935,22 @@ export default function ClassDashboard() {
           </div>
         </div>
       )}
+      
+      {/* Enrollment Modal */}
+      <EnrollmentModal
+        isOpen={showEnrollmentModal}
+        onClose={() => setShowEnrollmentModal(false)}
+        classId={classId}
+        onEnrollmentSuccess={handleEnrollmentSuccess}
+      />
+      
+      {/* Schedule Modal */}
+      <ScheduleModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        classId={classId}
+        onScheduleSuccess={handleScheduleSuccess}
+      />
     </div>
   );
 }
