@@ -46,7 +46,31 @@ CREATE TABLE IF NOT EXISTS enrollments (
   UNIQUE(class_id, student_id)
 );
 
--- Attendance records
+-- Attendance sessions (new structure for Class Dashboard)
+CREATE TABLE IF NOT EXISTS attendance_sessions (
+  id SERIAL PRIMARY KEY,
+  class_id INT REFERENCES classes(id) ON DELETE CASCADE,
+  session_date DATE NOT NULL,
+  start_time TIME,
+  end_time TIME,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- Attendance records (new structure for Class Dashboard)
+CREATE TABLE IF NOT EXISTS attendance_records (
+  id SERIAL PRIMARY KEY,
+  session_id INT REFERENCES attendance_sessions(id) ON DELETE CASCADE,
+  student_id INT REFERENCES students(id) ON DELETE CASCADE,
+  present BOOLEAN DEFAULT true,
+  method TEXT CHECK (method IN ('qr', 'face', 'manual')),
+  confidence FLOAT DEFAULT 1.0,
+  timestamp TIMESTAMP DEFAULT now(),
+  UNIQUE(session_id, student_id)
+);
+
+-- Attendance records (legacy - keep for compatibility)
 CREATE TABLE IF NOT EXISTS attendance (
   id SERIAL PRIMARY KEY,
   class_id INT REFERENCES classes(id) ON DELETE CASCADE,
@@ -86,6 +110,11 @@ CREATE INDEX IF NOT EXISTS idx_class_schedules_active ON class_schedules(is_acti
 CREATE INDEX IF NOT EXISTS idx_class_schedules_date ON class_schedules(scheduled_date);
 CREATE INDEX IF NOT EXISTS idx_class_schedules_completed ON class_schedules(is_completed);
 CREATE INDEX IF NOT EXISTS idx_class_schedules_room ON class_schedules(room_number);
+CREATE INDEX IF NOT EXISTS idx_attendance_sessions_class ON attendance_sessions(class_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_sessions_date ON attendance_sessions(session_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_sessions_active ON attendance_sessions(is_active);
+CREATE INDEX IF NOT EXISTS idx_attendance_records_session ON attendance_records(session_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_records_student ON attendance_records(student_id);
 
 -- Insert a default admin user
 -- Username: admin
