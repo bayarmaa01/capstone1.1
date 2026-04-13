@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create centralized API client
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:4000/api',
+  baseURL: process.env.REACT_APP_API_URL || '/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -47,7 +47,7 @@ api.interceptors.response.use(
 
 // Face service client
 export const faceApi = axios.create({
-  baseURL: process.env.REACT_APP_FACE_SERVICE_URL || '/face',
+  baseURL: process.env.REACT_APP_FACE_API_URL || '/face',
   headers: {
     'Content-Type': 'application/json',
   },
