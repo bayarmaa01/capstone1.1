@@ -87,7 +87,7 @@ export default function StudentProfile() {
             marginBottom: '20px'
           }}
         >
-          <- Back
+          Back
         </button>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
