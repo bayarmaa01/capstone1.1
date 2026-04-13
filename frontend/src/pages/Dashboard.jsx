@@ -12,27 +12,44 @@ export default function Dashboard({ user, onLogout }) {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('Dashboard - useEffect triggered');
+    console.log('Dashboard - API base URL:', api.defaults.baseURL);
+    console.log('Dashboard - Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
     fetchClasses();
     fetchStudents();
   }, []);
 
   const fetchClasses = async () => {
     try {
+      console.log('Dashboard - Fetching classes from:', api.getUri({url: '/classes'}));
       const response = await api.get('/classes');
       console.log('Dashboard - Classes API response:', response.data);
       setClasses(response.data);
     } catch (error) {
       console.error('Dashboard - Error fetching classes:', error);
+      console.error('Dashboard - Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
     }
   };
 
   const fetchStudents = async () => {
     try {
+      console.log('Dashboard - Fetching students from:', api.getUri({url: '/students'}));
       const response = await api.get('/students');
       console.log('Dashboard - Students API response:', response.data);
       setStudents(response.data);
     } catch (error) {
       console.error('Dashboard - Error fetching students:', error);
+      console.error('Dashboard - Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        url: error.config?.url
+      });
     }
   };
 
