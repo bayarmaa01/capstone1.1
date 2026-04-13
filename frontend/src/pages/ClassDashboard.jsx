@@ -13,6 +13,18 @@ export default function ClassDashboard() {
   const [students, setStudents] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Validate classId
+  useEffect(() => {
+    console.log("classId:", classId);
+    if (!classId) {
+      console.error("classId is undefined");
+      setError("Invalid class ID");
+      setLoading(false);
+      return;
+    }
+  }, [classId]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showStudentProfile, setShowStudentProfile] = useState(false);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -22,66 +34,41 @@ export default function ClassDashboard() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   useEffect(() => {
-    loadClassData();
-  }, [classId]);
+    if (classId && !error) {
+      loadClassData();
+    }
+  }, [classId, error]);
 
   const loadClassData = async () => {
+    if (!classId) return;
+    
     try {
       setLoading(true);
+      setError(null);
       
       console.log('Loading class data for classId:', classId);
       
       // Load class information
-      console.log('Fetching class info...');
       const classResponse = await api.get(`/classes/${classId}`);
       console.log('Class info response:', classResponse.data);
       setClassInfo(classResponse.data);
       
       // Load students
-      console.log('Fetching students...');
       const studentsResponse = await api.get(`/classes/${classId}/students`);
       console.log('Students response:', studentsResponse.data);
       setStudents(studentsResponse.data);
       
-      // Load schedule (try Moodle first, fallback to local)
-      let scheduleData = [];
-      try {
-        // Try Moodle schedule first
-        const moodleResponse = await api.get('/moodle-schedule');
-        if (moodleResponse.data.success && moodleResponse.data.data.length > 0) {
-          // Convert Moodle sessions to schedule format
-          scheduleData = moodleResponse.data.data.map(session => ({
-            id: session.sessionId,
-            day_of_week: session.day_of_week,
-            start_time: session.start_time_formatted,
-            end_time: session.end_time_formatted,
-            scheduled_date: session.session_date,
-            source: 'moodle'
-          }));
-          console.log('Using Moodle schedule:', scheduleData);
-        }
-      } catch (moodleError) {
-        console.log('Moodle schedule failed, using local schedule');
-      }
-
-      // Fallback to local schedule if Moodle fails or empty
-      if (scheduleData.length === 0) {
-        const scheduleResponse = await api.get(`/classes/${classId}/schedule`);
-        scheduleData = scheduleResponse.data.map(session => ({
-          ...session,
-          source: session.source || 'manual'
-        }));
-        console.log('Using local schedule:', scheduleData);
-      }
-      
-      setSchedule(scheduleData);
+      // Load schedule - use the unified endpoint
+      const scheduleResponse = await api.get(`/classes/${classId}/schedule`);
+      console.log('Schedule response:', scheduleResponse.data);
+      setSchedule(scheduleResponse.data || []);
       
     } catch (error) {
       console.error('Error loading class data:', error);
       console.error('Error details:', error.response?.data);
       console.error('Error status:', error.response?.status);
       
-      // Set empty data on error to prevent loading state
+      setError('Failed to load class data');
       setClassInfo(null);
       setStudents([]);
       setSchedule([]);
@@ -159,6 +146,35 @@ export default function ClassDashboard() {
     loadClassData();
   };
 
+  const handleDeleteSchedule = async (scheduleId, source) => {
+    if (source === 'moodle') {
+      alert('Cannot delete Moodle schedule - managed by LMS');
+      return;
+    }
+
+    if (!classId) {
+      console.error('classId is undefined - cannot delete schedule');
+      return;
+    }
+
+    const confirmed = window.confirm('Are you sure you want to delete this schedule?');
+    if (!confirmed) return;
+
+    try {
+      const response = await api.delete(`/classes/${classId}/schedule/${scheduleId}`);
+      
+      if (response.data.success) {
+        showToast('Schedule deleted successfully', 'success');
+        // Refresh schedule data
+        loadClassData();
+      }
+    } catch (error) {
+      console.error('Error deleting schedule:', error);
+      const message = error.response?.data?.error || 'Failed to delete schedule';
+      showToast(message, 'error');
+    }
+  };
+
   const handleRemoveStudent = async (student) => {
     const confirmed = window.confirm(
       `Are you sure you want to remove ${student.name} from this class?`
@@ -229,10 +245,43 @@ export default function ClassDashboard() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f8f9fa'
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', marginBottom: '10px' }}>Loading...</div>
+          <div style={{ fontSize: '24px', marginBottom: '10px', color: 'white' }}>Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+      }}>
+        <div style={{ textAlign: 'center', color: 'white' }}>
+          <div style={{ fontSize: '24px', marginBottom: '10px' }}>Error</div>
+          <div style={{ fontSize: '16px' }}>{error}</div>
+          <button
+            onClick={() => navigate('/dashboard')}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              backgroundColor: 'white',
+              color: '#667eea',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Back to Dashboard
+          </button>
         </div>
       </div>
     );
@@ -628,18 +677,19 @@ export default function ClassDashboard() {
             </div>
           ) : (
             <div style={{ display: 'grid', gap: '15px' }}>
-              {schedule.map((session, index) => {
+              {schedule.map((session) => {
                 const isActive = isSessionActive(session);
+                const isMoodle = session.source === 'moodle';
                 return (
                   <div
-                    key={index}
+                    key={session.id}
                     style={{
                       padding: '20px',
                       background: isActive ? 
                         'linear-gradient(135deg, #48bb78 0%, #38a169 100%)' : 
                         'linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%)',
                       borderRadius: '12px',
-                      borderLeft: `4px solid ${isActive ? '#2f855a' : '#667eea'}`,
+                      borderLeft: `4px solid ${isActive ? '#2f855a' : (isMoodle ? '#ed8936' : '#667eea')}`,
                       position: 'relative',
                       transition: 'all 0.3s',
                       boxShadow: isActive ? 
@@ -704,72 +754,106 @@ export default function ClassDashboard() {
                             fontWeight: '700',
                             textTransform: 'uppercase',
                             letterSpacing: '0.5px',
-                            background: session.source === 'scheduled' ? 
-                              (isActive ? 'rgba(255,255,255,0.2)' : '#48bb78') : 
+                            background: isMoodle ? 
+                              (isActive ? 'rgba(251, 191, 36, 0.3)' : '#fbbf24') : 
                               (isActive ? 'rgba(255,255,255,0.2)' : '#718096'),
-                            color: session.source === 'scheduled' ? 
-                              (isActive ? 'white' : 'white') : 
-                              (isActive ? 'white' : 'white')
+                            color: isMoodle ? 
+                              (isActive ? '#92400e' : '#92400e') : 
+                              (isActive ? 'white' : '#4a5568')
                           }}>
-                            {session.source === 'scheduled' ? 'Synced' : 'Manual'}
+                            {isMoodle ? 'Moodle' : 'Manual'}
                           </span>
+                          {isMoodle && (
+                            <span style={{
+                              marginLeft: '8px',
+                              fontSize: '11px',
+                              color: isActive ? 'rgba(255,255,255,0.7)' : '#64748b',
+                              fontStyle: 'italic'
+                            }}>
+                              Managed by LMS
+                            </span>
+                          )}
                         </div>
                       </div>
                       
-                      {isActive && (
-                        <div style={{ display: 'flex', gap: '8px', marginLeft: '15px' }}>
+                      <div style={{ display: 'flex', gap: '8px', marginLeft: '15px', alignItems: 'flex-start' }}>
+                        {isActive && (
+                          <>
+                            <button
+                              onClick={() => handleTakeAttendance(session, 'face')}
+                              style={{
+                                padding: '8px 16px',
+                                background: 'rgba(255,255,255,0.9)',
+                                color: '#2d3748',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                              }}
+                              onMouseOver={(e) => {
+                                e.target.style.background = 'white';
+                                e.target.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.target.style.background = 'rgba(255,255,255,0.9)';
+                                e.target.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              Face
+                            </button>
+                            <button
+                              onClick={() => handleTakeAttendance(session, 'qr')}
+                              style={{
+                                padding: '8px 16px',
+                                background: 'rgba(255,255,255,0.9)',
+                                color: '#2d3748',
+                                border: 'none',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                              }}
+                              onMouseOver={(e) => {
+                                e.target.style.background = 'white';
+                                e.target.style.transform = 'translateY(-1px)';
+                              }}
+                              onMouseOut={(e) => {
+                                e.target.style.background = 'rgba(255,255,255,0.9)';
+                                e.target.style.transform = 'translateY(0)';
+                              }}
+                            >
+                              QR
+                            </button>
+                          </>
+                        )}
+                        
+                        {!isMoodle && (
                           <button
-                            onClick={() => handleTakeAttendance(session, 'face')}
+                            onClick={() => handleDeleteSchedule(session.id, session.source)}
                             style={{
-                              padding: '8px 16px',
-                              background: 'rgba(255,255,255,0.9)',
-                              color: '#2d3748',
+                              padding: '6px 12px',
+                              background: '#ef4444',
+                              color: 'white',
                               border: 'none',
-                              borderRadius: '8px',
-                              fontSize: '12px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
                               fontWeight: '600',
                               cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                              transition: 'background-color 0.2s'
                             }}
-                            onMouseOver={(e) => {
-                              e.target.style.background = 'white';
-                              e.target.style.transform = 'translateY(-1px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.target.style.background = 'rgba(255,255,255,0.9)';
-                              e.target.style.transform = 'translateY(0)';
-                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#dc2626'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#ef4444'}
+                            title="Remove schedule"
                           >
-                            Face
+                            Remove
                           </button>
-                          <button
-                            onClick={() => handleTakeAttendance(session, 'qr')}
-                            style={{
-                              padding: '8px 16px',
-                              background: 'rgba(255,255,255,0.9)',
-                              color: '#2d3748',
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              fontWeight: '600',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                            }}
-                            onMouseOver={(e) => {
-                              e.target.style.background = 'white';
-                              e.target.style.transform = 'translateY(-1px)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.target.style.background = 'rgba(255,255,255,0.9)';
-                              e.target.style.transform = 'translateY(0)';
-                            }}
-                          >
-                            QR
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 );

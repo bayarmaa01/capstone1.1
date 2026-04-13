@@ -216,6 +216,51 @@ router.post('/schedule', async (req, res) => {
   }
 });
 
+// Delete class schedule (only local schedules, not Moodle)
+router.delete('/:classId/schedule/:scheduleId', async (req, res) => {
+  try {
+    const { classId, scheduleId } = req.params;
+    
+    if (!classId || !scheduleId) {
+      return res.status(400).json({ 
+        error: 'classId and scheduleId are required' 
+      });
+    }
+    
+    // Check if schedule exists and get its details
+    const scheduleCheck = await db.query(`
+      SELECT id, class_id, source FROM class_schedules 
+      WHERE id = $1 AND class_id = $2
+    `, [scheduleId, classId]);
+    
+    if (scheduleCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+    
+    const schedule = scheduleCheck.rows[0];
+    
+    // Prevent deletion of Moodle schedules
+    if (schedule.source === 'moodle') {
+      return res.status(403).json({ 
+        error: 'Cannot delete Moodle schedules - they are managed by the LMS' 
+      });
+    }
+    
+    // Delete the schedule
+    await db.query('DELETE FROM class_schedules WHERE id = $1 AND class_id = $2', [scheduleId, classId]);
+    
+    console.log(`Local schedule deleted - Class: ${classId}, Schedule: ${scheduleId}`);
+    
+    res.json({ 
+      success: true, 
+      message: 'Schedule deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete schedule error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get students in a class with attendance data
 router.get('/:classId/students', async (req, res) => {
   try {

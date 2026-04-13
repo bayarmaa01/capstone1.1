@@ -80,7 +80,7 @@ function App() {
         />
         <Route 
           path="/class/:classId" 
-          element={user ? <ClassScheduleWrapper /> : <Navigate to="/login" replace />} 
+          element={user ? <ClassDashboard user={user} /> : <Navigate to="/login" replace />} 
         />
         <Route 
           path="/attendance/:id" 

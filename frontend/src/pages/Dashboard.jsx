@@ -160,7 +160,7 @@ export default function Dashboard({ user, onLogout }) {
               <div 
                 key={cls.id} 
                 style={styles.card}
-                onClick={() => navigate(`/attendance/${cls.id}`)}
+                onClick={() => navigate(`/class/${cls.id}`)}
               >
                 <h3>{cls.code}</h3>
                 <p>{cls.name}</p>
