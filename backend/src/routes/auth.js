@@ -91,21 +91,36 @@ router.post('/login', async (req, res) => {
     const moodleUser = moodleResult[0];
     console.log(` User found - ID: ${moodleUser.id}, Username: ${moodleUser.username}`);
     
-    // Verify password using Moodle's MD5 hash
-    const verifyPassword = (input, hash) => {
-      // Check if it's an MD5 hash (starts with $ and is 32 chars)
-      if (!hash || !hash.startsWith('$') || hash.length !== 32) {
+    // Verify password using Moodle's bcrypt hash
+    const verifyPassword = async (input, hash) => {
+      console.log(`=== PASSWORD VERIFICATION ===`);
+      console.log(`Input password length: ${input.length}`);
+      console.log(`DB hash (original): ${hash.substring(0, 10)}...`);
+      
+      // Check if it's a bcrypt hash (starts with $2y$ or $2b$)
+      if (!hash || (!hash.startsWith('$2y$') && !hash.startsWith('$2b$'))) {
         console.log(` Invalid password hash format: ${hash}`);
         return false;
       }
       
-      const inputHash = crypto.createHash('md5').update(input).digest('hex');
-      const isValid = inputHash === hash.toLowerCase();
-      console.log(` Password verification: ${isValid ? 'SUCCESS' : 'FAILED'}`);
-      return isValid;
+      // Convert Moodle bcrypt hash ($2y$) to Node.js compatible format ($2b$)
+      let nodeCompatibleHash = hash;
+      if (hash.startsWith('$2y$')) {
+        nodeCompatibleHash = hash.replace('$2y$', '$2b$');
+        console.log(`Converted hash: ${nodeCompatibleHash.substring(0, 10)}...`);
+      }
+      
+      try {
+        const isValid = await bcrypt.compare(input, nodeCompatibleHash);
+        console.log(`Password verification: ${isValid ? 'SUCCESS' : 'FAILED'}`);
+        return isValid;
+      } catch (error) {
+        console.error(`Bcrypt comparison error: ${error.message}`);
+        return false;
+      }
     };
     
-    const valid = verifyPassword(password, moodleUser.password);
+    const valid = await verifyPassword(password, moodleUser.password);
     
     if (!valid) {
       console.log(` Login failed - Password mismatch for user: ${username}`);
@@ -139,14 +154,14 @@ router.post('/login', async (req, res) => {
         email: moodleUser.email,
         name: `${moodleUser.firstname} ${moodleUser.lastname}`,
         role: userRole,
-        course_id: roleResult.rows[0].course_id,
-        course_name: roleResult.rows[0].course_name
+        course_id: roleResult[0].course_id,
+        course_name: roleResult[0].course_name
       },
       process.env.JWT_SECRET || 'default_secret_change_this',
       { expiresIn: '24h' }
     );
     
-    console.log(`✓ Teacher logged in: ${username} (${userRole})`);
+    console.log(` Teacher logged in: ${username} (${userRole})`);
     res.json({ 
       success: true, 
       token, 
@@ -163,6 +178,51 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: error.message || 'Internal server error' });
+  }
+});
+
+// Test endpoint to verify authentication system
+router.get('/test', async (req, res) => {
+  try {
+    console.log('=== AUTH SYSTEM TEST ===');
+    
+    // Test database connection
+    await moodlePool.query('SELECT 1');
+    console.log('Database connection: OK');
+    
+    // Test hash conversion
+    const testHash = '$2y$10$JcmLcKMiTWyjYIV4HvYeD.sWMR8aE12r2GHeWK7Zh1i0caNnHi1q.';
+    const convertedHash = testHash.replace('$2y$', '$2b$');
+    console.log('Hash conversion: OK');
+    
+    // Count active users
+    const userCount = await moodlePool.query('SELECT COUNT(*) as count FROM mdl_user WHERE deleted = 0 AND suspended = 0');
+    console.log(`Active users: ${userCount[0].count}`);
+    
+    res.json({
+      success: true,
+      message: 'Authentication system test successful',
+      database: {
+        connected: true,
+        activeUsers: userCount[0].count
+      },
+      hashConversion: {
+        original: testHash.substring(0, 10) + '...',
+        converted: convertedHash.substring(0, 10) + '...'
+      },
+      testCredentials: {
+        username: 'admin',
+        password: 'Admin@123',
+        note: 'Test with actual Moodle admin credentials'
+      }
+    });
+  } catch (error) {
+    console.error('Auth test error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Authentication system test failed',
+      error: error.message 
+    });
   }
 });
 
