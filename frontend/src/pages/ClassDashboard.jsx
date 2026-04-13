@@ -5,7 +5,7 @@ import CameraCapture from '../components/CameraCapture';
 import QRScanner from '../components/QRScanner';
 
 export default function ClassDashboard() {
-  const { classId } = useParams();
+  const { id: classId } = useParams();
   const navigate = useNavigate();
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
@@ -39,11 +39,38 @@ export default function ClassDashboard() {
       console.log('Students response:', studentsResponse.data);
       setStudents(studentsResponse.data);
       
-      // Load schedule
-      console.log('Fetching schedule...');
-      const scheduleResponse = await api.get(`/classes/${classId}/schedule`);
-      console.log('Schedule response:', scheduleResponse.data);
-      setSchedule(scheduleResponse.data);
+      // Load schedule (try Moodle first, fallback to local)
+      let scheduleData = [];
+      try {
+        // Try Moodle schedule first
+        const moodleResponse = await api.get('/moodle-schedule');
+        if (moodleResponse.data.success && moodleResponse.data.data.length > 0) {
+          // Convert Moodle sessions to schedule format
+          scheduleData = moodleResponse.data.data.map(session => ({
+            id: session.sessionId,
+            day_of_week: session.day_of_week,
+            start_time: session.start_time_formatted,
+            end_time: session.end_time_formatted,
+            scheduled_date: session.session_date,
+            source: 'moodle'
+          }));
+          console.log('Using Moodle schedule:', scheduleData);
+        }
+      } catch (moodleError) {
+        console.log('Moodle schedule failed, using local schedule');
+      }
+
+      // Fallback to local schedule if Moodle fails or empty
+      if (scheduleData.length === 0) {
+        const scheduleResponse = await api.get(`/classes/${classId}/schedule`);
+        scheduleData = scheduleResponse.data.map(session => ({
+          ...session,
+          source: session.source || 'manual'
+        }));
+        console.log('Using local schedule:', scheduleData);
+      }
+      
+      setSchedule(scheduleData);
       
     } catch (error) {
       console.error('Error loading class data:', error);
