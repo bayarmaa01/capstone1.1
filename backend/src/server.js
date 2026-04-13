@@ -211,7 +211,7 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 
 app.use(cors({
-  origin: ['http://attendance-ml.duckdns.org', 'http://localhost:3000'],
+  origin: ['http://attendance-ml.duckdns.org', 'http://localhost:3000', 'http://localhost:4000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
