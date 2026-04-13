@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Create centralized API client
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://attendance-ml.duckdns.org/api',
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:4000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,6 +26,15 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('API Error:', error);
+    console.error('API Error Details:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url,
+      method: error.config?.method
+    });
+    
     if (error.response?.status === 401) {
       // Token expired or invalid
       localStorage.removeItem('token');
