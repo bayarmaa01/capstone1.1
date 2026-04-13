@@ -6,50 +6,38 @@ import { QRCodeSVG } from 'qrcode.react';
 export default function Dashboard({ user, onLogout }) {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showAddClass, setShowAddClass] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showQRCodes, setShowQRCodes] = useState(false);
   const navigate = useNavigate();
 
+  // FORCE API CALLS ON COMPONENT MOUNT
   useEffect(() => {
-    console.log('Dashboard - useEffect triggered');
-    console.log('Dashboard - API base URL:', api.defaults.baseURL);
-    console.log('Dashboard - Token in localStorage:', localStorage.getItem('token') ? 'Present' : 'Missing');
-    fetchClasses();
-    fetchStudents();
+    console.log('Dashboard: Component mounted, forcing API calls');
+    loadData();
   }, []);
 
-  const fetchClasses = async () => {
+  const loadData = async () => {
+    setLoading(true);
     try {
-      console.log('Dashboard - Fetching classes from:', api.getUri({url: '/classes'}));
-      const response = await api.get('/classes');
-      console.log('Dashboard - Classes API response:', response.data);
-      setClasses(response.data);
-    } catch (error) {
-      console.error('Dashboard - Error fetching classes:', error);
-      console.error('Dashboard - Error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url
-      });
-    }
-  };
+      // Fetch classes from backend
+      console.log('Dashboard: Fetching classes from backend...');
+      const classesResponse = await api.get('/classes');
+      console.log('Dashboard: Classes data received:', classesResponse.data);
+      setClasses(classesResponse.data || []);
 
-  const fetchStudents = async () => {
-    try {
-      console.log('Dashboard - Fetching students from:', api.getUri({url: '/students'}));
-      const response = await api.get('/students');
-      console.log('Dashboard - Students API response:', response.data);
-      setStudents(response.data);
+      // Fetch students from backend
+      console.log('Dashboard: Fetching students from backend...');
+      const studentsResponse = await api.get('/students');
+      console.log('Dashboard: Students data received:', studentsResponse.data);
+      setStudents(studentsResponse.data || []);
+
     } catch (error) {
-      console.error('Dashboard - Error fetching students:', error);
-      console.error('Dashboard - Error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url
-      });
+      console.error('Dashboard: Error loading data:', error);
+      // Still try to show what we can
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,7 +52,7 @@ export default function Dashboard({ user, onLogout }) {
       });
       setShowAddClass(false);
       e.target.reset();
-      fetchClasses();
+      loadData(); // Refresh data
       alert('Class added successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to add class'));
@@ -80,7 +68,7 @@ export default function Dashboard({ user, onLogout }) {
       });
       setShowAddStudent(false);
       e.target.reset();
-      fetchStudents();
+      loadData(); // Refresh data
       
       if (response.data.student.face_enrolled) {
         alert('Student added and face enrolled successfully!');
@@ -99,7 +87,7 @@ export default function Dashboard({ user, onLogout }) {
     
     try {
       await api.delete(`/students/${studentId}`);
-      fetchStudents();
+      loadData(); // Refresh data
       alert('Student deleted successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to delete student'));
@@ -140,6 +128,14 @@ export default function Dashboard({ user, onLogout }) {
           <button onClick={onLogout} style={styles.logoutBtn}>Logout</button>
         </div>
       </header>
+
+      {/* Loading Indicator */}
+      {loading && (
+        <div style={styles.loadingContainer}>
+          <div style={styles.loadingSpinner}></div>
+          <p style={styles.loadingText}>Loading data from backend...</p>
+        </div>
+      )}
 
       <div style={styles.grid}>
         {/* Classes Section */}
@@ -351,6 +347,31 @@ const styles = {
     cursor: 'pointer', 
     fontWeight: '600',
     transition: 'transform 0.2s'
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '40px',
+    background: 'white',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    marginBottom: '20px'
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f3f3',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    marginBottom: '15px'
+  },
+  loadingText: {
+    color: '#666',
+    fontSize: '16px',
+    margin: 0
   },
   grid: { 
     display: 'grid', 
