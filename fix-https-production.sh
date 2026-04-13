@@ -1,17 +1,17 @@
 #!/bin/bash
 
-# Production HTTPS SSL Configuration Fix Script
-# Fixes HTTPS connection issues for Docker-based system on Azure VM
+# Complete Production HTTPS SSL Configuration Fix Script
+# Single comprehensive script for SSL certificate creation and HTTPS setup
 
 set -e
 
-echo "=== PRODUCTION HTTPS SSL CONFIGURATION FIX ==="
+echo "=== COMPLETE PRODUCTION HTTPS SSL CONFIGURATION FIX ==="
 echo "Domain: attendance-ml.duckdns.org"
 echo "Target: Make HTTPS fully functional with Let's Encrypt certificates"
 echo
 
-# STEP 1: Verify SSL certificates exist on host
-echo "1. Verifying SSL certificates on host..."
+# STEP 1: Check and create SSL certificates if needed
+echo "1. Checking and creating SSL certificates..."
 if [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem" ]; then
     echo "SSL certificate found: /etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem"
     echo "Certificate files:"
@@ -19,9 +19,23 @@ if [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem" ]; then
     echo "Certificate expiration:"
     openssl x509 -in /etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem -noout -dates
 else
-    echo "ERROR: SSL certificate not found!"
-    echo "Please run: sudo certbot --nginx -d attendance-ml.duckdns.org"
-    exit 1
+    echo "SSL certificate not found - creating new certificate..."
+    echo "Stopping nginx to free port 80 for certbot..."
+    docker compose stop nginx || echo "Nginx already stopped"
+    
+    echo "Creating SSL certificate with certbot..."
+    sudo certbot certonly --standalone -d attendance-ml.duckdns.org --email admin@attendance-ml.duckdns.org --agree-tos --no-eff-email
+    
+    if [ -f "/etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem" ]; then
+        echo "SSL certificate created successfully!"
+        echo "Certificate files:"
+        ls -la /etc/letsencrypt/live/attendance-ml.duckdns.org/
+        echo "Certificate expiration:"
+        openssl x509 -in /etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem -noout -dates
+    else
+        echo "ERROR: Failed to create SSL certificate!"
+        exit 1
+    fi
 fi
 echo
 
@@ -129,13 +143,99 @@ echo "SSL certificate validation:"
 docker exec capstone11-nginx-1 openssl x509 -in /etc/letsencrypt/live/attendance-ml.duckdns.org/fullchain.pem -noout -dates 2>/dev/null || echo "Could not validate SSL cert"
 echo
 
-echo "=== HTTPS FIX COMPLETE ==="
+# STEP 14: Set up SSL auto-renewal
+echo "14. Setting up SSL auto-renewal..."
+# Create renewal script
+cat > /tmp/renew-ssl.sh << 'EOF'
+#!/bin/bash
+
+# SSL Certificate Renewal Script
+LOG_FILE="/var/log/ssl-renewal.log"
+
+echo "$(date): Starting SSL certificate renewal check" >> $LOG_FILE
+
+# Renew certificates
+if certbot renew --quiet --no-self-upgrade >> $LOG_FILE 2>&1; then
+    echo "$(date): SSL certificate renewal completed" >> $LOG_FILE
+    
+    # Restart nginx
+    if cd /home/azureuser/capstone1.1 && docker compose restart nginx >> $LOG_FILE 2>&1; then
+        echo "$(date): nginx restarted successfully" >> $LOG_FILE
+    else
+        echo "$(date): ERROR: Failed to restart nginx" >> $LOG_FILE
+    fi
+else
+    echo "$(date): No renewal needed" >> $LOG_FILE
+fi
+EOF
+
+sudo mv /tmp/renew-ssl.sh /usr/local/bin/renew-ssl.sh
+sudo chmod +x /usr/local/bin/renew-ssl.sh
+
+# Add cron job for twice daily renewal
+CRON_ENTRY="0 3,15 * * * /usr/local/bin/renew-ssl.sh"
+if (crontab -l 2>/dev/null | grep -q "renew-ssl.sh"); then
+    echo "Cron job already exists"
+else
+    (crontab -l 2>/dev/null; echo "$CRON_ENTRY") | crontab -
+    echo "SSL auto-renewal cron job added (3:00 AM and 3:00 PM)"
+fi
+
+# Create monitoring script
+cat > /tmp/monitor-ssl.sh << 'EOF'
+#!/bin/bash
+
+# SSL Certificate Monitoring Script
+DOMAIN="attendance-ml.duckdns.org"
+CERT_PATH="/etc/letsencrypt/live/$DOMAIN/fullchain.pem"
+WARNING_DAYS=30
+
+if [ -f "$CERT_PATH" ]; then
+    EXPIRY=$(openssl x509 -in "$CERT_PATH" -noout -enddate | cut -d= -f2)
+    EXPIRY_EPOCH=$(date -d "$EXPIRY" +%s)
+    CURRENT_EPOCH=$(date +%s)
+    DAYS_LEFT=$(( ($EXPIRY_EPOCH - $CURRENT_EPOCH) / 86400 ))
+    
+    if [ $DAYS_LEFT -lt $WARNING_DAYS ]; then
+        echo "WARNING: SSL certificate expires in $DAYS_LEFT days"
+    else
+        echo "SSL certificate valid for $DAYS_LEFT more days"
+    fi
+else
+    echo "ERROR: SSL certificate not found"
+fi
+EOF
+
+sudo mv /tmp/monitor-ssl.sh /usr/local/bin/monitor-ssl.sh
+sudo chmod +x /usr/local/bin/monitor-ssl.sh
+
+# Add weekly monitoring
+MONITOR_CRON="0 8 * * 1 /usr/local/bin/monitor-ssl.sh >> /var/log/ssl-renewal.log 2>&1"
+if (crontab -l 2>/dev/null | grep -q "monitor-ssl.sh"); then
+    echo "Monitoring cron job already exists"
+else
+    (crontab -l 2>/dev/null; echo "$MONITOR_CRON") | crontab -
+    echo "SSL monitoring cron job added (weekly on Mondays)"
+fi
+
+echo "SSL auto-renewal and monitoring setup complete"
+echo
+
+echo "=== COMPLETE HTTPS FIX FINISHED ==="
 echo
 echo "EXPECTED RESULTS:"
 echo "- Port 443 should be listening"
 echo "- HTTP should redirect to HTTPS (301)"
 echo "- HTTPS should return 200 OK"
 echo "- No connection refused errors"
+echo "- SSL auto-renewal configured (twice daily)"
+echo "- SSL monitoring configured (weekly)"
+echo
+echo "MANAGEMENT COMMANDS:"
+echo "- Check SSL status: sudo /usr/local/bin/monitor-ssl.sh"
+echo "- Test renewal: sudo /usr/local/bin/renew-ssl.sh"
+echo "- View logs: sudo tail -f /var/log/ssl-renewal.log"
+echo "- Edit cron: sudo crontab -e"
 echo
 echo "If HTTPS still fails, check:"
 echo "1. Azure Network Security Group allows 443"
