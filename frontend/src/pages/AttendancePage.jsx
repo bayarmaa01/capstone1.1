@@ -6,9 +6,9 @@ import CameraCapture from '../components/CameraCapture';
 import moment from 'moment';
 
 export default function AttendancePage() {
-  const { classId, scheduleId } = useParams();
+  const { scheduleId } = useParams();
   const navigate = useNavigate();
-  const [mode, setMode] = useState('face'); // 'face' or 'qr'
+  const [mode, setMode] = useState(null); // null, 'face', 'qr', or 'manual'
   const [classInfo, setClassInfo] = useState(null);
   const [scheduleInfo, setScheduleInfo] = useState(null);
   const [attendance, setAttendance] = useState([]);
@@ -21,10 +21,6 @@ export default function AttendancePage() {
   useEffect(() => {
     if (scheduleId) {
       fetchScheduleStatus();
-    } else {
-      // Fallback to old behavior if no scheduleId
-      fetchClassInfo();
-      fetchTodayAttendance();
     }
     
     // Check status every 30 seconds if schedule-based
@@ -32,52 +28,51 @@ export default function AttendancePage() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [classId, scheduleId]);
+  }, [scheduleId]);
 
   const fetchScheduleStatus = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await api.get(`/schedule/attendance/status?scheduleId=${scheduleId}`);
+      // Get schedule information
+      const scheduleResponse = await api.get(`/schedule/${scheduleId}`);
+      setScheduleInfo(scheduleResponse.data);
       
-      if (response.data.success) {
-        setScheduleInfo(response.data.schedule);
-        setIsActive(response.data.is_active);
-        
-        // Fetch class info and attendance
-        await fetchClassInfo();
-        await fetchTodayAttendance();
-        
-        // Redirect if not active
-        if (!response.data.is_active) {
-          setError('Attendance is only available during scheduled class time');
-        }
-      } else {
-        setError('Failed to load schedule status');
+      // Get class information from schedule
+      const classResponse = await api.get(`/classes/${scheduleResponse.data.class_id}`);
+      setClassInfo(classResponse.data);
+      
+      // Get attendance for this class and date
+      await fetchTodayAttendance(scheduleResponse.data.class_id);
+      
+      // Check if schedule is active (within 30 minutes of start time)
+      const now = new Date();
+      const scheduleDate = new Date(scheduleResponse.data.scheduled_date);
+      const [hours, minutes] = scheduleResponse.data.start_time.split(':');
+      const startTime = new Date(scheduleDate);
+      startTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      
+      const endTime = new Date(scheduleDate);
+      const [endHours, endMinutes] = scheduleResponse.data.end_time.split(':');
+      endTime.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
+      
+      const isActive = now >= startTime && now <= endTime;
+      setIsActive(isActive);
+      
+      if (!isActive) {
+        setError('Attendance is only available during scheduled class time');
       }
+      
     } catch (err) {
       console.error('Error fetching schedule status:', err);
-      setError(err.response?.data?.error || 'Failed to load schedule status');
-      // Fallback to old behavior
-      await fetchClassInfo();
-      await fetchTodayAttendance();
+      setError(err.response?.data?.error || 'Failed to load schedule information');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchClassInfo = async () => {
-    try {
-      const response = await api.get(`/classes/${classId}`);
-      setClassInfo(response.data);
-    } catch (error) {
-      console.error('Error fetching class:', error);
-      alert('Failed to load class information');
-    }
-  };
-
-  const fetchTodayAttendance = async () => {
+  const fetchTodayAttendance = async (classId) => {
     try {
       setLoading(true);
       const response = await api.get(
@@ -113,7 +108,7 @@ export default function AttendancePage() {
         if (match) {
           studentId = match[0].toUpperCase();
         } else {
-          alert('⚠️ QR code should contain student ID (format: STU001)');
+          alert('QR code should contain student ID (format: STU001)');
           return;
         }
       }
@@ -123,15 +118,15 @@ export default function AttendancePage() {
       
       // Validate format (STU followed by digits)
       if (!studentId.match(/^STU\d+$/i)) {
-        alert(`⚠️ Invalid student ID format: ${studentId}\nExpected format: STU001`);
+        alert(`Invalid student ID format: ${studentId}\nExpected format: STU001`);
         return;
       }
       
-      console.log('🔍 Looking for student ID:', studentId);
+      console.log('Looking for student ID:', studentId);
       
       // Check if already present
       if (recognizedIds.has(studentId)) {
-        alert(`✓ Student ${studentId} already marked present!`);
+        alert(`Student ${studentId} already marked present!`);
         return;
       }
 
@@ -139,16 +134,16 @@ export default function AttendancePage() {
       const student = attendance.find(s => s.student_id === studentId);
       
       if (!student) {
-        console.error('❌ Student not found in class');
-        alert(`⚠️ Student ${studentId} is not enrolled in this class!`);
+        console.error('Student not found in class');
+        alert(`Student ${studentId} is not enrolled in this class!`);
         return;
       }
 
-      console.log('✓ Found student:', student.name, '(DB ID:', student.id, ')');
+      console.log('Found student:', student.name, '(DB ID:', student.id, ')');
 
       // Record attendance with student's database ID
       await api.post('/attendance/record', {
-        class_id: parseInt(classId),
+        class_id: classInfo.id,
         student_id: student.id,  // Use database ID from the student record
         session_date: sessionDate,
         method: 'qr',
@@ -156,11 +151,11 @@ export default function AttendancePage() {
       });
       
       setRecognizedIds(prev => new Set([...prev, studentId]));
-      await fetchTodayAttendance();
-      alert(`✓ Attendance recorded for ${student.name} (${studentId})`);
+      await fetchTodayAttendance(classInfo.id);
+      alert(`Attendance recorded for ${student.name} (${studentId})`);
       
     } catch (error) {
-      console.error('❌ QR scan error:', error);
+      console.error('QR scan error:', error);
       const errorMsg = error.response?.data?.error || error.message || 'Failed to record attendance';
       alert(`Error: ${errorMsg}`);
     }
@@ -168,11 +163,11 @@ export default function AttendancePage() {
 
   const handleFaceRecognized = async (match) => {
     try {
-      console.log('👤 Face recognized:', match);
+      console.log('Face recognized:', match);
       
       // match should have: { student_id: "STU001", confidence: 0.95 }
       if (!match || !match.student_id) {
-        console.error('❌ Invalid match data:', match);
+        console.error('Invalid match data:', match);
         return;
       }
       
@@ -180,7 +175,7 @@ export default function AttendancePage() {
       
       // Check if already marked
       if (recognizedIds.has(studentId)) {
-        console.log('ℹ️ Student already marked present:', studentId);
+        console.log('Student already marked present:', studentId);
         return;
       }
       
@@ -188,15 +183,15 @@ export default function AttendancePage() {
       const student = attendance.find(s => s.student_id === studentId);
       
       if (!student) {
-        console.log(`⚠️ Student ${studentId} not enrolled in this class`);
+        console.log(`Student ${studentId} not enrolled in this class`);
         return;
       }
       
-      console.log('✓ Recording attendance for:', student.name, '(DB ID:', student.id, ')');
+      console.log('Recording attendance for:', student.name, '(DB ID:', student.id, ')');
       
       // Record attendance with student's database ID
       await api.post('/attendance/record', {
-        class_id: parseInt(classId),
+        class_id: classInfo.id,
         student_id: student.id,  // Use database ID from the student record
         session_date: sessionDate,
         method: 'face',
@@ -204,14 +199,14 @@ export default function AttendancePage() {
       });
       
       setRecognizedIds(prev => new Set([...prev, studentId]));
-      await fetchTodayAttendance();
-      console.log(`✓ Attendance recorded for ${student.name}`);
+      await fetchTodayAttendance(classInfo.id);
+      console.log(`Attendance recorded for ${student.name}`);
       
       // Show success notification
-      showNotification(`✓ ${student.name} marked present!`, 'success');
+      showNotification(`${student.name} marked present!`, 'success');
       
     } catch (error) {
-      console.error('❌ Face recognition error:', error);
+      console.error('Face recognition error:', error);
       const errorMsg = error.response?.data?.error || error.message || 'Failed to record attendance';
       showNotification(`Face recognition error: ${errorMsg}`, 'error');
     }
@@ -219,16 +214,16 @@ export default function AttendancePage() {
 
   const handleManualMark = async (student) => {
     try {
-      console.log('✋ Manual marking attendance for:', student);
+      console.log('Manual marking attendance for:', student);
       
       if (!student || !student.id) {
-        alert('❌ Invalid student data');
+        alert('Invalid student data');
         return;
       }
       
       // Check if already present
       if (recognizedIds.has(student.student_id)) {
-        alert(`✓ ${student.name} is already marked present!`);
+        alert(`${student.name} is already marked present!`);
         return;
       }
       
@@ -236,11 +231,11 @@ export default function AttendancePage() {
       const confirmed = window.confirm(`Mark ${student.name} (${student.student_id}) as present?`);
       if (!confirmed) return;
       
-      console.log('💾 Recording manual attendance - Student DB ID:', student.id, 'Class ID:', classId);
+      console.log('Recording manual attendance - Student DB ID:', student.id, 'Class ID:', classInfo.id);
       
       // Record attendance using the database ID
       await api.post('/attendance/record', {
-        class_id: parseInt(classId),
+        class_id: classInfo.id,
         student_id: student.id,  // IMPORTANT: Use database ID (integer), not student_id string
         session_date: sessionDate,
         method: 'manual',
@@ -248,11 +243,11 @@ export default function AttendancePage() {
       });
       
       setRecognizedIds(prev => new Set([...prev, student.student_id]));
-      await fetchTodayAttendance();
-      showNotification(`✓ ${student.name} marked present`, 'success');
+      await fetchTodayAttendance(classInfo.id);
+      showNotification(`${student.name} marked present`, 'success');
       
     } catch (error) {
-      console.error('❌ Manual marking error:', error);
+      console.error('Manual marking error:', error);
       console.error('Error details:', {
         response: error.response?.data,
         status: error.response?.status,
@@ -306,7 +301,7 @@ export default function AttendancePage() {
           <h3>Attendance Not Available</h3>
           <p>{error}</p>
         </div>
-        <button onClick={() => navigate(`/class/${classId}`)} style={styles.backBtn}>
+        <button onClick={() => navigate(`/class/${classInfo.id}`)} style={styles.backBtn}>
           Back to Class
         </button>
       </div>
@@ -316,27 +311,162 @@ export default function AttendancePage() {
   const presentCount = attendance.filter(s => s.present).length;
   const totalCount = attendance.length;
 
+  // Show mode selection if no mode is selected
+  if (!mode) {
+    return (
+      <div style={styles.container}>
+        <button onClick={() => navigate(`/class/${classInfo.id}`)} style={styles.backBtn}>
+          Back to Class
+        </button>
+
+        <header style={styles.header}>
+          <div>
+            <h1>Take Attendance</h1>
+            <p style={styles.headerText}>{classInfo.code} - {classInfo.name}</p>
+            {scheduleInfo && (
+              <p style={styles.headerText}>
+                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][scheduleInfo.day_of_week]} | 
+                {scheduleInfo.start_time} - {scheduleInfo.end_time} | 
+                {scheduleInfo.room_number && ` Room ${scheduleInfo.room_number}`}
+              </p>
+            )}
+            <p style={styles.headerText}>
+              Date: {new Date(sessionDate).toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </p>
+            {scheduleId && (
+              <p style={{
+                ...styles.headerText,
+                color: isActive ? '#28a745' : '#dc3545',
+                fontWeight: 'bold'
+              }}>
+                Status: {isActive ? 'Active' : 'Inactive'}
+              </p>
+            )}
+          </div>
+          <div style={styles.stats}>
+            <div style={styles.statBox}>
+              <div style={styles.statNum}>{presentCount}/{totalCount}</div>
+              <div style={styles.statLabel}>Present</div>
+            </div>
+            <div style={styles.statBox}>
+              <div style={styles.statNum}>
+                {totalCount > 0 ? Math.round((presentCount/totalCount)*100) : 0}%
+              </div>
+              <div style={styles.statLabel}>Attendance</div>
+            </div>
+          </div>
+        </header>
+
+        {/* Mode Selection */}
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+          gap: '20px', 
+          marginTop: '40px' 
+        }}>
+          <div 
+            onClick={() => setMode('face')}
+            style={{
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              padding: '40px 30px',
+              borderRadius: '15px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 15px 40px rgba(102, 126, 234, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(102, 126, 234, 0.3)';
+            }}
+          >
+            <div style={{ fontSize: '48px', marginBottom: '15px' }}>Face Recognition</div>
+            <div style={{ fontSize: '16px', opacity: 0.9 }}>Use camera to recognize faces</div>
+          </div>
+
+          <div 
+            onClick={() => setMode('qr')}
+            style={{
+              background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+              color: 'white',
+              padding: '40px 30px',
+              borderRadius: '15px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              boxShadow: '0 10px 30px rgba(240, 147, 251, 0.3)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 15px 40px rgba(240, 147, 251, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(240, 147, 251, 0.3)';
+            }}
+          >
+            <div style={{ fontSize: '48px', marginBottom: '15px' }}>QR Code</div>
+            <div style={{ fontSize: '16px', opacity: 0.9 }}>Scan QR codes for attendance</div>
+          </div>
+
+          <div 
+            onClick={() => setMode('manual')}
+            style={{
+              background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+              color: 'white',
+              padding: '40px 30px',
+              borderRadius: '15px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'transform 0.3s, box-shadow 0.3s',
+              boxShadow: '0 10px 30px rgba(79, 172, 254, 0.3)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-5px)';
+              e.currentTarget.style.boxShadow = '0 15px 40px rgba(79, 172, 254, 0.4)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 10px 30px rgba(79, 172, 254, 0.3)';
+            }}
+          >
+            <div style={{ fontSize: '48px', marginBottom: '15px' }}>Manual</div>
+            <div style={{ fontSize: '16px', opacity: 0.9 }}>Mark attendance manually</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
-      <button onClick={() => navigate(`/class/${classId}`)} style={styles.backBtn}>
-        {scheduleId ? 'Back to Schedule' : 'Back to Class'}
+      <button onClick={() => navigate(`/class/${classInfo.id}`)} style={styles.backBtn}>
+        Back to Class
       </button>
 
       <header style={styles.header}>
         <div>
-          <h1>📋 Attendance Session</h1>
+          <h1>Take Attendance</h1>
           <p style={styles.headerText}>{classInfo.code} - {classInfo.name}</p>
+          {scheduleInfo && (
+            <p style={styles.headerText}>
+              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][scheduleInfo.day_of_week]} | 
+              {scheduleInfo.start_time} - {scheduleInfo.end_time} | 
+              {scheduleInfo.room_number && ` Room ${scheduleInfo.room_number}`}
+            </p>
+          )}
           <p style={styles.headerText}>
-            {scheduleInfo && (
-              <>
-                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][scheduleInfo.day_of_week]} | 
-                {scheduleInfo.start_time} - {scheduleInfo.end_time} | 
-                {scheduleInfo.room_number && ` Room ${scheduleInfo.room_number}`}
-              </>
-            )}
-          </p>
-          <p style={styles.headerText}>
-            📅 {new Date(sessionDate).toLocaleDateString('en-US', { 
+            Date: {new Date(sessionDate).toLocaleDateString('en-US', { 
               weekday: 'long', 
               year: 'numeric', 
               month: 'long', 
@@ -386,7 +516,7 @@ export default function AttendancePage() {
             transform: mode === 'face' ? 'scale(1.02)' : 'scale(1)'
           }}
         >
-          📷 Face Recognition
+          Face Recognition
         </button>
         <button 
           onClick={() => setMode('qr')} 
@@ -397,18 +527,29 @@ export default function AttendancePage() {
             transform: mode === 'qr' ? 'scale(1.02)' : 'scale(1)'
           }}
         >
-          📱 QR Code Scanner
+          QR Code Scanner
+        </button>
+        <button 
+          onClick={() => setMode('manual')} 
+          style={{
+            ...styles.modeBtn,
+            background: mode === 'manual' ? '#667eea' : '#e9ecef',
+            color: mode === 'manual' ? 'white' : '#333',
+            transform: mode === 'manual' ? 'scale(1.02)' : 'scale(1)'
+          }}
+        >
+          Manual Attendance
         </button>
       </div>
 
       {/* Scanner Section */}
       <div style={styles.scannerSection}>
         <h3 style={{ marginTop: 0, marginBottom: '20px', color: '#333' }}>
-          {mode === 'face' ? '📷 Face Recognition Active' : '📱 QR Code Scanner Active'}
+          {mode === 'face' ? 'Face Recognition Active' : mode === 'qr' ? 'QR Code Scanner Active' : 'Manual Attendance Active'}
         </h3>
         {mode === 'face' ? (
           <CameraCapture 
-            classId={parseInt(classId)}
+            classId={classInfo.id}
             sessionDate={sessionDate}
             onRecognized={handleFaceRecognized}
             onError={(err) => {
@@ -416,25 +557,31 @@ export default function AttendancePage() {
               alert(err);
             }}
           />
-        ) : (
+        ) : mode === 'qr' ? (
           <QRScanner 
             onScan={handleQRScan}
             onError={(err) => {
               console.error('QR Scanner error:', err);
             }}
           />
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <p style={{ fontSize: '18px', color: '#666', marginBottom: '20px' }}>
+              Click "Mark Present" buttons in the student list below to record attendance manually.
+            </p>
+          </div>
         )}
       </div>
 
       {/* Attendance List */}
       <div style={styles.listSection}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h2 style={{ margin: 0 }}>👥 Student List</h2>
+          <h2 style={{ margin: 0 }}>Student List</h2>
           <button 
-            onClick={fetchTodayAttendance}
+            onClick={() => fetchTodayAttendance(classInfo.id)}
             style={styles.refreshBtn}
           >
-            🔄 Refresh
+            Refresh
           </button>
         </div>
         
@@ -442,7 +589,7 @@ export default function AttendancePage() {
           <div style={styles.emptyState}>
             <p>No students enrolled in this class.</p>
             <button 
-              onClick={() => navigate(`/class/${classId}`)}
+              onClick={() => navigate(`/class/${classInfo.id}`)}
               style={styles.enrollButton}
             >
               Go to Class Page to Enroll Students
@@ -480,9 +627,9 @@ export default function AttendancePage() {
                     <small style={{ color: '#666' }}>{student.student_id}</small>
                     {student.present && student.method && (
                       <span style={styles.methodBadge}>
-                        {student.method === 'face' && '📷 Face'} 
-                        {student.method === 'qr' && '📱 QR'} 
-                        {student.method === 'manual' && '✋ Manual'}
+                        {student.method === 'face' && 'Face'} 
+                        {student.method === 'qr' && 'QR'} 
+                        {student.method === 'manual' && 'Manual'}
                         {student.confidence && ` (${Math.round(student.confidence * 100)}%)`}
                       </span>
                     )}
@@ -490,7 +637,7 @@ export default function AttendancePage() {
                 </div>
                 <div>
                   {student.present ? (
-                    <span style={styles.presentBadge}>✓ Present</span>
+                    <span style={styles.presentBadge}>Present</span>
                   ) : (
                     <button 
                       onClick={() => handleManualMark(student)}
@@ -667,32 +814,30 @@ const styles = {
     fontSize: '20px',
     fontWeight: 'bold'
   },
-  methodBadge: { 
-    marginLeft: '10px', 
-    fontSize: '12px', 
-    color: '#666',
-    background: '#e9ecef',
-    padding: '2px 8px',
-    borderRadius: '4px',
+  methodBadge: {
     display: 'inline-block',
-    marginTop: '5px'
+    padding: '4px 8px',
+    background: '#28a745',
+    color: 'white',
+    borderRadius: '4px',
+    fontSize: '12px',
+    marginLeft: '8px'
   },
-  presentBadge: { 
-    padding: '8px 16px', 
-    background: '#28a745', 
-    color: 'white', 
-    borderRadius: '20px', 
-    fontSize: '14px', 
-    fontWeight: '600',
-    display: 'inline-block'
+  presentBadge: {
+    padding: '8px 16px',
+    background: '#28a745',
+    color: 'white',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600'
   },
-  markBtn: { 
-    padding: '8px 16px', 
-    background: '#007bff', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '6px', 
-    cursor: 'pointer', 
+  markBtn: {
+    padding: '8px 16px',
+    background: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
     transition: 'background 0.3s'
@@ -700,17 +845,17 @@ const styles = {
   emptyState: {
     textAlign: 'center',
     padding: '40px',
-    color: '#999'
+    color: '#666'
   },
   enrollButton: {
-    marginTop: '15px',
     padding: '10px 20px',
-    background: '#667eea',
+    background: '#007bff',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
     fontSize: '14px',
-    fontWeight: '600'
+    fontWeight: '600',
+    marginTop: '15px'
   }
 };

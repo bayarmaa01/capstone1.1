@@ -683,6 +683,7 @@ export default function ClassDashboard() {
                 return (
                   <div
                     key={session.id}
+                    onClick={() => navigate(`/attendance/${session.id}`)}
                     style={{
                       padding: '20px',
                       background: isActive ? 
@@ -694,19 +695,18 @@ export default function ClassDashboard() {
                       transition: 'all 0.3s',
                       boxShadow: isActive ? 
                         '0 8px 25px rgba(72, 187, 120, 0.3)' : 
-                        '0 4px 15px rgba(0,0,0,0.05)'
+                        '0 4px 15px rgba(0,0,0,0.05)',
+                      cursor: 'pointer'
                     }}
                     onMouseEnter={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.2)';
-                      }
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.2)';
                     }}
                     onMouseOut={(e) => {
-                      if (!isActive) {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.05)';
-                      }
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = isActive ? 
+                        '0 8px 25px rgba(72, 187, 120, 0.3)' : 
+                        '0 4px 15px rgba(0,0,0,0.05)';
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -834,7 +834,10 @@ export default function ClassDashboard() {
                         
                         {!isMoodle && (
                           <button
-                            onClick={() => handleDeleteSchedule(session.id, session.source)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSchedule(session.id, session.source);
+                            }}
                             style={{
                               padding: '6px 12px',
                               background: '#ef4444',

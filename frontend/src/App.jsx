@@ -83,8 +83,8 @@ function App() {
           element={user ? <ClassDashboard user={user} /> : <Navigate to="/login" replace />} 
         />
         <Route 
-          path="/attendance/:id" 
-          element={user ? <ClassDashboard user={user} /> : <Navigate to="/login" replace />} 
+          path="/attendance/:scheduleId" 
+          element={user ? <AttendancePage /> : <Navigate to="/login" replace />} 
         />
         <Route 
           path="/students/:id" 
