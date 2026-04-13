@@ -149,6 +149,5 @@ class LMSSyncService {
   }
 }
 
-// Temporarily disabled to prevent crashes
-// module.exports = new LMSSyncService();
-module.exports = null;
+// Enable LMS sync service
+module.exports = new LMSSyncService();

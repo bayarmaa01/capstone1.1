@@ -18,7 +18,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // const { startAutoAbsentJob } = require('./autoAbsentJob');
-// const lmsSyncService = require('./services/lms_sync');
+const lmsSyncService = require('./services/lms_sync');
 
 // Initialize database schema on startup
 const initializeDatabase = async () => {
@@ -79,11 +79,11 @@ if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
 //   console.error('Auto absent job failed to start:', err.message);
 // }
 
-// try {
-//   lmsSyncService.startScheduledSync();
-// } catch (err) {
-//   console.error('LMS sync service failed to start:', err.message);
-// }
+try {
+  lmsSyncService.startScheduledSync();
+} catch (err) {
+  console.error('LMS sync service failed to start:', err.message);
+}
 
 // =======================================
 // Metrics Collection
