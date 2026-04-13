@@ -52,7 +52,6 @@ export default function Dashboard({ user, onLogout }) {
       });
       setShowAddStudent(false);
       e.target.reset();
-      fetchStudents();
       
       if (response.data.student.face_enrolled) {
         alert('✓ Student added and face enrolled successfully!');
@@ -71,7 +70,6 @@ export default function Dashboard({ user, onLogout }) {
     
     try {
       await api.delete(`/students/${studentId}`);
-      fetchStudents();
       alert('✓ Student deleted successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to delete student'));
