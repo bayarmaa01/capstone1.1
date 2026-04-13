@@ -92,11 +92,20 @@ router.post('/:classId/enroll', async (req, res) => {
   }
 });
 
-// Get students in a class
+// Get students in a class with attendance data
 router.get('/:classId/students', async (req, res) => {
   try {
     const result = await db.query(`
-      SELECT s.id, s.student_id, s.name, s.email, s.photo_url, e.enrolled_at
+      SELECT s.id, s.student_id, s.name, s.email, s.photo_url, e.enrolled_at,
+             COALESCE(
+               (SELECT COUNT(*)::float / NULLIF(
+                 (SELECT COUNT(*) FROM attendance_sessions WHERE class_id = $1), 0
+               ) * 100 
+                FROM attendance_records ar 
+                JOIN attendance_sessions as_ ON ar.session_id = as_.id 
+                WHERE ar.student_id = s.id AND as_.class_id = $1 AND ar.present = true
+               ), 0
+             ) as attendance_percentage
       FROM students s 
       JOIN enrollments e ON s.id = e.student_id 
       WHERE e.class_id = $1 
@@ -106,6 +115,43 @@ router.get('/:classId/students', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching class students:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get schedule for a class
+router.get('/:classId/schedule', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT as_.id, as_.class_id, as_.session_date, as_.start_time, as_.end_time,
+             (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = as_.id AND ar.present = true) as attendance_count
+      FROM attendance_sessions as_ 
+      WHERE as_.class_id = $1 
+      ORDER BY as_.session_date
+    `, [req.params.classId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching class schedule:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get attendance data for a class
+router.get('/:classId/attendance', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT ar.id, ar.session_id, ar.student_id, ar.present, ar.timestamp,
+             s.name as student_name
+      FROM attendance_records ar 
+      JOIN students s ON ar.student_id = s.id 
+      WHERE ar.session_id IN (SELECT id FROM attendance_sessions WHERE class_id = $1) 
+      ORDER BY ar.timestamp
+    `, [req.params.classId]);
+    
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching class attendance:', error);
     res.status(500).json({ error: error.message });
   }
 });
