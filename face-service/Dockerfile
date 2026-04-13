@@ -8,11 +8,6 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Fix deprecated repositories and install build dependencies
-RUN sed -i 's|http://deb.debian.org|http://archive.debian.org|g' /etc/apt/sources.list && \
-    sed -i 's|http://security.debian.org|http://archive.debian.org|g' /etc/apt/sources.list && \
-    apt-get update && apt-get install -y cmake build-essential
-
 # Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
 

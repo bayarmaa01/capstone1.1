@@ -1,5 +1,5 @@
 # Multi-stage build for production optimization
-FROM ghcr.io/library/node:20-alpine AS base
+FROM node:20-alpine AS base
 
 # Install dependencies for building
 FROM base AS deps

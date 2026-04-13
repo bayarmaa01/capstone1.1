@@ -1,5 +1,5 @@
 # Development stage
-FROM ghcr.io/library/node:18-alpine AS development
+FROM node:18-alpine AS development
 
 WORKDIR /app
 
@@ -38,7 +38,7 @@ RUN npm run build
 
 
 # Production stage
-FROM ghcr.io/library/nginx:stable-alpine AS production
+FROM nginx:stable-alpine AS production
 
 # Copy built files from build stage to nginx
 COPY --from=build /app/build /usr/share/nginx/html
