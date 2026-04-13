@@ -13,6 +13,7 @@ export default function Dashboard({ user, onLogout }) {
 
   useEffect(() => {
     fetchClasses();
+    fetchStudents();
   }, []);
 
   const fetchClasses = async () => {
@@ -22,6 +23,16 @@ export default function Dashboard({ user, onLogout }) {
       setClasses(response.data);
     } catch (error) {
       console.error('Dashboard - Error fetching classes:', error);
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const response = await api.get('/students');
+      console.log('Dashboard - Students API response:', response.data);
+      setStudents(response.data);
+    } catch (error) {
+      console.error('Dashboard - Error fetching students:', error);
     }
   };
 
@@ -37,7 +48,7 @@ export default function Dashboard({ user, onLogout }) {
       setShowAddClass(false);
       e.target.reset();
       fetchClasses();
-      alert('✓ Class added successfully!');
+      alert('Class added successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to add class'));
     }
@@ -52,11 +63,12 @@ export default function Dashboard({ user, onLogout }) {
       });
       setShowAddStudent(false);
       e.target.reset();
+      fetchStudents();
       
       if (response.data.student.face_enrolled) {
-        alert('✓ Student added and face enrolled successfully!');
+        alert('Student added and face enrolled successfully!');
       } else {
-        alert('✓ Student added! Note: Face enrollment failed - check if photo is clear.');
+        alert('Student added! Note: Face enrollment failed - check if photo is clear.');
       }
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to add student'));
@@ -70,7 +82,8 @@ export default function Dashboard({ user, onLogout }) {
     
     try {
       await api.delete(`/students/${studentId}`);
-      alert('✓ Student deleted successfully!');
+      fetchStudents();
+      alert('Student deleted successfully!');
     } catch (error) {
       alert('Error: ' + (error.response?.data?.error || 'Failed to delete student'));
     }
