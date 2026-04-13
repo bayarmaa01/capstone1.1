@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
-export default function LoginPage() {
+export default function LoginPage({ onLogin }) {
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -33,6 +33,11 @@ export default function LoginPage() {
         // Save JWT to localStorage
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        // Call onLogin callback to update app state
+        if (onLogin) {
+          onLogin(response.data.user);
+        }
         
         // Redirect to dashboard
         navigate('/dashboard');
