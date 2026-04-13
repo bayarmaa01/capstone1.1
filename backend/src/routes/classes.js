@@ -99,11 +99,10 @@ router.get('/:classId/students', async (req, res) => {
       SELECT s.id, s.student_id, s.name, s.email, s.photo_url, e.enrolled_at,
              COALESCE(
                (SELECT COUNT(*)::float / NULLIF(
-                 (SELECT COUNT(*) FROM attendance_sessions WHERE class_id = $1), 0
+                 (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1), 0
                ) * 100 
-                FROM attendance_records ar 
-                JOIN attendance_sessions as_ ON ar.session_id = as_.id 
-                WHERE ar.student_id = s.id AND as_.class_id = $1 AND ar.present = true
+                FROM attendance a 
+                WHERE a.student_id = s.id AND a.class_id = $1 AND a.present = true
                ), 0
              ) as attendance_percentage
       FROM students s 
@@ -122,15 +121,30 @@ router.get('/:classId/students', async (req, res) => {
 // Get schedule for a class
 router.get('/:classId/schedule', async (req, res) => {
   try {
-    const result = await db.query(`
-      SELECT as_.id, as_.class_id, as_.session_date, as_.start_time, as_.end_time,
-             (SELECT COUNT(*) FROM attendance_records ar WHERE ar.session_id = as_.id AND ar.present = true) as attendance_count
-      FROM attendance_sessions as_ 
-      WHERE as_.class_id = $1 
-      ORDER BY as_.session_date
+    // First try to get from class_schedules table
+    const scheduleResult = await db.query(`
+      SELECT cs.id, cs.day_of_week, cs.start_time, cs.end_time, cs.scheduled_date, cs.room_number, cs.is_active,
+             'scheduled' as source
+      FROM class_schedules cs 
+      WHERE cs.class_id = $1 AND cs.is_active = true
+      ORDER BY cs.day_of_week, cs.start_time
     `, [req.params.classId]);
     
-    res.json(result.rows);
+    // If no schedule, fallback to attendance sessions
+    if (scheduleResult.rows.length === 0) {
+      const attendanceResult = await db.query(`
+        SELECT DISTINCT session_date, start_time, end_time,
+               (SELECT COUNT(*) FROM attendance a2 WHERE a2.session_date = a1.session_date AND a2.class_id = $1 AND a2.present = true) as attendance_count,
+               'attendance' as source
+        FROM attendance a1 
+        WHERE a1.class_id = $1 
+        ORDER BY session_date
+      `, [req.params.classId]);
+      
+      res.json(attendanceResult.rows);
+    } else {
+      res.json(scheduleResult.rows);
+    }
   } catch (error) {
     console.error('Error fetching class schedule:', error);
     res.status(500).json({ error: error.message });
@@ -141,12 +155,12 @@ router.get('/:classId/schedule', async (req, res) => {
 router.get('/:classId/attendance', async (req, res) => {
   try {
     const result = await db.query(`
-      SELECT ar.id, ar.session_id, ar.student_id, ar.present, ar.timestamp,
+      SELECT a.id, a.class_id, a.student_id, a.present, a.session_date, a.method, a.confidence, a.recorded_at,
              s.name as student_name
-      FROM attendance_records ar 
-      JOIN students s ON ar.student_id = s.id 
-      WHERE ar.session_id IN (SELECT id FROM attendance_sessions WHERE class_id = $1) 
-      ORDER BY ar.timestamp
+      FROM attendance a 
+      JOIN students s ON a.student_id = s.id 
+      WHERE a.class_id = $1 
+      ORDER BY a.session_date, a.recorded_at
     `, [req.params.classId]);
     
     res.json(result.rows);
