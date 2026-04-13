@@ -4,7 +4,7 @@ import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import ClassPage from './pages/ClassPage';
 import AttendancePage from './pages/AttendancePage';
-import AttendanceSession from './components/AttendanceSession';
+import ClassDashboard from './pages/ClassDashboard';
 import ClassScheduleClean from './components/ClassScheduleClean';
 
 function ClassScheduleWrapper() {
@@ -83,7 +83,7 @@ function App() {
         />
         <Route 
           path="/attendance/:id" 
-          element={user ? <AttendanceSession user={user} /> : <Navigate to="/login" replace />} 
+          element={user ? <ClassDashboard user={user} /> : <Navigate to="/login" replace />} 
         />
         <Route 
           path="/" 
