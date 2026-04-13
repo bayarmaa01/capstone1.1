@@ -125,6 +125,7 @@ router.get('/:classId/schedule', async (req, res) => {
     
     // Try to get from Moodle first
     try {
+      console.log('Attempting Moodle schedule query...');
       const mysql = require('mysql2/promise');
       const moodleDbConfig = {
         host: process.env.MOODLE_DB_HOST || 'moodle-db',
@@ -133,8 +134,10 @@ router.get('/:classId/schedule', async (req, res) => {
         database: process.env.MOODLE_DB_NAME || 'moodle',
         port: process.env.MOODLE_DB_PORT || 3306
       };
+      console.log('Moodle DB config:', moodleDbConfig);
       const moodlePool = mysql.createPool(moodleDbConfig);
       const connection = await moodlePool.getConnection();
+      console.log('Moodle connection established');
       
       // Simplified query - get all Moodle sessions
       const [moodleRows] = await connection.execute(`
@@ -155,7 +158,8 @@ router.get('/:classId/schedule', async (req, res) => {
         ORDER BY s.sessdate ASC
       `);
       
-      console.log("Moodle sessions:", moodleRows.length);
+      console.log("Moodle sessions query successful:", moodleRows.length);
+      console.log("Sample Moodle session:", moodleRows[0]);
       
       if (moodleRows.length > 0) {
         scheduleData = moodleRows.map(session => ({
@@ -173,9 +177,11 @@ router.get('/:classId/schedule', async (req, res) => {
         return;
       }
       
+      console.log('No Moodle sessions found, falling back to local schedule');
       connection.release();
     } catch (moodleError) {
       console.error('Moodle schedule error:', moodleError);
+      console.log('Falling back to local schedule due to error');
     }
 
     // Only fallback to local schedule if Moodle query fails
