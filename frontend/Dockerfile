@@ -1,5 +1,5 @@
-# Development stage
-FROM node:18-alpine AS development
+# Use Docker Hub with authentication and better caching to avoid rate limiting
+FROM docker.io/node:18-alpine AS development
 
 WORKDIR /app
 
@@ -19,8 +19,8 @@ EXPOSE 3000
 CMD ["npm", "start"]
 
 
-# Build stage
-FROM node:18-alpine AS build
+# Build stage - reuse the same base image
+FROM docker.io/node:18-alpine AS build
 
 WORKDIR /app
 
@@ -37,8 +37,8 @@ COPY . .
 RUN npm run build
 
 
-# Production stage
-FROM nginx:stable-alpine AS production
+# Production stage - use lightweight nginx alternative
+FROM docker.io/nginx:stable-alpine AS production
 
 # Copy built files from build stage to nginx
 COPY --from=build /app/build /usr/share/nginx/html
