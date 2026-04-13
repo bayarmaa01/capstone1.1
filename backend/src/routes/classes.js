@@ -118,20 +118,81 @@ router.get('/:classId/students', async (req, res) => {
   }
 });
 
-// Get schedule for a class
+// Get schedule for a class (with Moodle integration)
 router.get('/:classId/schedule', async (req, res) => {
   try {
-    // First try to get from class_schedules table
-    const scheduleResult = await db.query(`
-      SELECT cs.id, cs.day_of_week, cs.start_time, cs.end_time, cs.scheduled_date, cs.room_number, cs.is_active,
-             'scheduled' as source
-      FROM class_schedules cs 
-      WHERE cs.class_id = $1 AND cs.is_active = true
-      ORDER BY cs.day_of_week, cs.start_time
-    `, [req.params.classId]);
+    let scheduleData = [];
     
-    // If no schedule, fallback to attendance sessions
-    if (scheduleResult.rows.length === 0) {
+    // First try to get from Moodle
+    try {
+      const mysql = require('mysql2/promise');
+      const moodleDbConfig = {
+        host: process.env.MOODLE_DB_HOST || 'moodle-db',
+        user: process.env.MOODLE_DB_USER || 'moodle',
+        password: process.env.MOODLE_DB_PASSWORD || 'moodle_secret',
+        database: process.env.MOODLE_DB_NAME || 'moodle',
+        port: process.env.MOODLE_DB_PORT || 3306
+      };
+      const moodlePool = mysql.createPool(moodleDbConfig);
+      const connection = await moodlePool.getConnection();
+      
+      const [moodleRows] = await connection.execute(`
+        SELECT 
+          s.id AS sessionId,
+          s.sessdate,
+          s.duration,
+          c.fullname AS course,
+          FROM_UNIXTIME(s.sessdate) AS session_date,
+          FROM_UNIXTIME(s.sessdate) AS start_time,
+          FROM_UNIXTIME(s.sessdate + s.duration) AS end_time,
+          DAYOFWEEK(FROM_UNIXTIME(s.sessdate)) AS day_of_week,
+          DATE_FORMAT(FROM_UNIXTIME(s.sessdate), '%H:%i') AS start_time_formatted,
+          DATE_FORMAT(FROM_UNIXTIME(s.sessdate + s.duration), '%H:%i') AS end_time_formatted
+        FROM mdl_attendance_sessions s
+        JOIN mdl_attendance a ON a.id = s.attendanceid
+        JOIN mdl_course c ON c.id = a.course
+        WHERE c.idnumber = (SELECT code FROM classes WHERE id = ?)
+        ORDER BY s.sessdate ASC
+      `, [req.params.classId]);
+      
+      if (moodleRows.length > 0) {
+        scheduleData = moodleRows.map(session => ({
+          id: session.sessionId,
+          day_of_week: session.day_of_week,
+          start_time: session.start_time_formatted,
+          end_time: session.end_time_formatted,
+          scheduled_date: session.session_date,
+          source: 'moodle'
+        }));
+        console.log('Using Moodle schedule:', scheduleData.length, 'sessions');
+      }
+      
+      connection.release();
+    } catch (moodleError) {
+      console.log('Moodle schedule failed, using local schedule');
+    }
+
+    // Fallback to local schedule if Moodle fails or empty
+    if (scheduleData.length === 0) {
+      const scheduleResult = await db.query(`
+        SELECT cs.id, cs.day_of_week, cs.start_time, cs.end_time, cs.scheduled_date, cs.room_number, cs.is_active,
+               'scheduled' as source
+        FROM class_schedules cs 
+        WHERE cs.class_id = $1 AND cs.is_active = true
+        ORDER BY cs.day_of_week, cs.start_time
+      `, [req.params.classId]);
+      
+      if (scheduleResult.rows.length > 0) {
+        scheduleData = scheduleResult.rows.map(session => ({
+          ...session,
+          source: 'manual'
+        }));
+        console.log('Using local schedule:', scheduleData.length, 'sessions');
+      }
+    }
+
+    // If still no schedule, fallback to attendance sessions
+    if (scheduleData.length === 0) {
       const attendanceResult = await db.query(`
         SELECT DISTINCT session_date, start_time, end_time,
                (SELECT COUNT(*) FROM attendance a2 WHERE a2.session_date = a1.session_date AND a2.class_id = $1 AND a2.present = true) as attendance_count,
@@ -141,10 +202,11 @@ router.get('/:classId/schedule', async (req, res) => {
         ORDER BY session_date
       `, [req.params.classId]);
       
-      res.json(attendanceResult.rows);
-    } else {
-      res.json(scheduleResult.rows);
+      scheduleData = attendanceResult.rows;
+      console.log('Using attendance sessions:', scheduleData.length, 'sessions');
     }
+    
+    res.json(scheduleData);
   } catch (error) {
     console.error('Error fetching class schedule:', error);
     res.status(500).json({ error: error.message });

@@ -59,13 +59,19 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Authentication required' });
     }
     
-    // Query teacher's Moodle sessions with correct Moodle context
+    // Query teacher's Moodle sessions with correct Moodle context and time conversion
     const query = `
       SELECT 
         s.id AS sessionId,
         s.sessdate,
         s.duration,
-        c.fullname AS course
+        c.fullname AS course,
+        FROM_UNIXTIME(s.sessdate) AS session_date,
+        FROM_UNIXTIME(s.sessdate) AS start_time,
+        FROM_UNIXTIME(s.sessdate + s.duration) AS end_time,
+        DAYOFWEEK(FROM_UNIXTIME(s.sessdate)) AS day_of_week,
+        DATE_FORMAT(FROM_UNIXTIME(s.sessdate), '%H:%i') AS start_time_formatted,
+        DATE_FORMAT(FROM_UNIXTIME(s.sessdate + s.duration), '%H:%i') AS end_time_formatted
       FROM mdl_attendance_sessions s
       JOIN mdl_attendance a ON a.id = s.attendanceid
       JOIN mdl_course c ON c.id = a.course
