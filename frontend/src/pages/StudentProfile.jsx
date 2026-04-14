@@ -143,6 +143,23 @@ export default function StudentProfile() {
               Student ID
             </div>
             <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a202c' }}>
+              {(student.attendance_percentage || 0) < 75 && (
+                <div style={{
+                  marginTop: '20px',
+                  padding: '15px',
+                  background: '#f8d7da',
+                  borderRadius: '6px',
+                  border: '1px solid #f5c6cb'
+                }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#721c24' }}>
+                    <span style={{ marginRight: '8px' }}>!</span>
+                    At Risk Warning
+                  </h4>
+                  <p style={{ margin: 0, color: '#721c24', fontSize: '14px' }}>
+                    This student's attendance is below 75%. Consider taking corrective action.
+                  </p>
+                </div>
+              )}
               {student.student_id}
             </div>
           </div>
