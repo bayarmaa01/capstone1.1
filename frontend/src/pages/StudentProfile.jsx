@@ -120,7 +120,7 @@ export default function StudentProfile() {
         </div>
       </div>
 
-      {/* Analytics Section */}
+      {/* Student Details Section */}
       <div style={{
         background: 'white',
         borderRadius: '15px',
@@ -129,7 +129,7 @@ export default function StudentProfile() {
         border: '1px solid rgba(255,255,255,0.2)'
       }}>
         <h2 style={{ margin: '0 0 20px 0', color: '#1a202c', fontSize: '22px', fontWeight: '700' }}>
-          Attendance Analytics
+          Student Details
         </h2>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
@@ -137,14 +137,13 @@ export default function StudentProfile() {
             background: '#f8fafc',
             padding: '20px',
             borderRadius: '10px',
-            textAlign: 'center',
             border: '1px solid #e2e8f0'
           }}>
-            <div style={{ fontSize: '32px', fontWeight: '700', color: '#10b981', marginBottom: '8px' }}>
-              85%
+            <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '500', marginBottom: '8px' }}>
+              Student ID
             </div>
-            <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '500' }}>
-              Overall Attendance
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a202c' }}>
+              {student.student_id}
             </div>
           </div>
           
@@ -152,14 +151,13 @@ export default function StudentProfile() {
             background: '#f8fafc',
             padding: '20px',
             borderRadius: '10px',
-            textAlign: 'center',
             border: '1px solid #e2e8f0'
           }}>
-            <div style={{ fontSize: '32px', fontWeight: '700', color: '#3b82f6', marginBottom: '8px' }}>
-              12
+            <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '500', marginBottom: '8px' }}>
+              Email
             </div>
-            <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '500' }}>
-              Classes Enrolled
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a202c' }}>
+              {student.email || 'Not provided'}
             </div>
           </div>
           
@@ -167,16 +165,25 @@ export default function StudentProfile() {
             background: '#f8fafc',
             padding: '20px',
             borderRadius: '10px',
-            textAlign: 'center',
             border: '1px solid #e2e8f0'
           }}>
-            <div style={{ fontSize: '32px', fontWeight: '700', color: '#8b5cf6', marginBottom: '8px' }}>
-              Good
+            <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '500', marginBottom: '8px' }}>
+              Status
             </div>
-            <div style={{ fontSize: '14px', color: '#64748b', fontWeight: '500' }}>
-              Risk Status
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#10b981' }}>
+              Active Student
             </div>
           </div>
+        </div>
+        
+        <div style={{ marginTop: '20px' }}>
+          <h3 style={{ color: '#1a202c', fontSize: '18px', fontWeight: '600', marginBottom: '15px' }}>
+            Attendance Charts Coming Soon
+          </h3>
+          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>
+            Detailed analytics and graphs will be available here.
+          </p>
+        </div>
         </div>
 
         {/* Placeholder for future charts */}
@@ -199,3 +206,5 @@ export default function StudentProfile() {
     </div>
   );
 }
+
+export default StudentProfile;
