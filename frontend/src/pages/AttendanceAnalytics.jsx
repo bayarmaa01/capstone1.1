@@ -251,13 +251,11 @@ export default function AttendanceAnalytics() {
               <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>
                 Detailed analytics and graphs will be available here.
               </p>
-                    fill="#8884d8"
-                  >
-                    <PieCell fill="#8884d8" dataKey="color" />
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
             </div>
+            </div>
+          </div>
+        </ResponsiveContainer>
+      </div>
 
             {/* Bar Chart */}
             <div style={{
