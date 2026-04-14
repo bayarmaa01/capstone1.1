@@ -75,6 +75,103 @@ router.post('/record', async (req, res) => {
   }
 });
 
+// Compatibility endpoint expected by deployments/scripts
+router.post('/mark', async (req, res) => {
+  try {
+    const { user_id, course_id, session_date, method, confidence } = req.body;
+
+    if (!user_id || !course_id) {
+      return res.status(400).json({ error: 'user_id and course_id are required' });
+    }
+
+    const studentLookup = await db.query(
+      'SELECT id, student_id, name FROM students WHERE lms_user_id = $1 OR id = $1 LIMIT 1',
+      [user_id]
+    );
+    const classLookup = await db.query(
+      'SELECT id, code, name FROM classes WHERE lms_course_id = $1 OR id = $1 LIMIT 1',
+      [course_id]
+    );
+
+    if (studentLookup.rows.length === 0) {
+      return res.status(404).json({ error: 'Student mapping not found for user_id' });
+    }
+    if (classLookup.rows.length === 0) {
+      return res.status(404).json({ error: 'Class mapping not found for course_id' });
+    }
+
+    const student = studentLookup.rows[0];
+    const cls = classLookup.rows[0];
+    const targetDate = session_date || new Date().toISOString().slice(0, 10);
+
+    const result = await db.query(`
+      INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
+      VALUES ($1, $2, $3, true, $4, $5)
+      ON CONFLICT (class_id, student_id, session_date)
+      DO UPDATE SET
+        present = true,
+        method = EXCLUDED.method,
+        confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
+        recorded_at = now()
+      RETURNING *;
+    `, [cls.id, student.id, targetDate, method || 'manual', confidence || 1.0]);
+
+    res.json({
+      success: true,
+      attendance: result.rows[0],
+      mapped: {
+        class_id: cls.id,
+        student_id: student.id,
+        class_name: cls.name,
+        student_name: student.name
+      }
+    });
+  } catch (error) {
+    console.error('Error in /attendance/mark:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/student/:id', async (req, res) => {
+  try {
+    const studentId = parseInt(req.params.id, 10);
+    if (Number.isNaN(studentId)) {
+      return res.status(400).json({ error: 'Invalid student id' });
+    }
+
+    const totalClassesResult = await db.query(
+      'SELECT COUNT(DISTINCT session_date) AS total_classes FROM attendance WHERE student_id = $1',
+      [studentId]
+    );
+    const attendedResult = await db.query(
+      'SELECT COUNT(*) AS attended_classes FROM attendance WHERE student_id = $1 AND present = true',
+      [studentId]
+    );
+    const recentResult = await db.query(`
+      SELECT a.session_date, a.present, a.method, a.recorded_at, c.code as class_code, c.name as class_name
+      FROM attendance a
+      JOIN classes c ON c.id = a.class_id
+      WHERE a.student_id = $1
+      ORDER BY a.session_date DESC, a.recorded_at DESC
+      LIMIT 20
+    `, [studentId]);
+
+    const totalClasses = parseInt(totalClassesResult.rows[0].total_classes || 0, 10);
+    const attendedClasses = parseInt(attendedResult.rows[0].attended_classes || 0, 10);
+
+    res.json({
+      student_id: studentId,
+      total_classes: totalClasses,
+      attended_classes: attendedClasses,
+      attendance_rate: totalClasses > 0 ? Math.round((attendedClasses / totalClasses) * 100) : 0,
+      recent_records: recentResult.rows
+    });
+  } catch (error) {
+    console.error('Error fetching student attendance:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 
 // =======================================
 // 2️⃣ Get Attendance for a Class on a Specific Date
@@ -240,6 +337,7 @@ router.get('/session/:sessionId', async (req, res) => {
     const session = sessionResult.rows[0];
 
     // Get attendance records for this session
+    const sessionDate = session.scheduled_date || new Date().toISOString().slice(0, 10);
     const recordsResult = await db.query(`
       SELECT 
         s.student_id,
@@ -248,13 +346,13 @@ router.get('/session/:sessionId', async (req, res) => {
         COALESCE(a.method, 'manual') as method,
         COALESCE(a.recorded_at, NOW()) as timestamp
       FROM students s
+      JOIN enrollments e ON e.student_id = s.id
       LEFT JOIN attendance a ON a.student_id = s.id 
-        AND a.session_date = cs.scheduled_date
-      WHERE s.id IN (
-        SELECT student_id FROM enrollments WHERE class_id = cs.class_id
-      )
+        AND a.class_id = $1
+        AND a.session_date = $2
+      WHERE e.class_id = $1
       ORDER BY s.name
-    `);
+    `, [session.class_id, sessionDate]);
 
     const records = recordsResult.rows;
     const stats = {
@@ -270,7 +368,7 @@ router.get('/session/:sessionId', async (req, res) => {
         id: session.id,
         class_name: session.class_name,
         class_code: session.class_code,
-        session_date: session.scheduled_date,
+        session_date: sessionDate,
         start_time: session.start_time,
         end_time: session.end_time,
         room_number: session.room_number
@@ -287,6 +385,61 @@ router.get('/session/:sessionId', async (req, res) => {
 
   } catch (error) {
     console.error('Error fetching session analytics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/session/:sessionId/records', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const sessionResult = await db.query(
+      'SELECT id, class_id, scheduled_date FROM class_schedules WHERE id = $1',
+      [sessionId]
+    );
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = sessionResult.rows[0];
+    const sessionDate = session.scheduled_date || new Date().toISOString().slice(0, 10);
+    const recordsResult = await db.query(`
+      SELECT 
+        s.student_id,
+        s.name as student_name,
+        COALESCE(a.present, false) as present,
+        COALESCE(a.method, 'manual') as method,
+        COALESCE(a.recorded_at, NOW()) as timestamp
+      FROM students s
+      JOIN enrollments e ON e.student_id = s.id
+      LEFT JOIN attendance a ON a.student_id = s.id
+        AND a.class_id = $1
+        AND a.session_date = $2
+      WHERE e.class_id = $1
+      ORDER BY s.name
+    `, [session.class_id, sessionDate]);
+
+    const records = recordsResult.rows.map((record) => ({
+      student_id: record.student_id,
+      student_name: record.student_name,
+      status: record.present ? 'present' : 'absent',
+      method: record.method,
+      timestamp: record.timestamp
+    }));
+
+    const present = records.filter((r) => r.status === 'present').length;
+    const total = records.length;
+
+    res.json({
+      records,
+      stats: {
+        total,
+        present,
+        absent: total - present,
+        percentage: total > 0 ? Math.round((present / total) * 100) : 0
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching session records:', error);
     res.status(500).json({ error: error.message });
   }
 });

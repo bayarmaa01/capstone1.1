@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 export default function StudentProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [student, setStudent] = useState(null);
+  const [attendanceSummary, setAttendanceSummary] = useState({
+    total_classes: 0,
+    attended_classes: 0,
+    attendance_rate: 0,
+    recent_records: []
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,6 +37,8 @@ export default function StudentProfile() {
       setLoading(true);
       const response = await api.get(`/students/${id}`);
       setStudent(response.data);
+      const attendanceResponse = await api.get(`/attendance/student/${id}`);
+      setAttendanceSummary(attendanceResponse.data);
     } catch (error) {
       console.error('Error fetching student data:', error);
     } finally {
@@ -57,6 +77,23 @@ export default function StudentProfile() {
       </div>
     );
   }
+
+  const pieData = [
+    { name: 'Attended', value: attendanceSummary.attended_classes, color: '#10b981' },
+    {
+      name: 'Missed',
+      value: Math.max(0, attendanceSummary.total_classes - attendanceSummary.attended_classes),
+      color: '#ef4444'
+    }
+  ];
+
+  const barData = attendanceSummary.recent_records
+    .slice(0, 10)
+    .reverse()
+    .map((record) => ({
+      date: new Date(record.session_date).toLocaleDateString(),
+      attended: record.present ? 1 : 0
+    }));
 
   return (
     <div style={{ 
@@ -193,30 +230,38 @@ export default function StudentProfile() {
           </div>
         </div>
         
-        <div style={{ marginTop: '20px' }}>
+        <div style={{ marginTop: '25px' }}>
           <h3 style={{ color: '#1a202c', fontSize: '18px', fontWeight: '600', marginBottom: '15px' }}>
-            Attendance Charts Coming Soon
+            Attendance Analytics
           </h3>
-          <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>
-            Detailed analytics and graphs will be available here.
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <div style={{ background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '12px' }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" outerRadius={80} label>
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ background: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', padding: '12px' }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={barData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis domain={[0, 1]} ticks={[0, 1]} />
+                  <Tooltip />
+                  <Bar dataKey="attended" fill="#10b981" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <p style={{ marginTop: '10px', color: '#64748b', fontSize: '14px' }}>
+            Total classes: {attendanceSummary.total_classes} | Attended: {attendanceSummary.attended_classes} | Attendance rate: {attendanceSummary.attendance_rate}%
           </p>
-        </div>
-        
-        {/* Placeholder for future charts */}
-        <div style={{
-          marginTop: '30px',
-          padding: '30px',
-          background: '#f8fafc',
-          borderRadius: '10px',
-          border: '1px solid #e2e8f0',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontSize: '16px', color: '#64748b', marginBottom: '10px' }}>
-            Attendance Charts Coming Soon
-          </div>
-          <div style={{ fontSize: '14px', color: '#94a3b8' }}>
-            Detailed analytics and graphs will be available here
-          </div>
         </div>
       </div>
     </div>

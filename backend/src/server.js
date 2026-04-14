@@ -297,6 +297,7 @@ try {
   app.use('/api/students', require('./routes/students'));
   app.use('/api/classes', require('./routes/classes'));
   app.use('/api/attendance', require('./routes/attendance'));
+  app.use('/api/face', require('./routes/face'));
   app.use('/api/schedule', require('./routes/schedule'));
   app.use('/api/analytics', require('./routes/analytics'));
   app.use('/api/ai', require('./routes/ai'));

@@ -203,7 +203,7 @@ router.post('/schedule', async (req, res) => {
     const schedule = result.rows[0];
     const className = classCheck.rows[0].name;
     
-    console.log(`Schedule created for class ${className} (ID: ${classId}) - Day ${day_of_week}, ${start_time}-${end_time}`);
+    console.log(`Schedule created for class ${className} (ID: ${class_id}) - Day ${day_of_week}, ${start_time}-${end_time}`);
     
     res.json({ 
       success: true, 
