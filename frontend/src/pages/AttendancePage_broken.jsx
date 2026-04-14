@@ -24,7 +24,7 @@ export default function AttendancePage() {
     } else {
       // Fallback to old behavior if no scheduleId
       fetchClassInfo();
-      fetchTodayAttendance();
+      fetchTodayAttendance(classInfo.id);
     }
     
     // Check status every 30 seconds if schedule-based
