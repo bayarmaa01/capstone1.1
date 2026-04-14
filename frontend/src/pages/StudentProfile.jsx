@@ -204,6 +204,7 @@ export default function StudentProfile() {
         </div>
       </div>
     </div>
+    </>
   );
 }
 
