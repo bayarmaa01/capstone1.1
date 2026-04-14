@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import {
   PieChart,
+  Pie,
+  Cell,
   BarChart,
   Bar,
   XAxis,
@@ -10,8 +12,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer,
-  PieCell
+  ResponsiveContainer
 } from 'recharts';
 
 export default function AttendanceAnalytics() {
@@ -240,22 +241,34 @@ export default function AttendanceAnalytics() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
             {/* Pie Chart */}
             <div style={{
-              padding: '20px',
               background: '#f8fafc',
+              padding: '20px',
               borderRadius: '10px',
               border: '1px solid #e2e8f0'
             }}>
               <h3 style={{ margin: '0 0 15px 0', color: '#374151', fontSize: '18px', fontWeight: '600' }}>
-                Attendance Charts Coming Soon
+                Present vs Absent
               </h3>
-              <p style={{ color: '#64748b', fontSize: '14px', lineHeight: '1.5' }}>
-                Detailed analytics and graphs will be available here.
-              </p>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    label
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-            </div>
-          </div>
-        </ResponsiveContainer>
-      </div>
 
             {/* Bar Chart */}
             <div style={{
@@ -455,9 +468,6 @@ export default function AttendanceAnalytics() {
             </tbody>
           </table>
         </div>
-      </div>
-      </div>
-      </div>
       </div>
     </div>
   );

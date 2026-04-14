@@ -443,61 +443,62 @@ return (
           >
             Refresh
           </button>
-          <div style={styles.studentList}>
-            {attendance.map(student => (
-              <div 
-                key={student.id} 
-                style={{
-                  ...styles.studentItem,
-                  background: student.present ? '#d4edda' : '#f8f9fa',
-                  borderLeft: student.present ? '4px solid #28a745' : '4px solid transparent'
-                }}
-              >
-                <div style={styles.studentInfo}>
-                  {student.photo_url ? (
-                    <img 
-                      src={`/uploads/${student.photo_url}`} 
-                      alt={student.name}
-                      style={styles.photo}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div style={styles.photoPlaceholder}>
-                      {student.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div>
-                    <strong style={{ fontSize: '16px' }}>{student.name}</strong>
-                    <br />
-                    <small style={{ color: '#666' }}>{student.student_id}</small>
-                    {student.present && student.method && (
-                      <span style={styles.methodBadge}>
-                        {student.method === 'face' && '📷 Face'} 
-                        {student.method === 'qr' && '📱 QR'} 
-                        {student.method === 'manual' && '✋ Manual'}
-                        {student.confidence && ` (${Math.round(student.confidence * 100)}%)`}
-                      </span>
-                    )}
+        </div>
+
+        <div style={styles.studentList}>
+          {attendance.map(student => (
+            <div 
+              key={student.id} 
+              style={{
+                ...styles.studentItem,
+                background: student.present ? '#d4edda' : '#f8f9fa',
+                borderLeft: student.present ? '4px solid #28a745' : '4px solid transparent'
+              }}
+            >
+              <div style={styles.studentInfo}>
+                {student.photo_url ? (
+                  <img 
+                    src={`/uploads/${student.photo_url}`} 
+                    alt={student.name}
+                    style={styles.photo}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div style={styles.photoPlaceholder}>
+                    {student.name.charAt(0).toUpperCase()}
                   </div>
-                </div>
+                )}
                 <div>
-                  {student.present ? (
-                    <span style={styles.presentBadge}>✓ Present</span>
-                  ) : (
-                    <button 
-                      onClick={() => handleManualMark(student)}
-                      style={styles.markBtn}
-                    >
-                      Mark Present
-                    </button>
+                  <strong style={{ fontSize: '16px' }}>{student.name}</strong>
+                  <br />
+                  <small style={{ color: '#666' }}>{student.student_id}</small>
+                  {student.present && student.method && (
+                    <span style={styles.methodBadge}>
+                      {student.method === 'face' && '📷 Face'} 
+                      {student.method === 'qr' && '📱 QR'} 
+                      {student.method === 'manual' && '✋ Manual'}
+                      {student.confidence && ` (${Math.round(student.confidence * 100)}%)`}
+                    </span>
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+              <div>
+                {student.present ? (
+                  <span style={styles.presentBadge}>✓ Present</span>
+                ) : (
+                  <button 
+                    onClick={() => handleManualMark(student)}
+                    style={styles.markBtn}
+                  >
+                    Mark Present
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

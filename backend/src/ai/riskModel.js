@@ -213,6 +213,7 @@ class RiskModel {
    */
   generateRecommendations(riskLevel, factors) {
     const recommendations = [];
+    const normalizedFactors = factors.map((factor) => factor.toLowerCase());
 
     if (riskLevel === 'high') {
       recommendations.push('Immediate academic counseling required');
@@ -220,7 +221,7 @@ class RiskModel {
       recommendations.push('Consider temporary course load reduction');
       recommendations.push('Implement daily attendance monitoring');
       
-      if (factors.some(f => f.includes('consecutive'))) {
+      if (normalizedFactors.some(f => f.includes('consecutive'))) {
         recommendations.push('Contact student immediately to check wellbeing');
       }
     } else if (riskLevel === 'medium') {
@@ -229,7 +230,7 @@ class RiskModel {
       recommendations.push('Study skills workshop attendance');
       recommendations.push('Extended office hours utilization');
       
-      if (factors.some(f => f.includes('declining'))) {
+      if (normalizedFactors.some(f => f.includes('declining'))) {
         recommendations.push('Monitor attendance trends closely');
       }
     } else {
@@ -239,10 +240,10 @@ class RiskModel {
     }
 
     // Factor-specific recommendations
-    if (factors.some(f => f.includes('Monday'))) {
+    if (normalizedFactors.some(f => f.includes('monday'))) {
       recommendations.push('Address Monday motivation issues');
     }
-    if (factors.some(f => f.includes('Friday'))) {
+    if (normalizedFactors.some(f => f.includes('friday'))) {
       recommendations.push('Ensure Friday class completion');
     }
 
