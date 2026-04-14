@@ -87,6 +87,10 @@ function App() {
           element={user ? <AttendancePage /> : <Navigate to="/login" replace />} 
         />
         <Route 
+          path="/attendance/analytics/:sessionId" 
+          element={user ? <AttendanceAnalytics /> : <Navigate to="/login" replace />} 
+        />
+        <Route 
           path="/students/:id" 
           element={user ? <StudentProfile /> : <Navigate to="/login" replace />} 
         />

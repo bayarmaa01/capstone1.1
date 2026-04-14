@@ -219,6 +219,79 @@ router.get('/health', (req, res) => {
 
 
 // =======================================
+// 📊 Get Attendance Session Analytics
+// =======================================
+router.get('/session/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Get session details
+    const sessionResult = await db.query(`
+      SELECT cs.*, c.code as class_code, c.name as class_name
+      FROM class_schedules cs
+      JOIN classes c ON c.id = cs.class_id
+      WHERE cs.id = $1
+    `, [sessionId]);
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = sessionResult.rows[0];
+
+    // Get attendance records for this session
+    const recordsResult = await db.query(`
+      SELECT 
+        s.student_id,
+        s.name as student_name,
+        COALESCE(a.present, false) as present,
+        COALESCE(a.method, 'manual') as method,
+        COALESCE(a.recorded_at, NOW()) as timestamp
+      FROM students s
+      LEFT JOIN attendance a ON a.student_id = s.id 
+        AND a.session_date = cs.scheduled_date
+      WHERE s.id IN (
+        SELECT student_id FROM enrollments WHERE class_id = cs.class_id
+      )
+      ORDER BY s.name
+    `);
+
+    const records = recordsResult.rows;
+    const stats = {
+      total: records.length,
+      present: records.filter(r => r.present).length,
+      absent: records.filter(r => !r.present).length,
+      percentage: records.length > 0 ? 
+        Math.round((records.filter(r => r.present).length / records.length) * 100) : 0
+    };
+
+    res.json({
+      session: {
+        id: session.id,
+        class_name: session.class_name,
+        class_code: session.class_code,
+        session_date: session.scheduled_date,
+        start_time: session.start_time,
+        end_time: session.end_time,
+        room_number: session.room_number
+      },
+      stats,
+      records: records.map(record => ({
+        student_id: record.student_id,
+        student_name: record.student_name,
+        status: record.present ? 'present' : 'absent',
+        method: record.method,
+        timestamp: record.timestamp
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error fetching session analytics:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =======================================
 // ✅ Export Routes
 // =======================================
 module.exports = router;
