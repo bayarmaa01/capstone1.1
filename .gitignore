@@ -183,3 +183,6 @@ dmypy.json
 
 # Health check logs
 health-check.log
+
+# Moodle runtime data
+moodle-data/
