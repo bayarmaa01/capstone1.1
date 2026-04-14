@@ -3,6 +3,7 @@ import requests
 import json
 import logging
 from datetime import datetime
+from datetime import timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import face_recognition
@@ -11,6 +12,7 @@ import io
 import threading
 import time
 import pickle
+import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

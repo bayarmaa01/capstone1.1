@@ -2,6 +2,104 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+const toDateOnly = (date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getThisWeekDateForDay = (dayOfWeek) => {
+  const now = new Date();
+  const today = toDateOnly(now);
+  const diff = dayOfWeek - today.getDay();
+  const target = new Date(today);
+  target.setDate(today.getDate() + diff);
+  return target;
+};
+
+const combineDateAndTime = (dateObj, timeStr) => {
+  const [h, m] = String(timeStr || '00:00').split(':').map((v) => parseInt(v, 10));
+  const out = new Date(dateObj);
+  out.setHours(Number.isNaN(h) ? 0 : h, Number.isNaN(m) ? 0 : m, 0, 0);
+  return out;
+};
+
+const classifyStatus = (startAt, endAt, now = new Date()) => {
+  if (now < startAt) return 'upcoming';
+  if (now >= startAt && now <= endAt) return 'ongoing';
+  return 'completed';
+};
+
+// University-style smart schedule view (all classes)
+router.get('/', async (req, res) => {
+  try {
+    const rows = await db.query(`
+      SELECT 
+        cs.id,
+        cs.class_id,
+        cs.scheduled_date,
+        cs.day_of_week,
+        cs.start_time,
+        cs.end_time,
+        cs.room_number,
+        c.name AS course_name
+      FROM class_schedules cs
+      JOIN classes c ON c.id = cs.class_id
+      WHERE cs.is_active = true
+      ORDER BY cs.scheduled_date NULLS FIRST, cs.day_of_week, cs.start_time
+    `);
+
+    const now = new Date();
+    const sessions = rows.rows.map((row) => {
+      const sessionDate = row.scheduled_date
+        ? toDateOnly(row.scheduled_date)
+        : getThisWeekDateForDay(row.day_of_week);
+      const startAt = combineDateAndTime(sessionDate, row.start_time);
+      const endAt = combineDateAndTime(sessionDate, row.end_time);
+      const status = classifyStatus(startAt, endAt, now);
+
+      return {
+        id: row.id,
+        class_id: row.class_id,
+        course_name: row.course_name,
+        session_date: sessionDate.toISOString().slice(0, 10),
+        start_time: row.start_time,
+        end_time: row.end_time,
+        day_of_week: row.day_of_week,
+        day_name: DAY_NAMES[row.day_of_week] || 'Unknown',
+        room_number: row.room_number,
+        status,
+        start_at: startAt.toISOString(),
+        end_at: endAt.toISOString()
+      };
+    }).sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
+
+    const todayKey = now.toISOString().slice(0, 10);
+    const today = sessions.filter((s) => s.session_date === todayKey);
+    const ongoing = sessions.filter((s) => s.status === 'ongoing');
+    const upcoming = sessions
+      .filter((s) => s.status === 'upcoming')
+      .sort((a, b) => new Date(a.start_at) - new Date(b.start_at))
+      .slice(0, 5);
+    const completed = sessions
+      .filter((s) => s.status === 'completed')
+      .sort((a, b) => new Date(b.start_at) - new Date(a.start_at));
+
+    res.json({
+      today,
+      upcoming,
+      ongoing,
+      completed,
+      all: sessions
+    });
+  } catch (err) {
+    console.error('Error fetching smart schedules:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ✅ Get specific schedule by ID
 router.get('/:id(\\d+)', async (req, res) => {
   try {

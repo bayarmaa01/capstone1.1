@@ -229,7 +229,8 @@ router.delete('/:classId/schedule/:scheduleId', async (req, res) => {
     
     // Check if schedule exists and get its details
     const scheduleCheck = await db.query(`
-      SELECT id, class_id, source FROM class_schedules 
+      SELECT id, class_id
+      FROM class_schedules 
       WHERE id = $1 AND class_id = $2
     `, [scheduleId, classId]);
     
@@ -238,13 +239,6 @@ router.delete('/:classId/schedule/:scheduleId', async (req, res) => {
     }
     
     const schedule = scheduleCheck.rows[0];
-    
-    // Prevent deletion of Moodle schedules
-    if (schedule.source === 'moodle') {
-      return res.status(403).json({ 
-        error: 'Cannot delete Moodle schedules - they are managed by the LMS' 
-      });
-    }
     
     // Delete the schedule
     await db.query('DELETE FROM class_schedules WHERE id = $1 AND class_id = $2', [scheduleId, classId]);

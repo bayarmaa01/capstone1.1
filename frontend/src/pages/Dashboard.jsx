@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 export default function Dashboard({ user, onLogout }) {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
+  const [smartSchedule, setSmartSchedule] = useState({ ongoing: [], upcoming: [] });
   const [loading, setLoading] = useState(true);
   const [showAddClass, setShowAddClass] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
@@ -16,6 +17,8 @@ export default function Dashboard({ user, onLogout }) {
   useEffect(() => {
     console.log('Dashboard: Component mounted, forcing API calls');
     loadData();
+    const timer = setInterval(loadData, 30000);
+    return () => clearInterval(timer);
   }, []);
 
   const loadData = async () => {
@@ -32,6 +35,12 @@ export default function Dashboard({ user, onLogout }) {
       const studentsResponse = await api.get('/students');
       console.log('Dashboard: Students data received:', studentsResponse.data);
       setStudents(studentsResponse.data || []);
+
+      const scheduleResponse = await api.get('/schedule');
+      setSmartSchedule({
+        ongoing: scheduleResponse.data?.ongoing || [],
+        upcoming: scheduleResponse.data?.upcoming || []
+      });
 
     } catch (error) {
       console.error('Dashboard: Error loading data:', error);
@@ -119,6 +128,15 @@ export default function Dashboard({ user, onLogout }) {
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
+  const formatCountdown = (isoString) => {
+    const diffMs = new Date(isoString).getTime() - Date.now();
+    const totalMinutes = Math.floor(diffMs / 60000);
+    if (totalMinutes <= 0) return 'Starting now';
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `Starts in ${hours}h ${minutes}m` : `Starts in ${minutes}m`;
+  };
+
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -136,6 +154,62 @@ export default function Dashboard({ user, onLogout }) {
           <p style={styles.loadingText}>Loading data from backend...</p>
         </div>
       )}
+
+      <div style={styles.smartPanel}>
+        <div style={styles.smartHeaderRow}>
+          <h2 style={styles.smartTitle}>Smart Class View</h2>
+          <button style={styles.timetableBtn} onClick={() => navigate('/timetable')}>
+            Open Full Timetable
+          </button>
+        </div>
+
+        <div style={styles.smartSection}>
+          <h3 style={styles.smartSectionTitle}>Ongoing Class</h3>
+          {smartSchedule.ongoing.length === 0 ? (
+            <p style={styles.emptyState}>No class right now</p>
+          ) : (
+            smartSchedule.ongoing.map((session) => (
+              <div key={`ongoing-${session.id}`} style={styles.ongoingCard}>
+                <div>
+                  <strong>{session.course_name}</strong>
+                  <div style={styles.smartMeta}>
+                    {session.start_time} - {session.end_time} | {session.day_name}
+                  </div>
+                </div>
+                <button
+                  style={styles.joinBtn}
+                  onClick={() => navigate(`/attendance/${session.id}`, { state: { classId: session.class_id, session } })}
+                >
+                  Join / Take Attendance
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={styles.smartSection}>
+          <h3 style={styles.smartSectionTitle}>Upcoming Classes</h3>
+          {smartSchedule.upcoming.length === 0 ? (
+            <p style={styles.emptyState}>No upcoming classes</p>
+          ) : (
+            smartSchedule.upcoming.slice(0, 5).map((session) => (
+              <div key={`upcoming-${session.id}`} style={styles.upcomingCard}>
+                <div>
+                  <strong>{session.course_name}</strong>
+                  <div style={styles.smartMeta}>
+                    {session.day_name} | {session.session_date} | {session.start_time} - {session.end_time}
+                  </div>
+                </div>
+                <div style={styles.countdownText}>
+                  {formatCountdown(session.start_at)}
+                  {new Date(session.start_at).getTime() - Date.now() <= 10 * 60000 &&
+                    new Date(session.start_at).getTime() > Date.now() && ' • Starting in 10 mins'}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       <div style={styles.grid}>
         {/* Classes Section */}
@@ -372,6 +446,79 @@ const styles = {
     color: '#666',
     fontSize: '16px',
     margin: 0
+  },
+  smartPanel: {
+    background: 'white',
+    borderRadius: '10px',
+    padding: '20px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+  },
+  smartHeaderRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    flexWrap: 'wrap'
+  },
+  smartTitle: {
+    margin: 0
+  },
+  timetableBtn: {
+    padding: '8px 14px',
+    border: '1px solid #3b82f6',
+    borderRadius: '8px',
+    background: '#eff6ff',
+    color: '#1d4ed8',
+    cursor: 'pointer',
+    fontWeight: '600'
+  },
+  smartSection: {
+    marginTop: '16px'
+  },
+  smartSectionTitle: {
+    margin: '0 0 10px 0',
+    fontSize: '18px'
+  },
+  ongoingCard: {
+    background: '#ecfdf3',
+    borderLeft: '4px solid #22c55e',
+    borderRadius: '8px',
+    padding: '12px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  upcomingCard: {
+    background: '#eff6ff',
+    borderLeft: '4px solid #3b82f6',
+    borderRadius: '8px',
+    padding: '12px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '8px'
+  },
+  joinBtn: {
+    background: '#166534',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '8px 12px',
+    cursor: 'pointer',
+    fontWeight: '600'
+  },
+  smartMeta: {
+    color: '#4b5563',
+    fontSize: '13px',
+    marginTop: '4px'
+  },
+  countdownText: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#1d4ed8'
   },
   grid: { 
     display: 'grid', 

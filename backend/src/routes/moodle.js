@@ -2,6 +2,18 @@ const express = require('express');
 const router = express.Router();
 const moodleApi = require('../services/moodle_api');
 const db = require('../db');
+const mysql = require('mysql2/promise');
+
+const moodlePool = mysql.createPool({
+    host: process.env.MOODLE_DB_HOST || 'moodle-db',
+    user: process.env.MOODLE_DB_USER || 'moodle',
+    password: process.env.MOODLE_DB_PASSWORD || 'moodle_secret',
+    database: process.env.MOODLE_DB_NAME || 'moodle',
+    port: process.env.MOODLE_DB_PORT || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
 
 // Get Moodle courses
 router.get('/courses', async (req, res) => {
@@ -38,25 +50,34 @@ router.get('/courses', async (req, res) => {
 router.get('/courses/:courseId/students', async (req, res) => {
     try {
         const { courseId } = req.params;
-        
-        console.log(`👥 API: Fetching students for course ${courseId}...`);
-        
-        const students = await moodleApi.getEnrolledUsers(courseId);
-        
-        // Transform for frontend
-        const transformedStudents = students.map(student => ({
-            id: student.id,
-            student_id: student.username,
-            name: student.fullname,
-            email: student.email,
-            moodle_user_id: student.id,
-            created_at: new Date()
-        }));
+
+        console.log(`👥 API: Fetching students for course ${courseId} from Moodle DB...`);
+
+        const studentsQuery = `
+            SELECT 
+              u.id,
+              u.username,
+              u.firstname,
+              u.lastname,
+              u.email,
+              c.id as course_id,
+              c.fullname as course_name
+            FROM mdl_user u
+            JOIN mdl_user_enrolments ue ON ue.userid = u.id
+            JOIN mdl_enrol e ON e.id = ue.enrolid
+            JOIN mdl_course c ON c.id = e.courseid
+            JOIN mdl_role_assignments ra ON ra.userid = u.id
+            JOIN mdl_role r ON r.id = ra.roleid
+            WHERE r.shortname = 'student'
+              AND u.deleted = 0
+              AND c.id = ?
+        `;
+
+        const [students] = await moodlePool.execute(studentsQuery, [courseId]);
 
         res.json({
             success: true,
-            data: transformedStudents,
-            total: transformedStudents.length
+            data: students
         });
         
     } catch (error) {

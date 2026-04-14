@@ -8,6 +8,7 @@ import ClassDashboard from './pages/ClassDashboard';
 import StudentProfile from './pages/StudentProfile';
 import AttendanceAnalytics from './pages/AttendanceAnalytics';
 import ClassScheduleClean from './components/ClassScheduleClean';
+import TimetablePage from './pages/TimetablePage';
 
 function ClassScheduleWrapper() {
   const { classId } = useParams();
@@ -94,6 +95,10 @@ function App() {
         <Route 
           path="/students/:id" 
           element={user ? <StudentProfile /> : <Navigate to="/login" replace />} 
+        />
+        <Route
+          path="/timetable"
+          element={user ? <TimetablePage /> : <Navigate to="/login" replace />}
         />
         <Route 
           path="/" 
