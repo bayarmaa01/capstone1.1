@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import QRScanner from '../components/QRScanner';
 import CameraCapture from '../components/CameraCapture';
 import moment from 'moment';
@@ -8,6 +8,7 @@ import moment from 'moment';
 export default function AttendancePage() {
   const { scheduleId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mode, setMode] = useState(null); // null, 'face', 'qr', or 'manual'
   const [classInfo, setClassInfo] = useState(null);
   const [scheduleInfo, setScheduleInfo] = useState(null);
@@ -17,6 +18,11 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState(null);
+
+  const queryParams = new URLSearchParams(location.search);
+  const classIdFromQuery = queryParams.get('classId');
+  const sessionFromState = location.state?.session || null;
+  const classIdFromState = location.state?.classId || null;
 
   useEffect(() => {
     if (scheduleId) {
@@ -35,26 +41,48 @@ export default function AttendancePage() {
       setLoading(true);
       setError(null);
       
-      // Get schedule information
-      const scheduleResponse = await api.get(`/schedule/${scheduleId}`);
-      setScheduleInfo(scheduleResponse.data);
+      let resolvedSchedule = sessionFromState;
+
+      // Try local schedule route first (works for manual schedules).
+      if (!resolvedSchedule) {
+        try {
+          const scheduleResponse = await api.get(`/schedule/${scheduleId}`);
+          resolvedSchedule = scheduleResponse.data;
+        } catch (scheduleErr) {
+          const fallbackClassId = classIdFromState || classIdFromQuery;
+          if (!fallbackClassId) {
+            throw scheduleErr;
+          }
+          // Fallback for Moodle sessions: fetch class schedule list and match by ID.
+          const classScheduleResponse = await api.get(`/classes/${fallbackClassId}/schedule`);
+          resolvedSchedule = (classScheduleResponse.data || []).find(
+            (item) => String(item.id) === String(scheduleId)
+          );
+          if (!resolvedSchedule) {
+            throw scheduleErr;
+          }
+        }
+      }
+
+      setScheduleInfo(resolvedSchedule);
       
-      // Get class information from schedule
-      const classResponse = await api.get(`/classes/${scheduleResponse.data.class_id}`);
+      // Get class information from schedule/query/state
+      const resolvedClassId = resolvedSchedule.class_id || classIdFromState || classIdFromQuery;
+      const classResponse = await api.get(`/classes/${resolvedClassId}`);
       setClassInfo(classResponse.data);
       
       // Get attendance for this class and date
-      await fetchTodayAttendance(scheduleResponse.data.class_id);
+      await fetchTodayAttendance(resolvedClassId);
       
       // Check if schedule is active (within 30 minutes of start time)
       const now = new Date();
-      const scheduleDate = new Date(scheduleResponse.data.scheduled_date);
-      const [hours, minutes] = scheduleResponse.data.start_time.split(':');
+      const scheduleDate = new Date(resolvedSchedule.scheduled_date || sessionDate);
+      const [hours, minutes] = String(resolvedSchedule.start_time || '00:00').split(':');
       const startTime = new Date(scheduleDate);
       startTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
       
       const endTime = new Date(scheduleDate);
-      const [endHours, endMinutes] = scheduleResponse.data.end_time.split(':');
+      const [endHours, endMinutes] = String(resolvedSchedule.end_time || '23:59').split(':');
       endTime.setHours(parseInt(endHours), parseInt(endMinutes), 0, 0);
       
       const isActive = now >= startTime && now <= endTime;

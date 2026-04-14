@@ -113,8 +113,9 @@ export default function ClassDashboard() {
 
   const handleTakeAttendance = async (session, mode) => {
     console.log('Taking attendance with mode:', mode);
-    // This would open the AttendancePage in production
-    navigate(`/attendance/${session.id}`);
+    navigate(`/attendance/${session.id}?classId=${classId}`, {
+      state: { session, classId: Number(classId), mode }
+    });
   };
 
   const markAttendance = async (studentId, method) => {
@@ -849,17 +850,19 @@ export default function ClassDashboard() {
       {/* Modals */}
       {showEnrollmentModal && (
         <EnrollmentModal
+          isOpen={showEnrollmentModal}
           classId={classId}
           onClose={() => setShowEnrollmentModal(false)}
-          onSuccess={handleEnrollmentSuccess}
+          onEnrollmentSuccess={handleEnrollmentSuccess}
         />
       )}
       
       {showScheduleModal && (
         <ScheduleModal
+          isOpen={showScheduleModal}
           classId={classId}
           onClose={() => setShowScheduleModal(false)}
-          onSuccess={handleScheduleSuccess}
+          onScheduleSuccess={handleScheduleSuccess}
         />
       )}
       
