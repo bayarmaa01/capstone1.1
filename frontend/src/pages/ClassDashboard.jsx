@@ -245,24 +245,6 @@ export default function ClassDashboard() {
     }, 3000);
   };
       
-      
-  const markAttendance = async (studentId, method) => {
-    try {
-      const sessionDate = selectedSession.scheduled_date || new Date().toISOString().split('T')[0];
-      await api.post('/attendance/record', {
-        class_id: classId,
-        student_id: studentId,
-        session_date: sessionDate,
-        method: method
-      });
-      
-      // Refresh student data to update attendance percentages
-      loadClassData();
-    } catch (error) {
-      console.error('Error marking attendance:', error);
-    }
-  };
-
   if (loading) {
     return (
       <div style={{

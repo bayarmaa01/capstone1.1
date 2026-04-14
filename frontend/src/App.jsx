@@ -6,6 +6,7 @@ import ClassPage from './pages/ClassPage';
 import AttendancePage from './pages/AttendancePage';
 import ClassDashboard from './pages/ClassDashboard';
 import StudentProfile from './pages/StudentProfile';
+import AttendanceAnalytics from './pages/AttendanceAnalytics';
 import ClassScheduleClean from './components/ClassScheduleClean';
 
 function ClassScheduleWrapper() {
