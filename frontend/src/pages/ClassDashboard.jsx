@@ -7,7 +7,7 @@ import EnrollmentModal from '../components/EnrollmentModal';
 import ScheduleModal from '../components/ScheduleModal';
 
 export default function ClassDashboard() {
-  const { id: classId } = useParams();
+  const { classId } = useParams();
   const navigate = useNavigate();
   const [classInfo, setClassInfo] = useState(null);
   const [students, setStudents] = useState([]);
