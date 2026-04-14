@@ -1,7 +1,12 @@
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: process.env.DATABASE_URL || undefined,
+  host: process.env.DB_HOST || undefined,
+  user: process.env.DB_USER || undefined,
+  password: process.env.DB_PASSWORD || undefined,
+  database: process.env.DB_NAME || undefined,
+  port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 5432,
 });
 
 pool.on('connect', () => {

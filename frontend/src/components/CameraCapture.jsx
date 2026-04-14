@@ -17,9 +17,6 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
   const [scanCount, setScanCount] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
 
-  const BACKEND_URL = process.env.REACT_APP_FACE_SERVICE_URL || '/face';
-  const FACE_URL = (process.env.REACT_APP_FACE_SERVICE_URL || 'http://localhost:5001').replace(/\/$/, '');
-
   const setBanner = useCallback((text, color) => {
     setScanStatus(text);
     setScanColor(color);
@@ -80,7 +77,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
       console.error('Failed to record attendance after retries', err?.response?.data || err?.message || err);
       return false;
     }
-  }, [BACKEND_URL, classId, sessionDate]);
+  }, [classId, sessionDate]);
 
   const captureAndRecognize = useCallback(async () => {
     const video = videoRef.current;
@@ -186,7 +183,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
       setBanner('⚠️ Recognition unavailable', '#6c757d');
       if (onError) onError(err);
     }
-  }, [FACE_URL, cameraStatus, isScanning, recordAttendance, sessionDate, setBanner, showSuccessNotification, onRecognized, onError]);
+  }, [cameraStatus, isScanning, recordAttendance, sessionDate, setBanner, showSuccessNotification, onRecognized, onError]);
 
   const startCamera = useCallback(async () => {
     try {

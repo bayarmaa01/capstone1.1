@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 
 // ✅ Get specific schedule by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id(\\d+)', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
 
