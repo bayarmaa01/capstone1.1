@@ -290,9 +290,10 @@ router.get('/:classId/students', async (req, res) => {
 // Get schedule for a class (with Moodle integration)
 router.get('/:classId/schedule', async (req, res) => {
   try {
+    const { classId } = req.params;
     let scheduleData = [];
     
-    // Try to get from Moodle first
+    // Try to get from Moodle first (read-only LMS sessions)
     try {
       console.log('Attempting Moodle schedule query...');
       const mysql = require('mysql2/promise');
@@ -308,10 +309,18 @@ router.get('/:classId/schedule', async (req, res) => {
       const connection = await moodlePool.getConnection();
       console.log('Moodle connection established');
       
+      // Resolve LMS course id for this class (if available)
+      const classMeta = await db.query(
+        'SELECT lms_course_id FROM classes WHERE id = $1',
+        [classId]
+      );
+      const lmsCourseId = classMeta.rows[0]?.lms_course_id || null;
+
       // Simplified query - get all Moodle sessions
       const [moodleRows] = await connection.execute(`
         SELECT 
           s.id AS sessionId,
+          a.course AS course_id,
           s.sessdate,
           s.duration,
           c.fullname AS course,
@@ -324,36 +333,37 @@ router.get('/:classId/schedule', async (req, res) => {
         FROM mdl_attendance_sessions s
         JOIN mdl_attendance a ON a.id = s.attendanceid
         JOIN mdl_course c ON c.id = a.course
+        ${lmsCourseId ? 'WHERE a.course = ?' : ''}
         ORDER BY s.sessdate ASC
-      `);
+      `, lmsCourseId ? [lmsCourseId] : []);
       
       console.log("Moodle sessions query successful:", moodleRows.length);
       console.log("Sample Moodle session:", moodleRows[0]);
       
       if (moodleRows.length > 0) {
-        scheduleData = moodleRows.map(session => ({
+        const moodleSchedule = moodleRows.map(session => ({
           id: session.sessionId,
+          class_id: parseInt(classId, 10),
           day_of_week: session.day_of_week,
           start_time: session.start_time_formatted,
           end_time: session.end_time_formatted,
           scheduled_date: session.session_date,
           room_number: 'TBD',
           is_active: true,
-          source: 'moodle'
+          source: 'moodle',
+          readonly: true
         }));
-        console.log('Using Moodle schedule:', scheduleData.length, 'sessions');
-        res.json(scheduleData);
-        return;
+        scheduleData = scheduleData.concat(moodleSchedule);
+        console.log('Using Moodle schedule:', moodleSchedule.length, 'sessions');
       }
       
-      console.log('No Moodle sessions found, falling back to local schedule');
       connection.release();
     } catch (moodleError) {
       console.error('Moodle schedule error:', moodleError);
-      console.log('Falling back to local schedule due to error');
+      console.log('Continuing with local schedule due to Moodle error');
     }
 
-    // Only fallback to local schedule if Moodle query fails
+    // Always include local/manual schedule entries
     try {
       const scheduleResult = await db.query(`
         SELECT cs.id, cs.day_of_week, cs.start_time, cs.end_time, cs.scheduled_date, cs.room_number, cs.is_active,
@@ -361,16 +371,23 @@ router.get('/:classId/schedule', async (req, res) => {
         FROM class_schedules cs 
         WHERE cs.class_id = $1 AND cs.is_active = true
         ORDER BY cs.day_of_week, cs.start_time
-      `, [req.params.classId]);
+      `, [classId]);
       
       if (scheduleResult.rows.length > 0) {
-        scheduleData = scheduleResult.rows;
-        console.log('Using local schedule:', scheduleData.length, 'sessions');
+        scheduleData = scheduleData.concat(scheduleResult.rows);
+        console.log('Using local schedule:', scheduleResult.rows.length, 'sessions');
       }
     } catch (localError) {
       console.error('Local schedule error:', localError);
     }
     
+    // Keep output stable for the dashboard
+    scheduleData.sort((a, b) => {
+      const aDate = a.scheduled_date ? new Date(a.scheduled_date).getTime() : 0;
+      const bDate = b.scheduled_date ? new Date(b.scheduled_date).getTime() : 0;
+      if (aDate !== bDate) return aDate - bDate;
+      return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+    });
     res.json(scheduleData);
   } catch (error) {
     console.error('Error fetching class schedule:', error);

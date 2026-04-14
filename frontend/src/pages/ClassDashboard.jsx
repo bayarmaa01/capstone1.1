@@ -201,6 +201,36 @@ export default function ClassDashboard() {
     }
   };
 
+  const handleEditSchedule = async (session) => {
+    if (session.source === 'moodle') {
+      showToast('Moodle schedules are read-only and cannot be edited here.', 'error');
+      return;
+    }
+
+    const startTime = window.prompt('Enter start time (HH:mm)', session.start_time || '');
+    if (startTime === null) return;
+    const endTime = window.prompt('Enter end time (HH:mm)', session.end_time || '');
+    if (endTime === null) return;
+    const roomNumber = window.prompt('Enter room number (optional)', session.room_number || '');
+    if (roomNumber === null) return;
+
+    try {
+      const response = await api.put(`/schedule/${session.id}`, {
+        start_time: startTime,
+        end_time: endTime,
+        room_number: roomNumber || null
+      });
+      if (response.data.success) {
+        showToast('Schedule updated successfully', 'success');
+        loadClassData();
+      }
+    } catch (error) {
+      console.error('Error editing schedule:', error);
+      const message = error.response?.data?.error || 'Failed to update schedule';
+      showToast(message, 'error');
+    }
+  };
+
   const handleRemoveStudent = async (student) => {
     const confirmed = window.confirm(
       `Are you sure you want to remove ${student.name} from this class?`
@@ -813,6 +843,30 @@ export default function ClassDashboard() {
                         >
                           Take Attendance
                         </button>
+                        {!isMoodle && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditSchedule(session);
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              background: '#3b82f6',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s'
+                            }}
+                            onMouseOver={(e) => e.target.style.backgroundColor = '#2563eb'}
+                            onMouseLeave={(e) => e.target.style.backgroundColor = '#3b82f6'}
+                            title="Edit schedule"
+                          >
+                            Edit
+                          </button>
+                        )}
                         {!isMoodle && (
                           <button
                             onClick={(e) => {
