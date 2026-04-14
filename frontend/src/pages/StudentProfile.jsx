@@ -101,7 +101,7 @@ export default function StudentProfile() {
                 borderRadius: '50%',
                 objectFit: 'cover'
               }}
-              onError={(e) => e.target.style.display = 'none'}
+              onError={(e) => { e.target.style.display = 'none'; }}
             />
           )}
           <div>
@@ -143,6 +143,7 @@ export default function StudentProfile() {
               Student ID
             </div>
             <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a202c' }}>
+              {student.student_id}
               {(student.attendance_percentage || 0) < 75 && (
                 <div style={{
                   marginTop: '20px',
@@ -160,7 +161,6 @@ export default function StudentProfile() {
                   </p>
                 </div>
               )}
-              {student.student_id}
             </div>
           </div>
           
@@ -201,8 +201,7 @@ export default function StudentProfile() {
             Detailed analytics and graphs will be available here.
           </p>
         </div>
-        </div>
-
+        
         {/* Placeholder for future charts */}
         <div style={{
           marginTop: '30px',
@@ -221,7 +220,6 @@ export default function StudentProfile() {
         </div>
       </div>
     </div>
-    </>
   );
 }
 

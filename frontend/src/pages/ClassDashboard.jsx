@@ -783,7 +783,6 @@ export default function ClassDashboard() {
                       </div>
                       
                       <div style={{ display: 'flex', gap: '8px', marginLeft: '15px', alignItems: 'flex-start' }}>
-                        <div style={{ display: 'flex', gap: '8px', marginLeft: '15px', alignItems: 'flex-start' }}>
                         <button
                           onClick={() => {
                             setSelectedSession(session);
@@ -838,16 +837,32 @@ export default function ClassDashboard() {
                           </button>
                         )}
                       </div>
-                      </div>
                     </div>
                   </div>
                 );
               })}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Attendance Modal */}
+      {/* Modals */}
+      {showEnrollmentModal && (
+        <EnrollmentModal
+          classId={classId}
+          onClose={() => setShowEnrollmentModal(false)}
+          onSuccess={handleEnrollmentSuccess}
+        />
+      )}
+      
+      {showScheduleModal && (
+        <ScheduleModal
+          classId={classId}
+          onClose={() => setShowScheduleModal(false)}
+          onSuccess={handleScheduleSuccess}
+        />
+      )}
+      
       {showAttendanceModal && selectedSession && (
         <div style={{
           position: 'fixed',
@@ -865,371 +880,69 @@ export default function ClassDashboard() {
             background: 'white',
             borderRadius: '15px',
             padding: '30px',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflowY: 'auto'
+            maxWidth: '500px',
+            width: '90%'
           }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px'
-            }}>
-              <h2 style={{ margin: 0, color: '#2c3e50' }}>
-                Take Attendance
-              </h2>
+            <h3 style={{ margin: '0 0 20px 0', color: '#1a202c' }}>Take Attendance</h3>
+            <p style={{ margin: '0 0 20px 0', color: '#718096' }}>
+              Select attendance method for {selectedSession.scheduled_date ? 
+                new Date(selectedSession.scheduled_date).toLocaleDateString() : 
+                'this session'
+              }
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
               <button
-                onClick={() => setShowAttendanceModal(false)}
+                onClick={() => handleTakeAttendance(selectedSession, 'face')}
                 style={{
-                  background: 'none',
+                  flex: 1,
+                  padding: '15px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  color: 'white',
                   border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#6c757d'
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
                 }}
               >
-                ×
+                Face Recognition
               </button>
-            </div>
-
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px'
-            }}>
-              <h3 style={{ margin: 0, color: '#2c3e50' }}>
-                {selectedSession.class_name} - {new Date(selectedSession.session_date || selectedSession.scheduled_date).toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                })}
-              </h3>
-              <div style={{ fontSize: '14px', color: '#64748b', marginBottom: '10px' }}>
-                {selectedSession.start_time} - {selectedSession.end_time} | Room: {selectedSession.room_number || 'N/A'}
-              </div>
-            </div>
-
-            {/* Mode Selector */}
-            {!attendanceMode && (
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                <button
-                  onClick={() => setAttendanceMode('face')}
-                  style={{
-                    padding: '12px 20px',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  📷 Face Recognition
-                </button>
-                <button
-                  onClick={() => setAttendanceMode('qr')}
-                  style={{
-                    padding: '12px 20px',
-                    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  📱 QR Code Scanner
-                </button>
-                <button
-                  onClick={() => setAttendanceMode('manual')}
-                  style={{
-                    padding: '12px 20px',
-                    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer'
-                  }}
-                >
-                  ✋ Manual Attendance
-                </button>
-              </div>
-            )}
-
-            {/* Face Recognition Mode */}
-            {attendanceMode === 'face' && (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <h3 style={{ color: '#2c3e50', marginBottom: '15px' }}>
-                  📷 Face Recognition Active
-                </h3>
-                <p style={{ color: '#64748b', fontSize: '14px' }}>
-                  Position students in front of camera for automatic recognition
-                </p>
-              </div>
-            )}
-
-            {/* QR Code Mode */}
-            {attendanceMode === 'qr' && (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <h3 style={{ color: '#2c3e50', marginBottom: '15px' }}>
-                  📱 QR Code Scanner Active
-                </h3>
-                <p style={{ color: '#64748b', fontSize: '14px' }}>
-                  Scan QR codes for quick attendance marking
-                </p>
-              </div>
-            )}
-
-            {/* Manual Mode */}
-            {attendanceMode === 'manual' && (
-              <div style={{ textAlign: 'center', padding: '20px' }}>
-                <h3 style={{ color: '#2c3e50', marginBottom: '15px' }}>
-                  ✋ Manual Attendance
-                </h3>
-                <p style={{ color: '#64748b', fontSize: '14px' }}>
-                  Click on students below to mark them present
-                </p>
-              </div>
-            )}
-
-            {/* Manual Attendance List */}
-            {attendanceMode === 'manual' && (
-              <div style={{
-                background: '#f8fafc',
-                borderRadius: '10px',
-                padding: '20px',
-                marginTop: '20px',
-                maxHeight: '300px',
-                overflowY: 'auto'
-              }}>
-                <h4 style={{ margin: '0 0 15px 0', color: '#374151' }}>
-                  Students
-                </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
-                  {students.map(student => (
-                    <div key={student.id} style={{
-                      background: 'white',
-                      padding: '15px',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        {student.photo_url && (
-                          <img 
-                            src={`/uploads/${student.photo_url}`} 
-                            alt={student.name}
-                            style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              objectFit: 'cover'
-                            }}
-                            onError={(e) => e.target.style.display = 'none'}
-                          />
-                        )}
-                        <div>
-                          <div style={{ fontWeight: '600', color: '#1a202c', fontSize: '14px' }}>
-                            {student.name}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#64748b' }}>
-                            {student.student_id}
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => markAttendance(student.id)}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '6px',
-                          fontSize: '14px',
-                          fontWeight: '600',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Mark Present
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Student Profile Modal */}
-      {showStudentProfile && selectedStudent && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            background: 'white',
-            borderRadius: '10px',
-            padding: '30px',
-            maxWidth: '600px',
-            width: '90%',
-            maxHeight: '80vh',
-            overflowY: 'auto'
-          }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '20px'
-            }}>
-              <h2 style={{ margin: 0, color: '#2c3e50' }}>
-                Student Profile
-              </h2>
               <button
-                onClick={() => setShowStudentProfile(false)}
+                onClick={() => handleTakeAttendance(selectedSession, 'qr')}
                 style={{
-                  background: 'none',
+                  flex: 1,
+                  padding: '15px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
                   border: 'none',
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  color: '#6c757d'
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
                 }}
               >
-                ×
+                QR Code Scanner
               </button>
             </div>
-
-            <div style={{ marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>
-                {selectedStudent.name}
-              </h3>
-              <p style={{ margin: '5px 0', color: '#6c757d' }}>
-                ID: {selectedStudent.student_id}
-              </p>
-              <p style={{ margin: '5px 0', color: '#6c757d' }}>
-                Email: {selectedStudent.email}
-              </p>
-            </div>
-
-            <div style={{
-              padding: '20px',
-              background: '#f8f9fa',
-              borderRadius: '8px',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '48px', fontWeight: 'bold', marginBottom: '10px' }}>
-                {selectedStudent.attendance_percentage || 0}%
-              </div>
-              <div style={{
-                padding: '8px 16px',
-                borderRadius: '4px',
-                display: 'inline-block',
-                fontWeight: 'bold',
-                background: getAttendanceStatus(selectedStudent.attendance_percentage || 0).color,
-                color: 'white'
-              }}>
-                {getAttendanceStatus(selectedStudent.attendance_percentage || 0).status}
-              </div>
-            </div>
-
-            {(selectedStudent.attendance_percentage || 0) < 75 && (
-              <div style={{
-                marginTop: '20px',
-                padding: '15px',
-                background: '#f8d7da',
-                borderRadius: '6px',
-                border: '1px solid #f5c6cb'
-              }}>
-                <h4 style={{ margin: '0 0 10px 0', color: '#721c24' }}>
-                  <span style={{ marginRight: '8px' }}>!</span>
-                  At Risk Warning
-                </h4>
-                <p style={{ margin: 0, color: '#721c24', fontSize: '14px' }}>
-                  This student's attendance is below 75%. Consider taking corrective action.
-                </p>
-              </div>
-            )}
+            <button
+              onClick={() => setShowAttendanceModal(false)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                background: '#f3f4f6',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
-
-                  'All day'
-                }
-              </div>
-            </div>
-            
-            {attendanceMode === 'face' ? (
-              <CameraCapture
-                classId={classId}
-                sessionDate={selectedSession.scheduled_date || new Date().toISOString().split('T')[0]}
-                onRecognized={(student) => {
-                  console.log('👤 Face recognized:', student);
-                  alert(`✓ ${student.name} marked present via Face Recognition!`);
-                }}
-                onError={(err) => {
-                  console.error('Camera error:', err);
-                  alert(err);
-                onError={(error) => {
-                  console.error('Face recognition error:', error);
-                }}
-              />
-            ) : (
-              <QRScanner
-                onScan={(studentId) => {
-                  console.log('QR scanned:', studentId);
-                  // Mark attendance
-                  markAttendance(studentId, 'qr');
-                  // Show success notification
-                  const note = document.createElement('div');
-                  note.style.cssText = `
-                    position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
-                    color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
-                  `;
-                  note.innerHTML = `Attendance marked for ${studentId}`;
-                  document.body.appendChild(note);
-                  setTimeout(() => note.remove(), 3000);
-                }}
-                onError={(error) => {
-                  console.error('QR scanning error:', error);
-                }}
-              />
-            )}
-          </div>
-        </div>
-      )}
-      
-      {/* Enrollment Modal */}
-      <EnrollmentModal
-        isOpen={showEnrollmentModal}
-        onClose={() => setShowEnrollmentModal(false)}
-        classId={classId}
-        onEnrollmentSuccess={handleEnrollmentSuccess}
-      />
-      
-      {/* Schedule Modal */}
-      <ScheduleModal
-        isOpen={showScheduleModal}
-        onClose={() => setShowScheduleModal(false)}
-        classId={classId}
-        onScheduleSuccess={handleScheduleSuccess}
-      />
     </div>
   );
 }
