@@ -72,32 +72,8 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
     throw lastErr;
   };
 
-  // send attendance to backend (sends both raw and percent)
-  const recordAttendance = useCallback(async (match, rawConfidence, confidencePercent) => {
-    const payload = {
-      class_id: parseInt(classId, 10),
-      student_id: match.student_id,
-      session_date: sessionDate,
-      method: 'face',
-      confidence: rawConfidence,
-      confidence_percent: confidencePercent
-    };
-
-    try {
-      // retry posting attendance up to 2 times (2 attempts)
-      const fn = async () => {
-        // 10s timeout per attempt
-        const resp = await api.post('/attendance/record', payload, { timeout: 10000 });
-        return resp;
-      };
-      const resp = await retry(fn, 2, 500);
-      console.debug('Backend attendance response:', resp?.data);
-      return true;
-    } catch (err) {
-      console.error('Failed to record attendance after retries', err?.response?.data || err?.message || err);
-      return false;
-    }
-  }, [classId, sessionDate]);
+  // This component should ONLY recognize faces and emit matches.
+  // Persisting attendance is handled by the parent so session scoping is consistent.
 
   const captureAndRecognize = useCallback(async () => {
     const video = videoRef.current;
@@ -196,20 +172,12 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
       setBanner(`✅ Match: ${best.student_id} (${roundedPct}%)`, '#28a745');
 
-      // only record once per student/session
+      // only emit once per student/session
       if (!recognizedRef.current.has(key)) {
-        // show interim banner while posting
-        setBanner('🟢 Recording attendance...', '#28a745');
-
-        const ok = await recordAttendance(best, rawConfidence, confidencePercent);
-        if (ok) {
-          recognizedRef.current.add(key);
-          showSuccessNotification(best.student_id, confidencePercent);
-          if (onRecognized) onRecognized({ ...best, confidence_percent: confidencePercent });
-          setBanner(`✅ Recorded: ${best.student_id} (${roundedPct}%)`, '#28a745');
-        } else {
-          setBanner('⚠️ Could not record attendance', '#6c757d');
-        }
+        recognizedRef.current.add(key);
+        showSuccessNotification(best.student_id, confidencePercent);
+        if (onRecognized) onRecognized({ ...best, confidence_percent: confidencePercent });
+        setBanner(`✅ Recognized: ${best.student_id} (${roundedPct}%)`, '#28a745');
       } else {
         console.debug('Already recorded for this session:', key);
       }
@@ -219,7 +187,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
       setBanner('⚠️ Recognition unavailable', '#6c757d');
       if (onError) onError(err);
     }
-  }, [cameraStatus, isScanning, recordAttendance, sessionDate, setBanner, showSuccessNotification, onRecognized, onError]);
+  }, [cameraStatus, isScanning, sessionDate, setBanner, showSuccessNotification, onRecognized, onError]);
 
   const startCamera = useCallback(async () => {
     try {

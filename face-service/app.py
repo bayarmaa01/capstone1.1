@@ -31,6 +31,11 @@ ENC_PATH = "encodings/encodings.pkl"
 ATTENDANCE_LOG = "attendance_log.json"
 SESSION_TIMEOUT = 300  # 5 minutes between attendance for same student
 
+# Face detection model selection:
+# - "hog" is CPU-friendly and reliable for most webcam frames
+# - "cnn" is heavier and often fails/timeout without GPU or proper dlib build
+FACE_DETECTION_MODEL = os.getenv("FACE_DETECTION_MODEL", "hog").strip().lower() or "hog"
+
 # Create directories
 os.makedirs("encodings", exist_ok=True)
 os.makedirs("logs", exist_ok=True)
@@ -241,17 +246,21 @@ def recognize_and_mark():
         # Load image
         image = face_recognition.load_image_file(file)
         
-        # Find all faces in image using CNN model
-        face_locations = face_recognition.face_locations(image, model="cnn")
+        # Find all faces in image using configured model
+        logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL}")
+        face_locations = face_recognition.face_locations(image, model=FACE_DETECTION_MODEL)
         face_encodings = face_recognition.face_encodings(image, face_locations)
         
         logger.info(f"🔍 Recognition request - Faces detected: {len(face_encodings)}")
         
         if len(face_encodings) == 0:
+            # Return a consistent shape for frontend consumers
             return jsonify({
-                "success": False,
-                "message": "No faces detected in image",
-                "attendance_marked": []
+                "success": True,
+                "faces_detected": 0,
+                "matches": [],
+                "attendance_marked": [],
+                "message": "No faces detected in image"
             })
         
         # Check if we have any enrolled students
@@ -396,9 +405,10 @@ def recognize():
             logger.error(f"❌ Failed to load image: {e}")
             return jsonify({"error": f"failed to load image: {str(e)}"}), 400
         
-        # Find all faces in image using CNN model
+        # Find all faces in image using configured model
         try:
-            face_locations = face_recognition.face_locations(image, model="cnn")
+            logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL}")
+            face_locations = face_recognition.face_locations(image, model=FACE_DETECTION_MODEL)
             face_encodings = face_recognition.face_encodings(image, face_locations)
             logger.info(f"🔍 Faces detected: {len(face_encodings)}")
         except Exception as e:

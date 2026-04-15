@@ -56,7 +56,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
     if (scheduleItem.source === 'moodle') {
       // For Moodle sessions, check within ±10 minutes of session time
       const sessionStart = new Date(scheduleItem.sessdate * 1000);
-      const sessionEnd = new Date(sessionStart.getTime() + scheduleItem.duration * 60000);
+      const sessionEnd = new Date(sessionStart.getTime() + (Number(scheduleItem.duration) || 0) * 1000);
       
       // Allow attendance ±10 minutes from session start/end
       const earlyStart = new Date(sessionStart.getTime() - 10 * 60000);
@@ -92,7 +92,7 @@ export default function ClassSchedule({ classId, onScheduleUpdated }) {
     
     if (scheduleItem.source === 'moodle') {
       const sessionStart = new Date(scheduleItem.sessdate * 1000);
-      const sessionEnd = new Date(sessionStart.getTime() + scheduleItem.duration * 60000);
+      const sessionEnd = new Date(sessionStart.getTime() + (Number(scheduleItem.duration) || 0) * 1000);
       
       if (now < sessionStart) {
         return 'upcoming';

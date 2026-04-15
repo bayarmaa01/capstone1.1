@@ -13,7 +13,7 @@ export default function AttendancePage() {
   const [classInfo, setClassInfo] = useState(null);
   const [scheduleInfo, setScheduleInfo] = useState(null);
   const [attendance, setAttendance] = useState([]);
-  const [sessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState(new Date().toISOString().split('T')[0]);
   const [recognizedIds, setRecognizedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
@@ -65,6 +65,8 @@ export default function AttendancePage() {
       }
 
       setScheduleInfo(resolvedSchedule);
+      const resolvedSessionDate = (resolvedSchedule.scheduled_date || sessionDate);
+      setSessionDate(resolvedSessionDate);
       
       // Get class information from schedule/query/state
       const resolvedClassId = resolvedSchedule.class_id || classIdFromState || classIdFromQuery;
@@ -72,7 +74,7 @@ export default function AttendancePage() {
       setClassInfo(classResponse.data);
       
       // Get attendance for this class and date
-      await fetchTodayAttendance(resolvedClassId);
+      await fetchTodayAttendance(resolvedClassId, resolvedSessionDate);
       
       // Check if schedule is active (within 30 minutes of start time)
       const now = new Date();
@@ -100,11 +102,14 @@ export default function AttendancePage() {
     }
   };
 
-  const fetchTodayAttendance = async (classId) => {
+  const fetchTodayAttendance = async (classId, dateOverride) => {
     try {
       setLoading(true);
+      const dateToUse = dateOverride || sessionDate;
       const response = await api.get(
-        `/attendance/class/${classId}/date/${sessionDate}`
+        scheduleId
+          ? `/attendance/class/${classId}/date/${dateToUse}?sessionId=${encodeURIComponent(scheduleId)}`
+          : `/attendance/class/${classId}/date/${dateToUse}`
       );
       setAttendance(response.data);
       
@@ -174,12 +179,13 @@ export default function AttendancePage() {
         class_id: classInfo.id,
         student_id: student.id,  // Use database ID from the student record
         session_date: sessionDate,
+        ...(scheduleId ? { session_id: scheduleId } : {}),
         method: 'qr',
         confidence: 1.0
       });
       
       setRecognizedIds(prev => new Set([...prev, studentId]));
-      await fetchTodayAttendance(classInfo.id);
+      await fetchTodayAttendance(classInfo.id, sessionDate);
       alert(`Attendance recorded for ${student.name} (${studentId})`);
       
     } catch (error) {
@@ -222,12 +228,13 @@ export default function AttendancePage() {
         class_id: classInfo.id,
         student_id: student.id,  // Use database ID from the student record
         session_date: sessionDate,
+        ...(scheduleId ? { session_id: scheduleId } : {}),
         method: 'face',
         confidence: match.confidence || 0.95
       });
       
       setRecognizedIds(prev => new Set([...prev, studentId]));
-      await fetchTodayAttendance(classInfo.id);
+      await fetchTodayAttendance(classInfo.id, sessionDate);
       console.log(`Attendance recorded for ${student.name}`);
       
       // Show success notification
@@ -266,12 +273,13 @@ export default function AttendancePage() {
         class_id: classInfo.id,
         student_id: student.id,  // IMPORTANT: Use database ID (integer), not student_id string
         session_date: sessionDate,
+        ...(scheduleId ? { session_id: scheduleId } : {}),
         method: 'manual',
         confidence: 1.0
       });
       
       setRecognizedIds(prev => new Set([...prev, student.student_id]));
-      await fetchTodayAttendance(classInfo.id);
+      await fetchTodayAttendance(classInfo.id, sessionDate);
       showNotification(`${student.name} marked present`, 'success');
       
     } catch (error) {
@@ -590,6 +598,7 @@ export default function AttendancePage() {
           <CameraCapture 
             classId={classInfo.id}
             sessionDate={sessionDate}
+            sessionId={scheduleId}
             onRecognized={handleFaceRecognized}
             onError={(err) => {
               console.error('Camera error:', err);

@@ -31,29 +31,74 @@ const initializeDatabase = async () => {
     
     if (result.rows[0].exists) {
       console.log('✅ Database already initialized');
-      return;
-    }
-    
-    console.log('📝 Initializing database schema...');
-    const initSQL = fs.readFileSync(path.join(__dirname, '../sql/init.sql'), 'utf8');
-    
-    // Execute each statement separately to handle multiple commands
-    const statements = initSQL
-      .split(';')
-      .map(stmt => stmt.trim())
-      .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
-    
-    for (const statement of statements) {
-      if (statement.trim()) {
-        await db.query(statement);
+    } else {
+      console.log('📝 Initializing database schema...');
+      const initSQL = fs.readFileSync(path.join(__dirname, '../sql/init.sql'), 'utf8');
+      
+      // Execute each statement separately to handle multiple commands
+      const statements = initSQL
+        .split(';')
+        .map(stmt => stmt.trim())
+        .filter(stmt => stmt.length > 0 && !stmt.startsWith('--'));
+      
+      for (const statement of statements) {
+        if (statement.trim()) {
+          await db.query(statement);
+        }
       }
+      
+      console.log('✅ Database schema initialized successfully');
+      
+      // Verify tables were created
+      const tables = await db.query('SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\' ORDER BY table_name');
+      console.log('📋 Created tables:', tables.rows.map(row => row.table_name).join(', '));
     }
     
-    console.log('✅ Database schema initialized successfully');
-    
-    // Verify tables were created
-    const tables = await db.query('SELECT table_name FROM information_schema.tables WHERE table_schema = \'public\' ORDER BY table_name');
-    console.log('📋 Created tables:', tables.rows.map(row => row.table_name).join(', '));
+    // Always ensure attendance session scoping exists (safe idempotent migration)
+    // This prevents "everyone is Present" across multiple sessions on the same day.
+    try {
+      console.log('🧩 Ensuring attendance session scoping...');
+      await db.query(`ALTER TABLE attendance ADD COLUMN IF NOT EXISTS session_id INT`);
+      await db.query(`CREATE INDEX IF NOT EXISTS idx_attendance_session_id ON attendance(session_id)`);
+
+      // Drop legacy unique constraint on (class_id, student_id, session_date) if present,
+      // and replace with two partial unique indexes:
+      // - rows without session_id remain unique per date (legacy behavior)
+      // - rows with session_id are unique per session
+      await db.query(`
+        DO $$
+        DECLARE
+          c_name text;
+        BEGIN
+          SELECT conname INTO c_name
+          FROM pg_constraint
+          WHERE conrelid = 'attendance'::regclass
+            AND contype = 'u'
+            AND pg_get_constraintdef(oid) = 'UNIQUE (class_id, student_id, session_date)';
+
+          IF c_name IS NOT NULL THEN
+            EXECUTE format('ALTER TABLE attendance DROP CONSTRAINT %I', c_name);
+          END IF;
+        END
+        $$;
+      `);
+
+      await db.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_attendance_legacy_date
+        ON attendance (class_id, student_id, session_date)
+        WHERE session_id IS NULL;
+      `);
+
+      await db.query(`
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_attendance_per_session
+        ON attendance (class_id, student_id, session_id)
+        WHERE session_id IS NOT NULL;
+      `);
+
+      console.log('✅ Attendance session scoping ensured');
+    } catch (migrateErr) {
+      console.error('⚠️ Attendance session scoping migration failed (non-fatal):', migrateErr.message);
+    }
     
   } catch (error) {
     console.error('❌ Database initialization failed:', error.message);

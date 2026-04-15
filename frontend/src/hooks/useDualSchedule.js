@@ -5,9 +5,11 @@ import api from '../services/api';
 function formatSession(s) {
   const d = new Date(s.sessdate * 1000);
 
-  const start = d.toTimeString().slice(0,5);
-  const endDate = new Date(d.getTime() + s.duration * 60000);
-  const end = endDate.toTimeString().slice(0,5);
+  // Moodle stores sessdate as UNIX seconds, and duration is in seconds (not minutes).
+  // Prefer backend-formatted times when present to avoid timezone/server conversion issues.
+  const start = (s.start_time_formatted || d.toTimeString().slice(0, 5));
+  const endDate = new Date(d.getTime() + (Number(s.duration) || 0) * 1000);
+  const end = (s.end_time_formatted || endDate.toTimeString().slice(0, 5));
 
   return {
     id: s.sessionId,
@@ -16,7 +18,10 @@ function formatSession(s) {
     course: s.course,
     source: "moodle",
     sessdate: s.sessdate,
-    duration: s.duration
+    duration: Number(s.duration) || 0,
+    // Keep raw formatted times if callers need them
+    start_time: start,
+    end_time: end
   };
 }
 

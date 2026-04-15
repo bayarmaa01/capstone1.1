@@ -14,6 +14,7 @@ router.post('/recognize', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'image is required' });
     }
 
+    const startedAt = Date.now();
     const form = new FormData();
     form.append('image', req.file.buffer, {
       filename: req.file.originalname || 'frame.jpg',
@@ -25,8 +26,22 @@ router.post('/recognize', upload.single('image'), async (req, res) => {
       timeout: 20000
     });
 
+    const elapsedMs = Date.now() - startedAt;
+    console.log('🧠 Face proxy result:', {
+      status: response.status,
+      elapsedMs,
+      faces_detected: response.data?.faces_detected,
+      matches: Array.isArray(response.data?.matches) ? response.data.matches.length : undefined,
+      message: response.data?.message
+    });
+
     res.json(response.data);
   } catch (error) {
+    console.error('❌ Face proxy error:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data
+    });
     res.status(error.response?.status || 500).json({
       error: error.response?.data?.error || error.message || 'Face recognition proxy failed'
     });

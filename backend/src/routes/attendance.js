@@ -11,23 +11,24 @@ const db = require('../db');
 // =======================================
 router.post('/record', async (req, res) => {
   try {
-    const { class_id, student_id, session_date, method, confidence } = req.body;
+    const { class_id, student_id, session_date, session_id, method, confidence } = req.body;
 
     console.log('📥 ATTENDANCE REQUEST:', { 
       class_id, 
       student_id, 
       session_date, 
+      session_id,
       method, 
       confidence,
       bodyKeys: Object.keys(req.body)
     });
 
-    if (!class_id || !student_id || !session_date) {
-      console.log('❌ MISSING REQUIRED FIELDS:', { class_id, student_id, session_date });
-      return res.status(400).json({ error: 'class_id, student_id, and session_date are required' });
+    if (!class_id || !student_id || (!session_date && !session_id)) {
+      console.log('❌ MISSING REQUIRED FIELDS:', { class_id, student_id, session_date, session_id });
+      return res.status(400).json({ error: 'class_id, student_id, and either session_date or session_id are required' });
     }
 
-    console.log('📥 Received:', { class_id, student_id, session_date });
+    console.log('📥 Received:', { class_id, student_id, session_date, session_id });
 
     // Convert string student_id (like "STU001") to numeric database ID
     let numericStudentId;
@@ -55,16 +56,38 @@ router.post('/record', async (req, res) => {
       return res.status(400).json({ error: 'Student not enrolled in this class' });
     }
 
-    // Mark attendance
-    const result = await db.query(`
-      INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
-      VALUES ($1, $2, $3, true, $4, $5)
-      ON CONFLICT (class_id, student_id, session_date)
-      DO UPDATE SET present = true, method = EXCLUDED.method, 
-                    confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
-                    recorded_at = now()
-      RETURNING *;
-    `, [class_id, numericStudentId, session_date, method || 'face_recognition', confidence || 1.0]);
+    // Mark attendance (session-scoped when session_id is provided).
+    // This fixes cross-session bleed on the same calendar date.
+    let result;
+    if (session_id) {
+      // Requires a unique constraint/index for (class_id, student_id, session_id) when session_id is not null.
+      result = await db.query(`
+        INSERT INTO attendance (class_id, student_id, session_id, session_date, present, method, confidence)
+        VALUES ($1, $2, $3, $4, true, $5, $6)
+        ON CONFLICT (class_id, student_id, session_id)
+        DO UPDATE SET present = true, method = EXCLUDED.method,
+                      confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
+                      recorded_at = now()
+        RETURNING *;
+      `, [
+        class_id,
+        numericStudentId,
+        parseInt(session_id, 10),
+        session_date || new Date().toISOString().slice(0, 10),
+        method || 'face_recognition',
+        confidence || 1.0
+      ]);
+    } else {
+      result = await db.query(`
+        INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
+        VALUES ($1, $2, $3, true, $4, $5)
+        ON CONFLICT (class_id, student_id, session_date)
+        DO UPDATE SET present = true, method = EXCLUDED.method, 
+                      confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
+                      recorded_at = now()
+        RETURNING *;
+      `, [class_id, numericStudentId, session_date, method || 'face_recognition', confidence || 1.0]);
+    }
 
     console.log(`✅ Marked: ${student_id} (ID: ${numericStudentId})`);
     res.json({ success: true, attendance: result.rows[0] });
@@ -179,21 +202,40 @@ router.get('/student/:id', async (req, res) => {
 router.get('/class/:classId/date/:date', async (req, res) => {
   try {
     const { classId, date } = req.params;
+    const sessionId = req.query.sessionId ? parseInt(req.query.sessionId, 10) : null;
+    if (req.query.sessionId && Number.isNaN(sessionId)) {
+      return res.status(400).json({ error: 'Invalid sessionId' });
+    }
 
-    const result = await db.query(`
-      SELECT 
-        s.id, s.student_id, s.name, s.photo_url,
-        COALESCE(a.present, false) AS present,
-        a.method, a.confidence, a.recorded_at
-      FROM students s
-      JOIN enrollments e ON s.id = e.student_id
-      LEFT JOIN attendance a 
-        ON a.student_id = s.id 
-        AND a.class_id = $1 
-        AND a.session_date = $2
-      WHERE e.class_id = $1
-      ORDER BY s.name;
-    `, [classId, date]);
+    const result = sessionId
+      ? await db.query(`
+        SELECT 
+          s.id, s.student_id, s.name, s.photo_url,
+          COALESCE(a.present, false) AS present,
+          a.method, a.confidence, a.recorded_at
+        FROM students s
+        JOIN enrollments e ON s.id = e.student_id
+        LEFT JOIN attendance a 
+          ON a.student_id = s.id 
+          AND a.class_id = $1 
+          AND a.session_id = $2
+        WHERE e.class_id = $1
+        ORDER BY s.name;
+      `, [classId, sessionId])
+      : await db.query(`
+        SELECT 
+          s.id, s.student_id, s.name, s.photo_url,
+          COALESCE(a.present, false) AS present,
+          a.method, a.confidence, a.recorded_at
+        FROM students s
+        JOIN enrollments e ON s.id = e.student_id
+        LEFT JOIN attendance a 
+          ON a.student_id = s.id 
+          AND a.class_id = $1 
+          AND a.session_date = $2
+        WHERE e.class_id = $1
+        ORDER BY s.name;
+      `, [classId, date]);
 
     res.json(result.rows);
 
