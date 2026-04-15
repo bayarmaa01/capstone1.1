@@ -35,6 +35,11 @@ SESSION_TIMEOUT = 300  # 5 minutes between attendance for same student
 # - "hog" is CPU-friendly and reliable for most webcam frames
 # - "cnn" is heavier and often fails/timeout without GPU or proper dlib build
 FACE_DETECTION_MODEL = os.getenv("FACE_DETECTION_MODEL", "hog").strip().lower() or "hog"
+# Upsampling helps detect smaller faces in webcam frames (trade-off: more CPU).
+try:
+    FACE_UPSAMPLE_TIMES = int(os.getenv("FACE_UPSAMPLE_TIMES", "1"))
+except Exception:
+    FACE_UPSAMPLE_TIMES = 1
 
 # Create directories
 os.makedirs("encodings", exist_ok=True)
@@ -247,8 +252,12 @@ def recognize_and_mark():
         image = face_recognition.load_image_file(file)
         
         # Find all faces in image using configured model
-        logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL}")
-        face_locations = face_recognition.face_locations(image, model=FACE_DETECTION_MODEL)
+        logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL} | upsample: {FACE_UPSAMPLE_TIMES}")
+        face_locations = face_recognition.face_locations(
+            image,
+            number_of_times_to_upsample=max(0, FACE_UPSAMPLE_TIMES),
+            model=FACE_DETECTION_MODEL
+        )
         face_encodings = face_recognition.face_encodings(image, face_locations)
         
         logger.info(f"🔍 Recognition request - Faces detected: {len(face_encodings)}")
@@ -407,8 +416,12 @@ def recognize():
         
         # Find all faces in image using configured model
         try:
-            logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL}")
-            face_locations = face_recognition.face_locations(image, model=FACE_DETECTION_MODEL)
+            logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL} | upsample: {FACE_UPSAMPLE_TIMES}")
+            face_locations = face_recognition.face_locations(
+                image,
+                number_of_times_to_upsample=max(0, FACE_UPSAMPLE_TIMES),
+                model=FACE_DETECTION_MODEL
+            )
             face_encodings = face_recognition.face_encodings(image, face_locations)
             logger.info(f"🔍 Faces detected: {len(face_encodings)}")
         except Exception as e:

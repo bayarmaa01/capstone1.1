@@ -14,6 +14,13 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+const getStudentPhotoUrl = (photoUrl) => {
+  if (!photoUrl) return null;
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) return photoUrl;
+  if (photoUrl.startsWith('/uploads/')) return photoUrl;
+  return `/uploads/${photoUrl}`;
+};
+
 export default function StudentProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -130,7 +137,7 @@ export default function StudentProfile() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           {student.photo_url && (
             <img 
-              src={`/uploads/${student.photo_url}`} 
+              src={getStudentPhotoUrl(student.photo_url)} 
               alt={student.name}
               style={{
                 width: '80px',
@@ -181,7 +188,7 @@ export default function StudentProfile() {
             </div>
             <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a202c' }}>
               {student.student_id}
-              {(student.attendance_percentage || 0) < 75 && (
+              {(attendanceSummary.attendance_rate || 0) < 75 && (
                 <div style={{
                   marginTop: '20px',
                   padding: '15px',

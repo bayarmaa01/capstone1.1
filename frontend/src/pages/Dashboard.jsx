@@ -3,6 +3,13 @@ import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 
+const getStudentPhotoUrl = (photoUrl) => {
+  if (!photoUrl) return null;
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) return photoUrl;
+  if (photoUrl.startsWith('/uploads/')) return photoUrl;
+  return `/uploads/${photoUrl}`;
+};
+
 export default function Dashboard({ user, onLogout }) {
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -350,7 +357,7 @@ export default function Dashboard({ user, onLogout }) {
                 <div key={student.id} style={styles.studentCard}>
                   {student.photo_url && (
                     <img 
-                      src={`/uploads/${student.photo_url}`} 
+                      src={getStudentPhotoUrl(student.photo_url)} 
                       alt={student.name}
                       style={styles.photo}
                       onError={(e) => e.target.style.display = 'none'}

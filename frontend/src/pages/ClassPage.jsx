@@ -5,6 +5,13 @@ import AttendanceChart from '../components/AttendanceChart';
 import ClassSchedule from '../components/ClassSchedule';
 import ScheduleCalendar from '../components/ScheduleCalendar';
 
+const getStudentPhotoUrl = (photoUrl) => {
+  if (!photoUrl) return null;
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) return photoUrl;
+  if (photoUrl.startsWith('/uploads/')) return photoUrl;
+  return `/uploads/${photoUrl}`;
+};
+
 export default function ClassPage() {
   const { classId } = useParams();
   const navigate = useNavigate();
@@ -163,7 +170,7 @@ export default function ClassPage() {
                       <div style={styles.studentInfoRow}>
                         {student.photo_url && (
                           <img 
-                            src={`/uploads/${student.photo_url}`}
+                            src={getStudentPhotoUrl(student.photo_url)}
                             alt={student.name}
                             style={styles.smallPhoto}
                             onError={(e) => {
@@ -244,7 +251,7 @@ export default function ClassPage() {
               <div key={student.id} style={styles.enrolledCard}>
                 {student.photo_url && (
                   <img 
-                    src={`/uploads/${student.photo_url}`}
+                    src={getStudentPhotoUrl(student.photo_url)}
                     alt={student.name}
                     style={styles.enrolledPhoto}
                     onError={(e) => e.target.style.display = 'none'}
