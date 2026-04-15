@@ -15,6 +15,9 @@ services:
       - REDIS_URL=redis://redis:6379
     ports:
       - 4000:4000
+    volumes:
+      # Persist student photos across rebuilds (served at /uploads/)
+      - ./backend/uploads:/app/uploads
     networks:
       - app_network
     depends_on:
@@ -54,6 +57,8 @@ services:
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
       - UPLOAD_FOLDER=/app/uploads
       - ENCODINGS_FOLDER=/app/encodings
+      # Prefer CPU-friendly model for webcam frames (fixes "No face detected" on CPU-only hosts)
+      - FACE_DETECTION_MODEL=hog
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
@@ -121,6 +126,7 @@ services:
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
       - UPLOAD_FOLDER=/app/uploads
       - ENCODINGS_FOLDER=/app/encodings
+      - FACE_DETECTION_MODEL=hog
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
@@ -371,7 +377,8 @@ services:
     ports:
       - "9187:9187"
     environment:
-      - DATA_SOURCE_NAME=postgresql://postgres:postgres_secret@postgres:5432/attendance_db?sslmode=disable
+      # Align with postgres service credentials/database
+      - DATA_SOURCE_NAME=postgresql://app:secret@postgres:5432/attendance?sslmode=disable
     networks:
       - app_network
     depends_on:
