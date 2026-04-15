@@ -339,7 +339,11 @@ router.get('/attendance/status', async (req, res) => {
         COUNT(CASE WHEN present = false THEN 1 END) as absent_count
       FROM attendance 
       WHERE class_id = $1 
-        AND session_date = CURRENT_DATE
+        AND session_date = (
+          SELECT MAX(session_date) 
+          FROM attendance 
+          WHERE class_id = $1
+        )
     `, [schedule.class_id]);
 
     const stats = attendanceStats.rows[0];
