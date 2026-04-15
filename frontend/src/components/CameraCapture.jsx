@@ -9,8 +9,14 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
   const recognizedRef = useRef(new Set());
+  const cameraStatusRef = useRef('idle');
 
   const [cameraStatus, setCameraStatus] = useState('idle'); // 'idle'|'requesting'|'active'|'stopped'|'error'
+
+  // Update ref when cameraStatus changes
+  useEffect(() => {
+    cameraStatusRef.current = cameraStatus;
+  }, [cameraStatus]);
   const [permissionError, setPermissionError] = useState('');
   const [scanStatus, setScanStatus] = useState('Idle');
   const [scanColor, setScanColor] = useState('#17a2b8');
@@ -81,7 +87,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
   const captureAndRecognize = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || cameraStatus !== 'active') return;
+    if (!video || cameraStatusRef.current !== 'active') return;
     if (video.paused || video.ended) return;
 
     const w = video.videoWidth;
