@@ -8,6 +8,7 @@ Flask-CORS==4.0.0
 # Computer Vision & Face Recognition - Simplified
 # Full face recognition (requires dlib build in Docker image)
 face-recognition==1.3.0
+face-recognition-models
 opencv-python==4.8.1.78
 Pillow==10.0.1
 numpy==1.24.3
