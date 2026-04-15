@@ -81,7 +81,7 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
   const captureAndRecognize = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || cameraStatus !== 'active' || !isScanning) return;
+    if (!video || cameraStatus !== 'active') return;
     if (video.paused || video.ended) return;
 
     const w = video.videoWidth;
