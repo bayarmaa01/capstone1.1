@@ -154,9 +154,25 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
       console.debug('Face service response:', resp?.data);
 
-      const matches = Array.isArray(resp.data) ? resp.data : [];
-      if (!matches.length) {
+      // Handle different response scenarios
+      if (!resp.data || resp.data.error) {
+        setBanner('❌ Request failed', '#dc3545');
+        return;
+      }
+
+      const matches = Array.isArray(resp.data.matches) ? resp.data.matches : [];
+      if (!resp.data.success) {
+        setBanner('❌ Request failed', '#dc3545');
+        return;
+      }
+
+      if (resp.data.faces_detected === 0) {
         setBanner('❌ No face detected', '#dc3545');
+        return;
+      }
+
+      if (matches.length === 0) {
+        setBanner('❌ Face detected but not recognized', '#dc3545');
         return;
       }
 
