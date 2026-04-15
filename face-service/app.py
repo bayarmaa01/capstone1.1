@@ -241,8 +241,11 @@ def recognize_and_mark():
         # Load image
         image = face_recognition.load_image_file(file)
         
-        # Find all faces in image
-        face_locations = face_recognition.face_locations(image)
+        # Convert BGR to RGB for CNN model
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Find all faces in image using CNN model
+        face_locations = face_recognition.face_locations(image, model="cnn")
         face_encodings = face_recognition.face_encodings(image, face_locations)
         
         logger.info(f"🔍 Recognition request - Faces detected: {len(face_encodings)}")
@@ -396,9 +399,12 @@ def recognize():
             logger.error(f"❌ Failed to load image: {e}")
             return jsonify({"error": f"failed to load image: {str(e)}"}), 400
         
-        # Find all faces in image
+        # Convert BGR to RGB for CNN model
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Find all faces in image using CNN model
         try:
-            face_locations = face_recognition.face_locations(image)
+            face_locations = face_recognition.face_locations(image, model="cnn")
             face_encodings = face_recognition.face_encodings(image, face_locations)
             logger.info(f"🔍 Faces detected: {len(face_encodings)}")
         except Exception as e:
