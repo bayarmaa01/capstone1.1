@@ -47,7 +47,7 @@ api.interceptors.response.use(
 
 // Face service client
 export const faceApi = axios.create({
-  baseURL: process.env.REACT_APP_FACE_API_URL || '/face',
+  baseURL: process.env.REACT_APP_FACE_API_URL || '/api/face',
   headers: {
     'Content-Type': 'application/json',
   },
