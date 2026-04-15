@@ -20,7 +20,7 @@ router.post('/recognize', upload.single('image'), async (req, res) => {
       contentType: req.file.mimetype || 'image/jpeg'
     });
 
-    const response = await axios.post(`${FACE_SERVICE_URL}/recognize`, form, {
+    const response = await axios.post(`${FACE_SERVICE_URL}/recognize-and-mark`, form, {
       headers: form.getHeaders(),
       timeout: 20000
     });
