@@ -23,7 +23,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code with correct permissions
-COPY --chown=appuser:appuser app_simple.py app.py
+# IMPORTANT: run the full implementation in app.py (not the simplified stub).
+COPY --chown=appuser:appuser app.py .
 
 # Create necessary directories
 RUN mkdir -p encodings logs && \
