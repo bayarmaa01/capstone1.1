@@ -49,7 +49,8 @@ export default function AttendancePage() {
   };
 
   const handleAttendanceRecorded = (attendanceData) => {
-    // Refresh attendance stats after recording
+    // Show success message and refresh stats immediately
+    console.log('✅ Attendance recorded:', attendanceData);
     fetchAttendanceStatus();
   };
 
