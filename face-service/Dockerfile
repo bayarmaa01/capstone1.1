@@ -29,8 +29,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code with correct permissions
-# IMPORTANT: run the full implementation in app.py (not the simplified stub).
-COPY --chown=appuser:appuser app.py .
+# IMPORTANT: run the OpenCV-based implementation to avoid dlib issues.
+COPY --chown=appuser:appuser app_opencv.py app.py
 
 # Create necessary directories
 RUN mkdir -p encodings logs && \
