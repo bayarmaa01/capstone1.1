@@ -5,6 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { v4: uuidv4 } = require('uuid');
 
 // =======================================
 // 1️⃣ Record Attendance
@@ -56,10 +57,13 @@ router.post('/record', async (req, res) => {
       return res.status(400).json({ error: 'Student not enrolled in this class' });
     }
 
+    // Generate unique session_id if not provided to prevent cross-week duplication
+    const uniqueSessionId = session_id || uuidv4();
+    
     // Mark attendance (session-scoped when session_id is provided).
     // This fixes cross-session bleed on the same calendar date.
     let result;
-    if (session_id) {
+    if (uniqueSessionId) {
       // Requires a unique constraint/index for (class_id, student_id, session_id) when session_id is not null.
       result = await db.query(`
         INSERT INTO attendance (class_id, student_id, session_id, session_date, present, method, confidence)
@@ -72,7 +76,7 @@ router.post('/record', async (req, res) => {
       `, [
         class_id,
         numericStudentId,
-        parseInt(session_id, 10),
+        uniqueSessionId,
         session_date || new Date().toISOString().slice(0, 10),
         method || 'face_recognition',
         confidence || 1.0

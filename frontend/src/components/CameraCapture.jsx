@@ -163,8 +163,8 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
       console.debug('Best match:', { student_id: best.student_id, rawConfidence, confidencePercent });
 
-      // THRESHOLD: strictly greater than 40% (lowered for testing)
-      if (!(confidencePercent > 40)) {
+      // THRESHOLD: strictly greater than 50% (demo safety)
+      if (!(confidencePercent > 50)) {
         setBanner(`Low confidence (${roundedPct}%)`, '#dc3545');
         return;
       }

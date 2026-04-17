@@ -30,7 +30,7 @@ const combineDateAndTime = (dateObj, timeStr) => {
 const classifyStatus = (startAt, endAt, now = new Date()) => {
   const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
   if (utcNow < startAt) return 'upcoming';
-  if (utcNow >= startAt && utcNow <= endAt) return 'ongoing';
+  if (utcNow >= startAt && utcNow <= endAt) return 'ongoing'; // Inclusive boundaries
   return 'completed';
 };
 
