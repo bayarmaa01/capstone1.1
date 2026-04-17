@@ -16,7 +16,7 @@ function base64ToBlob(base64) {
   return new Blob([ab], { type: mimeString });
 }
 
-export default function CameraCapture({ classId, sessionDate, onRecognized, onError }) {
+export default function CameraCapture({ classId, sessionId, sessionDate, onRecognized, onError }) {
   const videoRef = useRef(null);
   const debugCanvasRef = useRef(null);
 
@@ -107,6 +107,8 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
       const fd = new FormData();
       fd.append('image', blob, 'frame.jpg');
+      fd.append('class_id', classId);
+      fd.append('session_id', sessionId);
 
       // Face recognition request with retries - this is where you saw timeouts
       const callFaceService = async () => {
