@@ -112,7 +112,6 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
       const callFaceService = async () => {
         // 15s per attempt
         return faceApi.post('/recognize', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
           timeout: 15000
         });
       };
@@ -164,9 +163,9 @@ export default function CameraCapture({ classId, sessionDate, onRecognized, onEr
 
       console.debug('Best match:', { student_id: best.student_id, rawConfidence, confidencePercent });
 
-      // THRESHOLD: strictly greater than 60%
-      if (!(confidencePercent > 60)) {
-        setBanner(`❌ Low confidence (${roundedPct}%)`, '#dc3545');
+      // THRESHOLD: strictly greater than 40% (lowered for testing)
+      if (!(confidencePercent > 40)) {
+        setBanner(`Low confidence (${roundedPct}%)`, '#dc3545');
         return;
       }
 

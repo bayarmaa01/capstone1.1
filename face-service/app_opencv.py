@@ -135,25 +135,56 @@ def recognize():
         if attendance_log is None:
             load_attendance_log()
         
+        # DEBUG: Log request details
+        logger.info(f"Request files: {list(request.files.keys())}")
+        logger.info(f"Request form: {list(request.form.keys())}")
+        
         # Get image from request
         if 'image' not in request.files:
+            logger.error("No image field in request.files")
             return jsonify({"error": "No image provided"}), 400
         
         file = request.files['image']
+        logger.info(f"Image filename: {file.filename}, content type: {file.content_type}")
+        
         if file.filename == '':
+            logger.error("Empty filename")
             return jsonify({"error": "No image selected"}), 400
         
-        # Read and process image
+        # Read and process image with robust error handling
         image_bytes = file.read()
-        image = Image.open(io.BytesIO(image_bytes))
-        image_array = np.array(image)
+        logger.info(f"Image bytes length: {len(image_bytes)}")
         
-        # Convert RGB to BGR for OpenCV
-        if len(image_array.shape) == 3 and image_array.shape[2] == 3:
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_RGB2BGR)
+        if len(image_bytes) == 0:
+            logger.error("Empty image file")
+            return jsonify({"error": "Empty image file"}), 400
+        
+        # Use OpenCV for more reliable image decoding
+        img_array = np.frombuffer(image_bytes, np.uint8)
+        image_array = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        
+        if image_array is None:
+            logger.error("Failed to decode image - invalid format")
+            return jsonify({"error": "Invalid image format"}), 400
+        
+        logger.info(f"Successfully decoded image shape: {image_array.shape}")
+        
+        # Ensure image is in BGR format (OpenCV default)
+        if len(image_array.shape) == 3 and image_array.shape[2] == 4:
+            # Convert RGBA to BGR
+            image_array = cv2.cvtColor(image_array, cv2.COLOR_RGBA2BGR)
+        elif len(image_array.shape) == 2:
+            # Convert grayscale to BGR
+            image_array = cv2.cvtColor(image_array, cv2.COLOR_GRAY2BGR)
+        
+        # Resize image for better face detection
+        if image_array.shape[0] > 800 or image_array.shape[1] > 800:
+            image_array = cv2.resize(image_array, (640, 480))
+            logger.info(f"Resized image to: {image_array.shape}")
         
         # Detect faces
         faces_detected, num_faces = detect_faces(image_array)
+        logger.info(f"Face detection result: faces_detected={faces_detected}, num_faces={num_faces}")
         
         if not faces_detected:
             return jsonify({
@@ -164,6 +195,7 @@ def recognize():
         
         # Simple recognition (placeholder)
         matched, confidence = recognize_face(image_array, encodings)
+        logger.info(f"Recognition result: matched={matched}, confidence={confidence}")
         
         if matched and encodings:
             # Get first student encoding as match (simplified)
@@ -179,18 +211,21 @@ def recognize():
                         "confidence_percent": round(confidence * 100, 2)
                     }]
                 }
+                logger.info(f"SUCCESS: Matched student {match_data.get('student_id')} with {round(confidence * 100, 2)}% confidence")
             else:
                 result = {
                     "success": False,
-                    "error": "Face detected but not recognized",
+                    "error": "Face detected but no encodings available",
                     "faces_detected": num_faces
                 }
+                logger.warning("Face detected but no encodings available")
         else:
             result = {
                 "success": False,
                 "error": "Face detected but not recognized",
                 "faces_detected": num_faces
             }
+            logger.info(f"Face detected but recognition failed: confidence={confidence}")
         
         return jsonify(result)
         

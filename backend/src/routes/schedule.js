@@ -12,7 +12,8 @@ const toDateOnly = (date) => {
 
 const getThisWeekDateForDay = (dayOfWeek) => {
   const now = new Date();
-  const today = toDateOnly(now);
+  const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+  const today = toDateOnly(utcNow);
   const diff = dayOfWeek - today.getDay();
   const target = new Date(today);
   target.setDate(today.getDate() + diff);
@@ -27,8 +28,9 @@ const combineDateAndTime = (dateObj, timeStr) => {
 };
 
 const classifyStatus = (startAt, endAt, now = new Date()) => {
-  if (now < startAt) return 'upcoming';
-  if (now >= startAt && now <= endAt) return 'ongoing';
+  const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+  if (utcNow < startAt) return 'upcoming';
+  if (utcNow >= startAt && utcNow <= endAt) return 'ongoing';
   return 'completed';
 };
 
@@ -52,6 +54,7 @@ router.get('/', async (req, res) => {
     `);
 
     const now = new Date();
+    const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
     const sessions = rows.rows.map((row) => {
       const sessionDate = row.scheduled_date
         ? toDateOnly(row.scheduled_date)
@@ -76,7 +79,7 @@ router.get('/', async (req, res) => {
       };
     }).sort((a, b) => new Date(a.start_at) - new Date(b.start_at));
 
-    const todayKey = now.toISOString().slice(0, 10);
+    const todayKey = utcNow.toISOString().slice(0, 10);
     const today = sessions.filter((s) => s.session_date === todayKey);
     const ongoing = sessions.filter((s) => s.status === 'ongoing');
     const upcoming = sessions
