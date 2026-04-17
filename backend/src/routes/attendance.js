@@ -162,9 +162,26 @@ router.post('/mark', async (req, res) => {
 
 router.get('/student/:id', async (req, res) => {
   try {
-    const studentId = parseInt(req.params.id, 10);
-    if (Number.isNaN(studentId)) {
-      return res.status(400).json({ error: 'Invalid student id' });
+    const { id } = req.params;
+    
+    // Support both STU001 format and numeric registration numbers
+    let numericStudentId;
+    if (typeof id === 'string' && isNaN(id)) {
+      // Handle STU001 format - look up by student_id field
+      const lookup = await db.query('SELECT id FROM students WHERE student_id = $1', [id]);
+      if (lookup.rows.length === 0) {
+        return res.status(404).json({ error: `Student ${id} not found` });
+      }
+      numericStudentId = lookup.rows[0].id;
+    } else {
+      // Handle numeric registration numbers
+      numericStudentId = parseInt(id, 10);
+      if (Number.isNaN(numericStudentId)) {
+        return res.status(400).json({ 
+          error: `Invalid student ID format: ${id}`,
+          expected: "STU001 or numeric registration number"
+        });
+      }
     }
 
     const totalClassesResult = await db.query(
