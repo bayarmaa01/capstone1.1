@@ -28,7 +28,8 @@ const combineDateAndTime = (dateObj, timeStr) => {
 };
 
 const classifyStatus = (startAt, endAt, now = new Date()) => {
-  const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+  // Convert local time to UTC properly
+  const utcNow = new Date(now.toISOString());
   if (utcNow < startAt) return 'upcoming';
   if (utcNow >= startAt && utcNow <= endAt) return 'ongoing'; // Inclusive boundaries
   return 'completed';
@@ -36,6 +37,7 @@ const classifyStatus = (startAt, endAt, now = new Date()) => {
 
 // University-style smart schedule view (all classes)
 router.get('/', async (req, res) => {
+  console.log("📅 Schedule route hit:", req.originalUrl);
   try {
     const rows = await db.query(`
       SELECT 
@@ -54,7 +56,7 @@ router.get('/', async (req, res) => {
     `);
 
     const now = new Date();
-    const utcNow = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+    const utcNow = new Date(now.toISOString());
     const sessions = rows.rows.map((row) => {
       const sessionDate = row.scheduled_date
         ? toDateOnly(row.scheduled_date)

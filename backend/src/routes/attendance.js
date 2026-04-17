@@ -11,6 +11,7 @@ const { v4: uuidv4 } = require('uuid');
 // 1️⃣ Record Attendance
 // =======================================
 router.post('/record', async (req, res) => {
+  console.log("📝 Attendance record route hit:", req.originalUrl);
   try {
     const { class_id, student_id, session_date, session_id, method, confidence } = req.body;
 
@@ -204,6 +205,7 @@ router.get('/student/:id', async (req, res) => {
 // 2️⃣ Get Attendance for a Class on a Specific Date
 // =======================================
 router.get('/class/:classId/date/:date', async (req, res) => {
+  console.log("📊 Attendance class/date route hit:", req.originalUrl);
   try {
     const { classId, date } = req.params;
     const sessionId = req.query.sessionId ? parseInt(req.query.sessionId, 10) : null;
@@ -486,6 +488,65 @@ router.get('/session/:sessionId/records', async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching session records:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =======================================
+// 4️⃣ Get Attendance for a Specific Student
+// =======================================
+router.get('/student/:studentId', async (req, res) => {
+  console.log("👤 Student attendance route hit:", req.originalUrl);
+  try {
+    const { studentId } = req.params;
+    
+    // Convert string student_id to numeric database ID if needed
+    let numericStudentId;
+    if (typeof studentId === 'string' && isNaN(studentId)) {
+      const lookup = await db.query('SELECT id FROM students WHERE student_id = $1', [studentId]);
+      if (lookup.rows.length === 0) {
+        return res.status(404).json({ error: `Student ${studentId} not found` });
+      }
+      numericStudentId = lookup.rows[0].id;
+    } else {
+      numericStudentId = parseInt(studentId);
+    }
+    
+    const result = await db.query(`
+      SELECT 
+        a.id,
+        a.class_id,
+        a.session_date,
+        a.present,
+        a.method,
+        a.confidence,
+        a.recorded_at,
+        c.code as class_code,
+        c.name as class_name,
+        s.name as student_name
+      FROM attendance a
+      JOIN classes c ON c.id = a.class_id
+      JOIN students s ON s.id = a.student_id
+      WHERE a.student_id = $1
+      ORDER BY a.session_date DESC, a.recorded_at DESC
+    `, [numericStudentId]);
+    
+    // Calculate attendance statistics
+    const totalSessions = result.rows.length;
+    const presentSessions = result.rows.filter(r => r.present).length;
+    const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions * 100).toFixed(2) : 0;
+    
+    res.json({
+      attendance: result.rows,
+      stats: {
+        total_sessions: totalSessions,
+        present_sessions: presentSessions,
+        attendance_rate: parseFloat(attendanceRate)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching student attendance:', error);
     res.status(500).json({ error: error.message });
   }
 });
