@@ -243,7 +243,8 @@ router.get('/class/:classId/date/:date', async (req, res) => {
         ORDER BY s.name;
       `, [classId, date]);
 
-    res.json(result.rows);
+    // Always return array, never 404
+    res.json(result.rows || []);
 
   } catch (error) {
     console.error('❌ Error fetching attendance by date:', error);

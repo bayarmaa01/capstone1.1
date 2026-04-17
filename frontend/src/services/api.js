@@ -41,6 +41,12 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+    
+    // Handle 404 errors gracefully - return empty array for missing data
+    if (error.response?.status === 404) {
+      return Promise.resolve({ data: [] });
+    }
+    
     return Promise.reject(error);
   }
 );

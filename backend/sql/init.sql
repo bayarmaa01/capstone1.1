@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   class_id INT REFERENCES classes(id) ON DELETE CASCADE,
   student_id INT REFERENCES students(id) ON DELETE CASCADE,
   session_date DATE NOT NULL,
+  session_id INT REFERENCES class_schedules(id) ON DELETE SET NULL,
   present BOOLEAN DEFAULT true,
   method TEXT CHECK (method IN ('qr', 'face', 'manual')),
   confidence FLOAT DEFAULT 1.0,
@@ -103,6 +104,7 @@ CREATE TABLE IF NOT EXISTS class_schedules (
 CREATE INDEX IF NOT EXISTS idx_attendance_class ON attendance(class_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_student ON attendance(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance(session_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_session_id ON attendance(session_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_class ON enrollments(class_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
 CREATE INDEX IF NOT EXISTS idx_class_schedules_class ON class_schedules(class_id);
