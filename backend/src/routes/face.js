@@ -14,11 +14,28 @@ router.post('/recognize', upload.single('image'), async (req, res) => {
       return res.status(400).json({ error: 'image is required' });
     }
 
+    const { class_id, session_id } = req.body;
+    
+    // Validate required parameters
+    if (!class_id) {
+      return res.status(400).json({ error: 'class_id is required' });
+    }
+
     const startedAt = Date.now();
     const form = new FormData();
     form.append('image', req.file.buffer, {
       filename: req.file.originalname || 'frame.jpg',
       contentType: req.file.mimetype || 'image/jpeg'
+    });
+    form.append('class_id', class_id);
+    if (session_id) {
+      form.append('session_id', session_id);
+    }
+
+    console.log('🧠 Sending to face service:', {
+      hasImage: !!req.file,
+      class_id,
+      session_id
     });
 
     const response = await axios.post(`${FACE_SERVICE_URL}/recognize-and-mark`, form, {

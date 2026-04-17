@@ -75,21 +75,23 @@ def save_attendance_log():
     except Exception as e:
         logger.error(f"Error saving attendance log: {e}")
 
-def can_mark_attendance(student_id, class_id):
+def can_mark_attendance(student_id, class_id, session_id=None):
     """Check if student can mark attendance (prevent duplicates within timeout)"""
-    key = f"{student_id}_{class_id}"
+    key = f"{student_id}_{class_id}_{session_id or 'default'}"
     if key not in attendance_log:
         return True
     
+    # Check timeout
     last_marked = datetime.fromisoformat(attendance_log[key])
     if datetime.now() - last_marked > timedelta(seconds=SESSION_TIMEOUT):
+        del attendance_log[key]
         return True
     
     return False
 
-def mark_attendance(student_id, class_id):
+def mark_attendance(student_id, class_id, session_id=None):
     """Mark attendance for student"""
-    key = f"{student_id}_{class_id}"
+    key = f"{student_id}_{class_id}_{session_id or 'default'}"
     attendance_log[key] = datetime.now().isoformat()
     save_attendance_log()
 
@@ -257,6 +259,7 @@ def recognize_and_mark():
     try:
         # Get parameters
         class_id = request.form.get('class_id')
+        session_id = request.form.get('session_id')
         session_date = request.form.get('session_date', datetime.now().strftime('%Y-%m-%d'))
         
         if not class_id:
@@ -305,9 +308,9 @@ def recognize_and_mark():
                 student_id = match_data.get("student_id", "unknown")
                 
                 # Check if can mark attendance
-                if can_mark_attendance(student_id, class_id):
+                if can_mark_attendance(student_id, class_id, session_id):
                     # Mark attendance
-                    mark_attendance(student_id, class_id)
+                    mark_attendance(student_id, class_id, session_id)
                     
                     result = {
                         "success": True,
