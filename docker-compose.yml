@@ -204,6 +204,7 @@ services:
       - moodle_data:/var/www/moodledata
       - ./moodle-data/plugins/attendance:/var/www/html/mod/attendance:ro
     environment:
+      - TZ=Asia/Kolkata
       - MOODLE_DB_HOST=moodle-db
       - MOODLE_DB_USER=moodle
       - MOODLE_DB_PASSWORD=moodle_secret
