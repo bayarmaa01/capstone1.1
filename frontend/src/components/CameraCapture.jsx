@@ -131,19 +131,39 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
 
         console.log("Sending image length:", imageSrc.length);
 
-        await axios.post(
-          "/api/face/recognize",
-          {
-            image: imageSrc,   // MUST be string
-            class_id: String(classId),
-            session_id: String(sessionId)
-          },
-          {
-            headers: {
-              "Content-Type": "application/json"
+        try {
+          const response = await axios.post(
+            "/api/face/recognize",
+            {
+              image: imageSrc,   // MUST be string
+              class_id: String(classId),
+              session_id: String(sessionId)
+            },
+            {
+              headers: {
+                "Content-Type": "application/json"
+              }
             }
+          );
+
+          if (!response || !response.data) {
+            console.error("Empty response from backend");
+            return;
           }
-        );
+
+          console.log("SUCCESS:", response.data);
+          return response;
+
+        } catch (error) {
+          if (error.response) {
+            console.error("API ERROR:", error.response.data);
+          } else if (error.request) {
+            console.error("NO RESPONSE FROM SERVER");
+          } else {
+            console.error("REQUEST ERROR:", error.message);
+          }
+          throw error;
+        }
       };
 
       // Try up to 3 attempts with exponential-ish backoff
@@ -160,7 +180,7 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       console.debug('Face service response:', resp?.data);
 
       // Handle different response scenarios
-      if (!resp.data || resp.data.error) {
+      if (!resp || !resp.data || resp.data.error) {
         setBanner('❌ Request failed', '#dc3545');
         return;
       }
