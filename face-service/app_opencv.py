@@ -200,7 +200,7 @@ def recognize():
                     "success": True,
                     "faces_detected": num_faces,
                     "matches": [{
-                        "student_id": match_data.get("student_id", "unknown"),
+                        "student_id": match_data.get("student_id_text", "unknown"),
                         "name": match_data.get("name", "Unknown Student"),
                         "confidence": confidence,
                         "confidence_percent": round(confidence * 100, 2)
