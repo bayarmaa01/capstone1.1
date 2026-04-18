@@ -85,7 +85,7 @@ async function setupSampleData() {
       await db.query(`
         INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence, recorded_at)
         VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (class_id, student_id, session_date) DO UPDATE
+        ON CONFLICT (class_id, student_id, session_date) WHERE session_id IS NULL DO UPDATE
         SET present = EXCLUDED.present, method = EXCLUDED.method, confidence = EXCLUDED.confidence
       `, [record.class_id, record.student_id, record.session_date, record.present, record.method, record.confidence]);
     }

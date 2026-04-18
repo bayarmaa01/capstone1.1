@@ -7,6 +7,43 @@ const router = express.Router();
 const db = require('../db');
 const { v4: uuidv4 } = require('uuid');
 
+// Safe UPSERT helper function with fallback
+async function safeUpsertAttendance(query, params, conflictColumns) {
+  try {
+    // Try INSERT with ON CONFLICT first
+    const result = await db.query(query, params);
+    return result;
+  } catch (error) {
+    if (error.message.includes('there is no unique or exclusion constraint matching the ON CONFLICT specification')) {
+      console.log('ON CONFLICT failed, using fallback UPDATE then INSERT logic');
+      
+      // Extract values from params
+      const [class_id, student_id, session_date, session_id, present, method, confidence] = params;
+      
+      // Try UPDATE first
+      const updateResult = await db.query(`
+        UPDATE attendance 
+        SET present = $1, method = $2, confidence = $3, recorded_at = NOW()
+        WHERE class_id = $4 AND student_id = $5 AND session_date = $6 AND session_id IS ${session_id ? 'NOT NULL' : 'NULL'} ${session_id ? 'AND session_id = $7' : ''}
+        RETURNING *
+      `, [present, method, confidence, class_id, student_id, session_date, ...(session_id ? [session_id] : [])]);
+      
+      // If no rows were updated, try INSERT
+      if (updateResult.rows.length === 0) {
+        const insertResult = await db.query(`
+          INSERT INTO attendance (class_id, student_id, session_date, session_id, present, method, confidence, recorded_at)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          RETURNING *
+        `, [class_id, student_id, session_date, session_id, present, method, confidence]);
+        return insertResult;
+      }
+      
+      return updateResult;
+    }
+    throw error;
+  }
+}
+
 // =======================================
 // 1️⃣ Record Attendance
 // =======================================
@@ -32,20 +69,34 @@ router.post('/record', async (req, res) => {
 
     console.log('📥 Received:', { class_id, student_id, session_date, session_id });
 
-    // Convert string student_id (like "STU001") to numeric database ID
+    // Normalize and validate student_id (support both STU001 and numeric formats)
+    let normalizedStudentId = student_id;
+    
+    // Normalize numeric-only IDs to STU format if needed
+    if (typeof student_id === 'string' && !student_id.startsWith("STU") && /^\d+$/.test(student_id)) {
+      normalizedStudentId = "STU" + student_id;
+    }
+    
+    // Convert string student_id to numeric database ID
     let numericStudentId;
     
-    if (typeof student_id === 'string' && isNaN(student_id)) {
-      const lookup = await db.query('SELECT id FROM students WHERE student_id = $1', [student_id]);
+    if (typeof normalizedStudentId === 'string' && isNaN(normalizedStudentId)) {
+      const lookup = await db.query('SELECT id FROM students WHERE student_id = $1', [normalizedStudentId]);
       
       if (lookup.rows.length === 0) {
-        return res.status(404).json({ error: `Student ${student_id} not found` });
+        return res.status(404).json({ error: `Student ${normalizedStudentId} not found` });
       }
       
       numericStudentId = lookup.rows[0].id;
-      console.log(`🔍 ${student_id} → ID: ${numericStudentId}`);
+      console.log(`? ${normalizedStudentId} ? ID: ${numericStudentId}`);
     } else {
-      numericStudentId = parseInt(student_id);
+      numericStudentId = parseInt(normalizedStudentId);
+      if (Number.isNaN(numericStudentId)) {
+        return res.status(400).json({ 
+          error: `Invalid student ID format: ${student_id}`,
+          expected: "STU001 or numeric registration number"
+        });
+      }
     }
 
     // Check enrollment
@@ -64,12 +115,17 @@ router.post('/record', async (req, res) => {
     // Mark attendance (session-scoped when session_id is provided).
     // This fixes cross-session bleed on the same calendar date.
     let result;
+    const targetDate = session_date || new Date().toISOString().slice(0, 10);
+    const attendanceMethod = method || 'face_recognition';
+    const attendanceConfidence = confidence || 1.0;
+    
     if (uniqueSessionId) {
-      // Requires a unique constraint/index for (class_id, student_id, session_id) when session_id is not null.
-      result = await db.query(`
+      // Use safe UPSERT for session-based attendance
+      result = await safeUpsertAttendance(`
         INSERT INTO attendance (class_id, student_id, session_id, session_date, present, method, confidence)
         VALUES ($1, $2, $3, $4, true, $5, $6)
         ON CONFLICT (class_id, student_id, session_id)
+        WHERE session_id IS NOT NULL
         DO UPDATE SET present = true, method = EXCLUDED.method,
                       confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
                       recorded_at = now()
@@ -78,20 +134,22 @@ router.post('/record', async (req, res) => {
         class_id,
         numericStudentId,
         uniqueSessionId,
-        session_date || new Date().toISOString().slice(0, 10),
-        method || 'face_recognition',
-        confidence || 1.0
+        targetDate,
+        attendanceMethod,
+        attendanceConfidence
       ]);
     } else {
-      result = await db.query(`
+      // Use safe UPSERT for date-based attendance
+      result = await safeUpsertAttendance(`
         INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
         VALUES ($1, $2, $3, true, $4, $5)
         ON CONFLICT (class_id, student_id, session_date)
+        WHERE session_id IS NULL
         DO UPDATE SET present = true, method = EXCLUDED.method, 
                       confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
                       recorded_at = now()
         RETURNING *;
-      `, [class_id, numericStudentId, session_date, method || 'face_recognition', confidence || 1.0]);
+      `, [class_id, numericStudentId, targetDate, attendanceMethod, attendanceConfidence, null]);
     }
 
     console.log(`✅ Marked: ${student_id} (ID: ${numericStudentId})`);
@@ -136,6 +194,7 @@ router.post('/mark', async (req, res) => {
       INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
       VALUES ($1, $2, $3, true, $4, $5)
       ON CONFLICT (class_id, student_id, session_date)
+      WHERE session_id IS NULL
       DO UPDATE SET
         present = true,
         method = EXCLUDED.method,
@@ -186,11 +245,11 @@ router.get('/student/:id', async (req, res) => {
 
     const totalClassesResult = await db.query(
       'SELECT COUNT(DISTINCT session_date) AS total_classes FROM attendance WHERE student_id = $1',
-      [studentId]
+      [numericStudentId]
     );
     const attendedResult = await db.query(
       'SELECT COUNT(*) AS attended_classes FROM attendance WHERE student_id = $1 AND present = true',
-      [studentId]
+      [numericStudentId]
     );
     const recentResult = await db.query(`
       SELECT a.session_date, a.present, a.method, a.recorded_at, c.code as class_code, c.name as class_name
@@ -199,13 +258,13 @@ router.get('/student/:id', async (req, res) => {
       WHERE a.student_id = $1
       ORDER BY a.session_date DESC, a.recorded_at DESC
       LIMIT 20
-    `, [studentId]);
+    `, [numericStudentId]);
 
     const totalClasses = parseInt(totalClassesResult.rows[0].total_classes || 0, 10);
     const attendedClasses = parseInt(attendedResult.rows[0].attended_classes || 0, 10);
 
     res.json({
-      student_id: studentId,
+      student_id: numericStudentId,
       total_classes: totalClasses,
       attended_classes: attendedClasses,
       attendance_rate: totalClasses > 0 ? Math.round((attendedClasses / totalClasses) * 100) : 0,

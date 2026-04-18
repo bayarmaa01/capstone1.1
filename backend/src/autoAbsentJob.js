@@ -64,7 +64,7 @@ function startAutoAbsentJob() {
           await db.query(`
             INSERT INTO attendance (class_id, student_id, session_date, present, status, method, marked_at)
             VALUES ($1, $2, $3, false, 'absent', 'auto', NOW())
-            ON CONFLICT (class_id, student_id, session_date) DO UPDATE
+            ON CONFLICT (class_id, student_id, session_date) WHERE session_id IS NULL DO UPDATE
             SET present = false, status = 'absent', method = 'auto', marked_at = NOW();
           `, [sched.class_id, sid, sched.scheduled_date || new Date().toISOString().slice(0,10)]);
         }
