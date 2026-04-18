@@ -127,18 +127,22 @@ def recognize_face(image_array, student_encodings):
     
     # Compare the detected face with known faces
     try:
-        matches = face_recognition.compare_faces(face_encodings, student_encodings, tolerance=0.6)
+        # Use more lenient tolerance for better matching
+        matches = face_recognition.compare_faces(face_encodings, student_encodings, tolerance=0.8)
+        logger.info(f"Face comparison found {len(matches)} matches")
     except Exception as e:
         logger.error(f"Error in face_recognition.compare_faces: {e}")
         return False, 0.0
     
     if len(matches) == 0:
+        logger.warning("No matches found in face comparison")
         return False, 0.0
     
-    # Get the best match
+    # Get the best match (lowest distance = highest confidence)
     try:
-        best_match = matches[0]
-        confidence = 1 - best_match.distance
+        best_match = min(matches, key=lambda m: m['distance'])
+        confidence = 1 - best_match['distance']
+        logger.info(f"Best match: {best_match.get('student_id_text', 'unknown')} with confidence {confidence}")
     except Exception as e:
         logger.error(f"Error getting best match: {e}")
         return False, 0.0
