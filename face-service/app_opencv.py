@@ -116,20 +116,32 @@ def recognize_face(image_array, student_encodings):
         return False, 0.0
     
     # Extract face encodings from the image
-    face_encodings = face_recognition.face_encodings(image_array, known_face_locations=[])
+    try:
+        face_encodings = face_recognition.face_encodings(image_array, known_face_locations=[])
+    except Exception as e:
+        logger.error(f"Error in face_recognition.face_encodings: {e}")
+        return False, 0.0
     
     if len(face_encodings) == 0:
         return False, 0.0
     
     # Compare the detected face with known faces
-    matches = face_recognition.compare_faces(face_encodings, student_encodings, tolerance=0.6)
+    try:
+        matches = face_recognition.compare_faces(face_encodings, student_encodings, tolerance=0.6)
+    except Exception as e:
+        logger.error(f"Error in face_recognition.compare_faces: {e}")
+        return False, 0.0
     
     if len(matches) == 0:
         return False, 0.0
     
     # Get the best match
-    best_match = matches[0]
-    confidence = 1 - best_match.distance
+    try:
+        best_match = matches[0]
+        confidence = 1 - best_match.distance
+    except Exception as e:
+        logger.error(f"Error getting best match: {e}")
+        return False, 0.0
     
     return True, confidence
 
