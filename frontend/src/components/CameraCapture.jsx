@@ -123,18 +123,17 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
 
       // Face recognition request with retries - this is where you saw timeouts
       const callFaceService = async () => {
-        // 15s per attempt
-        const blob = base64ToBlob(imageSrc);
+        if (!imageSrc || typeof imageSrc !== "string" || imageSrc.length < 1000) {
+          throw new Error("Invalid image capture");
+        }
 
-        const formData = new FormData();
-        formData.append("image", blob, "capture.jpg");
-        formData.append("class_id", Number(classId));
-        formData.append("session_id", Number(sessionId));
+        console.log("Sending image length:", imageSrc.length);
 
-        return faceApi.post('/recognize', formData, {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          },
+        return faceApi.post('/recognize', {
+          image: imageSrc,
+          class_id: Number(classId),
+          session_id: Number(sessionId)
+        }, {
           timeout: 15000
         });
       };

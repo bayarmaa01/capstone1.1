@@ -53,10 +53,8 @@ api.interceptors.response.use(
 
 // Face service client
 export const faceApi = axios.create({
-  baseURL: process.env.REACT_APP_FACE_API_URL || '/face',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: process.env.REACT_APP_FACE_SERVICE_URL || "/face",
+  timeout: 15000,
 });
 
 export { api };

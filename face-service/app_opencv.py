@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import logging
+import base64
 from datetime import datetime
 from datetime import timedelta
 from flask import Flask, request, jsonify
@@ -140,22 +141,36 @@ def recognize():
         # DEBUG: Log request details
         logger.info(f"Request files: {list(request.files.keys())}")
         logger.info(f"Request form: {list(request.form.keys())}")
+        logger.info(f"Request JSON: {request.get_json()}")
         
-        # Get image from request
-        if 'image' not in request.files:
-            logger.error("No image field in request.files")
+        # Get image from JSON request
+        if not request.is_json:
+            logger.error("Request is not JSON")
+            return jsonify({"error": "Request must be JSON"}), 400
+        
+        data = request.get_json()
+        if not data or 'image' not in data:
+            logger.error("No image field in JSON request")
             return jsonify({"error": "No image provided"}), 400
         
-        file = request.files['image']
-        logger.info(f"Image filename: {file.filename}, content type: {file.content_type}")
+        image_data = data['image']
+        if not image_data or not isinstance(image_data, str):
+            logger.error("Invalid image data")
+            return jsonify({"error": "Invalid image data"}), 400
         
-        if file.filename == '':
-            logger.error("Empty filename")
-            return jsonify({"error": "No image selected"}), 400
-        
-        # Read and process image with robust error handling
-        image_bytes = file.read()
-        logger.info(f"Image bytes length: {len(image_bytes)}")
+        # Decode base64 image
+        try:
+            # Remove data URL prefix if present
+            if image_data.startswith('data:image/'):
+                base64_data = image_data.split(',')[1]
+            else:
+                base64_data = image_data
+            
+            image_bytes = base64.b64decode(base64_data)
+            logger.info(f"Image bytes length: {len(image_bytes)}")
+        except Exception as e:
+            logger.error(f"Error decoding base64: {e}")
+            return jsonify({"error": "Invalid base64 image data"}), 400
         
         if len(image_bytes) == 0:
             logger.error("Empty image file")
