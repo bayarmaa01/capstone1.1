@@ -139,33 +139,38 @@ def recognize():
         if attendance_log is None:
             load_attendance_log()
         
-        # Get image from JSON request
-        image_data = request.get_json().get("image")
+        image_json = request.get_json(silent=True)
 
-        if not image_data or not isinstance(image_data, str):
-            return jsonify({"error": "Invalid image"}), 400
+        if not image_json or "image" not in image_json:
+            return jsonify({"error": "No image provided"}), 400
 
-        # REMOVE prefix (supports jpeg/png/jpg)
-        match = re.match(r"data:image/\w+;base64,(.+)", image_data)
+        image_data = image_json.get("image")
 
-        if not match:
-            return jsonify({"error": "Invalid base64 format"}), 400
-
-        base64_str = match.group(1)
+        if not isinstance(image_data, str) or len(image_data) < 100:
+            return jsonify({"error": "Invalid image data"}), 400
 
         try:
+            # Remove base64 prefix safely
+            if "," in image_data:
+                base64_str = image_data.split(",", 1)[1]
+            else:
+                base64_str = image_data
+
+            base64_str = base64_str.strip()
+
             image_bytes = base64.b64decode(base64_str)
             np_arr = np.frombuffer(image_bytes, np.uint8)
             img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
         except Exception as e:
-            print("Decode error:", str(e))
+            print("DECODE ERROR:", str(e))
             return jsonify({"error": "Image decode failed"}), 400
 
         if img is None:
+            print("IMG NONE ERROR")
             return jsonify({"error": "Invalid image decode"}), 400
 
-        # Add debug log
-        print("Image shape:", img.shape)
+        print("SUCCESS IMAGE SHAPE:", img.shape)
         
         # Resize image for better face detection
         if img.shape[0] > 800 or img.shape[1] > 800:
