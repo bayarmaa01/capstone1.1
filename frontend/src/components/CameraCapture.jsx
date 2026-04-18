@@ -64,6 +64,13 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
         return await fn();
       } catch (err) {
         lastErr = err;
+        
+        // DO NOT retry on 400 errors (bad request - validation failure)
+        if (err.response?.status === 400) {
+          console.error('Bad request - invalid image payload, not retrying');
+          throw err;
+        }
+        
         const delay = baseDelay * Math.pow(2, i); // exponential-ish backoff
         console.warn(`Attempt ${i + 1} failed. Retrying in ${delay}ms...`, err?.message || err);
         await sleep(delay);
@@ -102,18 +109,26 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
         dbg.drawImage(canvas, 0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
       }
 
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-      if (!blob) return;
-
-      const fd = new FormData();
-      fd.append('image', blob, 'frame.jpg');
-      fd.append('class_id', classId);
-      fd.append('session_id', sessionId);
+      // Capture image as base64 string
+      const imageSrc = canvas.toDataURL("image/jpeg");
+      
+      // Add debug logs
+      console.log("Captured image:", imageSrc?.slice(0, 50));
+      console.log("Type:", typeof imageSrc);
+      
+      // Validate image capture
+      if (!imageSrc || typeof imageSrc !== "string") {
+        throw new Error("Invalid image capture");
+      }
 
       // Face recognition request with retries - this is where you saw timeouts
       const callFaceService = async () => {
         // 15s per attempt
-        return faceApi.post('/recognize', fd, {
+        return faceApi.post('/recognize', {
+          image: imageSrc,
+          class_id: Number(classId),
+          session_id: Number(sessionId)
+        }, {
           timeout: 15000
         });
       };
