@@ -225,7 +225,7 @@ def recognize():
         # Add fallback debug response for demo safety
         if not result.get("success") and faces_detected > 0:
             result["debug"] = {
-                "image_shape": str(image_array.shape),
+                "image_shape": str(img.shape),
                 "faces_detected": faces_detected,
                 "num_faces": num_faces,
                 "encodings_available": len(encodings) if encodings else 0,
