@@ -48,6 +48,7 @@ services:
       - blue_backend
 
   blue_face:
+    container_name: blue_face
     build:
       context: ./face-service
       dockerfile: Dockerfile
