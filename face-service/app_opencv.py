@@ -3,6 +3,7 @@ import requests
 import json
 import logging
 import base64
+import re
 from datetime import datetime
 from datetime import timedelta
 from flask import Flask, request, jsonify
@@ -160,12 +161,13 @@ def recognize():
         
         # Decode base64 image
         try:
-            # Remove data URL prefix if present
-            if image_data.startswith('data:image/'):
-                base64_data = image_data.split(',')[1]
-            else:
-                base64_data = image_data
+            # Use universal regex to handle all image formats
+            matches = image_data.match(r'^data:(image\/\w+);base64,(.+)$')
             
+            if not matches:
+                return jsonify({"error": "Invalid base64 format"}), 400
+            
+            base64_data = matches[2]
             image_bytes = base64.b64decode(base64_data)
             logger.info(f"Image bytes length: {len(image_bytes)}")
         except Exception as e:
