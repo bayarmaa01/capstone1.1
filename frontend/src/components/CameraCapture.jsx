@@ -127,7 +127,7 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
         const blob = base64ToBlob(imageSrc);
 
         const formData = new FormData();
-        formData.append("file", blob, "capture.jpg");
+        formData.append("image", blob, "capture.jpg");
         formData.append("class_id", Number(classId));
         formData.append("session_id", Number(sessionId));
 
