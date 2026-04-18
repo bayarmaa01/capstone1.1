@@ -59,19 +59,13 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Authentication required' });
     }
     
-    // Query teacher's Moodle sessions with correct Moodle context and time conversion
+    // Query teacher's Moodle sessions with raw timestamps for proper timezone conversion
     const query = `
       SELECT 
         s.id AS sessionId,
         s.sessdate,
         s.duration,
-        c.fullname AS course,
-        FROM_UNIXTIME(s.sessdate) AS session_date,
-        FROM_UNIXTIME(s.sessdate) AS start_time,
-        FROM_UNIXTIME(s.sessdate + s.duration) AS end_time,
-        DAYOFWEEK(FROM_UNIXTIME(s.sessdate)) AS day_of_week,
-        DATE_FORMAT(FROM_UNIXTIME(s.sessdate), '%H:%i') AS start_time_formatted,
-        DATE_FORMAT(FROM_UNIXTIME(s.sessdate + s.duration), '%H:%i') AS end_time_formatted
+        c.fullname AS course
       FROM mdl_attendance_sessions s
       JOIN mdl_attendance a ON a.id = s.attendanceid
       JOIN mdl_course c ON c.id = a.course
@@ -92,15 +86,43 @@ router.get('/', async (req, res) => {
       connection = await moodlePool.getConnection();
       const [rows] = await connection.execute(query, [userId]);
       
-      if (!rows || !rows.length) {
+      if (!rows || rows.length === 0) {
         console.log('No Moodle sessions found for teacher:', userId);
         return res.json({ success: true, data: [] });
       }
       
-      console.log(`✓ Retrieved ${rows.length} Moodle sessions for teacher ${userId}`);
+      // Convert timestamps to Asia/Kolkata timezone
+      const processedRows = rows.map(row => {
+        const startUTC = new Date(row.sessdate * 1000);
+        const start = new Date(startUTC.toLocaleString("en-US", {
+          timeZone: "Asia/Kolkata"
+        }));
+        
+        const end = new Date(start.getTime() + row.duration * 1000);
+        
+        return {
+          ...row,
+          session_date: start.toISOString().split('T')[0],
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          day_of_week: start.getDay(),
+          start_time_formatted: start.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Kolkata'
+          }),
+          end_time_formatted: end.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: 'Asia/Kolkata'
+          })
+        };
+      });
+      
+      console.log(`? Retrieved ${rows.length} Moodle sessions for teacher ${userId}`);
       res.json({ 
         success: true, 
-        data: rows 
+        data: processedRows 
       });
     } catch (error) {
       console.error('Moodle schedule fetch error:', error);

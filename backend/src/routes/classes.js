@@ -310,20 +310,14 @@ router.get('/:classId/schedule', async (req, res) => {
       );
       const lmsCourseId = classMeta.rows[0]?.lms_course_id || null;
 
-      // Simplified query - get all Moodle sessions
+      // Simplified query - get all Moodle sessions with raw timestamps
       const [moodleRows] = await connection.execute(`
         SELECT 
           s.id AS sessionId,
           a.course AS course_id,
           s.sessdate,
           s.duration,
-          c.fullname AS course,
-          FROM_UNIXTIME(s.sessdate) AS session_date,
-          FROM_UNIXTIME(s.sessdate) AS start_time,
-          FROM_UNIXTIME(s.sessdate + s.duration) AS end_time,
-          DAYOFWEEK(FROM_UNIXTIME(s.sessdate)) AS day_of_week,
-          DATE_FORMAT(FROM_UNIXTIME(s.sessdate), '%H:%i') AS start_time_formatted,
-          DATE_FORMAT(FROM_UNIXTIME(s.sessdate + s.duration), '%H:%i') AS end_time_formatted
+          c.fullname AS course
         FROM mdl_attendance_sessions s
         JOIN mdl_attendance a ON a.id = s.attendanceid
         JOIN mdl_course c ON c.id = a.course
@@ -335,18 +329,36 @@ router.get('/:classId/schedule', async (req, res) => {
       console.log("Sample Moodle session:", moodleRows[0]);
       
       if (moodleRows.length > 0) {
-        const moodleSchedule = moodleRows.map(session => ({
-          id: session.sessionId,
-          class_id: parseInt(classId, 10),
-          day_of_week: session.day_of_week,
-          start_time: session.start_time_formatted,
-          end_time: session.end_time_formatted,
-          scheduled_date: session.session_date,
-          room_number: 'TBD',
-          is_active: true,
-          source: 'moodle',
-          readonly: true
-        }));
+        // Convert timestamps to Asia/Kolkata timezone
+        const moodleSchedule = moodleRows.map(session => {
+          const startUTC = new Date(session.sessdate * 1000);
+          const start = new Date(startUTC.toLocaleString("en-US", {
+            timeZone: "Asia/Kolkata"
+          }));
+          
+          const end = new Date(start.getTime() + session.duration * 1000);
+          
+          return {
+            id: session.sessionId,
+            class_id: parseInt(classId, 10),
+            day_of_week: start.getDay(),
+            start_time: start.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Kolkata'
+            }),
+            end_time: end.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'Asia/Kolkata'
+            }),
+            scheduled_date: start.toISOString().split('T')[0],
+            room_number: 'TBD',
+            is_active: true,
+            source: 'moodle',
+            readonly: true
+          };
+        });
         scheduleData = scheduleData.concat(moodleSchedule);
         console.log('Using Moodle schedule:', moodleSchedule.length, 'sessions');
       }
