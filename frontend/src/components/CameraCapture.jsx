@@ -1,6 +1,7 @@
 // src/components/CameraCapture.jsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { faceApi, api } from '../services/api';
+import axios from 'axios';
 
 function base64ToBlob(base64) {
   const byteString = atob(base64.split(',')[1]);
@@ -115,6 +116,7 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       // Add debug logs
       console.log("Captured image:", imageSrc?.slice(0, 50));
       console.log("Type:", typeof imageSrc);
+      console.log("VALUE:", imageSrc?.substring(0, 50));
       
       // Validate image capture
       if (!imageSrc || typeof imageSrc !== "string") {
@@ -129,13 +131,19 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
 
         console.log("Sending image length:", imageSrc.length);
 
-        return faceApi.post('/recognize', {
-          image: imageSrc,
-          class_id: Number(classId),
-          session_id: Number(sessionId)
-        }, {
-          timeout: 15000
-        });
+        await axios.post(
+          "/api/face/recognize",
+          {
+            image: imageSrc,   // MUST be string
+            class_id: String(classId),
+            session_id: String(sessionId)
+          },
+          {
+            headers: {
+              "Content-Type": "application/json"
+            }
+          }
+        );
       };
 
       // Try up to 3 attempts with exponential-ish backoff
