@@ -139,70 +139,41 @@ def recognize():
         if attendance_log is None:
             load_attendance_log()
         
-        # DEBUG: Log request details
-        logger.info(f"Request files: {list(request.files.keys())}")
-        logger.info(f"Request form: {list(request.form.keys())}")
-        logger.info(f"Request JSON: {request.get_json()}")
-        
         # Get image from JSON request
-        if not request.is_json:
-            logger.error("Request is not JSON")
-            return jsonify({"error": "Request must be JSON"}), 400
-        
-        data = request.get_json()
-        if not data or 'image' not in data:
-            logger.error("No image field in JSON request")
-            return jsonify({"error": "No image provided"}), 400
-        
-        image_data = data['image']
+        image_data = request.get_json().get("image")
+
         if not image_data or not isinstance(image_data, str):
-            logger.error("Invalid image data")
-            return jsonify({"error": "Invalid image data"}), 400
-        
-        # Decode base64 image
+            return jsonify({"error": "Invalid image"}), 400
+
+        # REMOVE prefix (supports jpeg/png/jpg)
+        match = re.match(r"data:image/\w+;base64,(.+)", image_data)
+
+        if not match:
+            return jsonify({"error": "Invalid base64 format"}), 400
+
+        base64_str = match.group(1)
+
         try:
-            # Use universal regex to handle all image formats
-            matches = image_data.match(r'^data:(image\/\w+);base64,(.+)$')
-            
-            if not matches:
-                return jsonify({"error": "Invalid base64 format"}), 400
-            
-            base64_data = matches[2]
-            image_bytes = base64.b64decode(base64_data)
-            logger.info(f"Image bytes length: {len(image_bytes)}")
+            image_bytes = base64.b64decode(base64_str)
+            np_arr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         except Exception as e:
-            logger.error(f"Error decoding base64: {e}")
-            return jsonify({"error": "Invalid base64 image data"}), 400
-        
-        if len(image_bytes) == 0:
-            logger.error("Empty image file")
-            return jsonify({"error": "Empty image file"}), 400
-        
-        # Use OpenCV for more reliable image decoding
-        img_array = np.frombuffer(image_bytes, np.uint8)
-        image_array = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-        
-        if image_array is None:
-            logger.error("Failed to decode image - invalid format")
-            return jsonify({"error": "Invalid image format"}), 400
-        
-        logger.info(f"Successfully decoded image shape: {image_array.shape}")
-        
-        # Ensure image is in BGR format (OpenCV default)
-        if len(image_array.shape) == 3 and image_array.shape[2] == 4:
-            # Convert RGBA to BGR
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_RGBA2BGR)
-        elif len(image_array.shape) == 2:
-            # Convert grayscale to BGR
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_GRAY2BGR)
+            print("Decode error:", str(e))
+            return jsonify({"error": "Image decode failed"}), 400
+
+        if img is None:
+            return jsonify({"error": "Invalid image decode"}), 400
+
+        # Add debug log
+        print("Image shape:", img.shape)
         
         # Resize image for better face detection
-        if image_array.shape[0] > 800 or image_array.shape[1] > 800:
-            image_array = cv2.resize(image_array, (640, 480))
-            logger.info(f"Resized image to: {image_array.shape}")
+        if img.shape[0] > 800 or img.shape[1] > 800:
+            img = cv2.resize(img, (640, 480))
+            logger.info(f"Resized image to: {img.shape}")
         
         # Detect faces
-        faces_detected, num_faces = detect_faces(image_array)
+        faces_detected, num_faces = detect_faces(img)
         logger.info(f"Face detection result: faces_detected={faces_detected}, num_faces={num_faces}")
         
         if not faces_detected:
@@ -213,7 +184,7 @@ def recognize():
             })
         
         # Simple recognition (placeholder)
-        matched, confidence = recognize_face(image_array, encodings)
+        matched, confidence = recognize_face(img, encodings)
         logger.info(f"Recognition result: matched={matched}, confidence={confidence}")
         
         if matched and encodings:
