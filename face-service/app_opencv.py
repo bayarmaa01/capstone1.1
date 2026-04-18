@@ -111,18 +111,27 @@ def detect_faces(image_array):
     return len(faces) > 0, len(faces)
 
 def recognize_face(image_array, student_encodings):
-    """Simple face recognition simulation"""
-    # This is a placeholder - in real implementation, you'd use proper face recognition
-    # For now, we'll simulate recognition by checking if we have any encodings
+    """Actual face recognition using face encodings"""
     if not student_encodings:
         return False, 0.0
     
-    # Simulate face matching with random confidence for demo
-    import random
-    confidence = random.uniform(0.7, 0.95) if student_encodings else 0.0
-    matched = confidence > 0.8
+    # Extract face encodings from the image
+    face_encodings = face_recognition.face_encodings(image_array, known_face_locations=[])
     
-    return matched, confidence
+    if len(face_encodings) == 0:
+        return False, 0.0
+    
+    # Compare the detected face with known faces
+    matches = face_recognition.compare_faces(face_encodings, student_encodings, tolerance=0.6)
+    
+    if len(matches) == 0:
+        return False, 0.0
+    
+    # Get the best match
+    best_match = matches[0]
+    confidence = 1 - best_match.distance
+    
+    return True, confidence
 
 @app.route('/health', methods=['GET'])
 def health_check():
