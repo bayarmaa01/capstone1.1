@@ -4,11 +4,9 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgtk-3-dev \
-    python3-dev \
+    libgl1 \
+    libglib2.0-0 \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setuptools
@@ -20,6 +18,12 @@ WORKDIR /app
 # Create non-root user for security
 RUN groupadd -g 1001 appuser && \
     useradd -m -u 1001 -g appuser appuser
+
+# Install numpy first, then face_recognition_models and face_recognition
+RUN pip install --no-cache-dir numpy
+RUN pip install --no-cache-dir \
+    face_recognition \
+    git+https://github.com/ageitgey/face_recognition_models
 
 # Copy requirements and install all dependencies
 COPY requirements.txt .
