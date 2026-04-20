@@ -18,15 +18,19 @@ RUN python -m pip install --upgrade pip
 # Clean old installs
 RUN python -m pip uninstall -y face_recognition face_recognition_models || true
 
-# 🔥 INSTALL MODELS FROM GITHUB (CRITICAL FIX)
-RUN python -m pip install --no-cache-dir \
-    git+https://github.com/ageitgey/face_recognition_models
+# Install models FIRST with explicit clone and install
+RUN git clone https://github.com/ageitgey/face_recognition_models.git /tmp/face_recognition_models && \
+    cd /tmp/face_recognition_models && \
+    python -m pip install --no-cache-dir . && \
+    cd /app && \
+    rm -rf /tmp/face_recognition_models
 
-# Install main lib
+# Install main library
 RUN python -m pip install --no-cache-dir face_recognition
 
-# Verify
-RUN python -c "import face_recognition_models; print('MODELS OK')"
+# Verify installation
+RUN python -c "import face_recognition_models; print('MODELS OK'); print('MODELS PATH:', face_recognition_models.__file__)" && \
+    python -c "import face_recognition; print('FACE_RECOGNITION OK')"
 
 COPY . .
 
