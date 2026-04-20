@@ -31,6 +31,8 @@ export default function StudentProfile() {
     attendance_rate: 0,
     recent_records: []
   });
+  const [attendanceHistory, setAttendanceHistory] = useState([]);
+  const [showOnlyAbsences, setShowOnlyAbsences] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,6 +48,8 @@ export default function StudentProfile() {
       setStudent(response.data);
       const attendanceResponse = await api.get(`/attendance/student/${id}`);
       setAttendanceSummary(attendanceResponse.data);
+      const historyResponse = await api.get(`/students/${id}/attendance`);
+      setAttendanceHistory(historyResponse.data);
     } catch (error) {
       console.error('Error fetching student data:', error);
     } finally {
@@ -270,6 +274,120 @@ export default function StudentProfile() {
             Total classes: {attendanceSummary.total_classes} | Attended: {attendanceSummary.attended_classes} | Attendance rate: {attendanceSummary.attendance_rate}%
           </p>
         </div>
+      </div>
+
+      {/* Attendance History Section */}
+      <div style={{
+        background: 'white',
+        borderRadius: '15px',
+        padding: '25px',
+        marginTop: '20px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+        border: '1px solid rgba(255,255,255,0.2)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h3 style={{ margin: 0, color: '#1a202c', fontSize: '22px', fontWeight: '700' }}>
+            Attendance History
+          </h3>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={showOnlyAbsences}
+              onChange={(e) => setShowOnlyAbsences(e.target.checked)}
+              style={{ cursor: 'pointer' }}
+            />
+            <span style={{ color: '#4b5563', fontSize: '14px' }}>Show only absences</span>
+          </label>
+        </div>
+        
+        {attendanceHistory.length > 0 ? (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              overflow: 'hidden'
+            }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f8fafc' }}>
+                  <th style={{
+                    padding: '12px 16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    color: '#374151',
+                    borderBottom: '2px solid #e5e7eb',
+                    fontSize: '14px'
+                  }}>
+                    Date
+                  </th>
+                  <th style={{
+                    padding: '12px 16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    color: '#374151',
+                    borderBottom: '2px solid #e5e7eb',
+                    fontSize: '14px'
+                  }}>
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {attendanceHistory
+                  .filter(item => !showOnlyAbsences || item.status === 'absent')
+                  .map((item, index) => (
+                    <tr 
+                      key={index} 
+                      style={{
+                        borderBottom: '1px solid #f3f4f6',
+                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#fafafa'
+                      }}
+                    >
+                      <td style={{
+                        padding: '12px 16px',
+                        color: '#1f2937',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      }}>
+                        {new Date(item.date).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </td>
+                      <td style={{
+                        padding: '12px 16px',
+                        fontSize: '14px',
+                        fontWeight: '600'
+                      }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          backgroundColor: item.status === 'present' ? '#d1fae5' : '#fee2e2',
+                          color: item.status === 'present' ? '#065f46' : '#991b1b'
+                        }}>
+                          {item.status === 'present' ? '✅' : '❌'} {item.status === 'present' ? 'Present' : 'Absent'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px',
+            color: '#6b7280',
+            fontSize: '16px'
+          }}>
+            No attendance records found for this student.
+          </div>
+        )}
       </div>
     </div>
   );

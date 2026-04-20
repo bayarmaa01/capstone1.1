@@ -263,13 +263,13 @@ def recognize_and_mark():
         logger.info(f"🔍 Recognition request - Faces detected: {len(face_encodings)}")
         
         if len(face_encodings) == 0:
-            # Return a consistent shape for frontend consumers
+            # Return consistent response for no faces detected
             return jsonify({
-                "success": True,
+                "success": False,
+                "error": "No face detected",
                 "faces_detected": 0,
                 "matches": [],
-                "attendance_marked": [],
-                "message": "No faces detected in image"
+                "attendance_marked": []
             })
         
         # Check if we have any enrolled students
@@ -374,13 +374,24 @@ def recognize_and_mark():
         logger.info(f"📊 Total matches: {len(matches)}")
         logger.info(f"📊 Attendance marked for: {len([r for r in attendance_results if r['moodle_marked']])} students")
         
-        return jsonify({
-            "success": True,
-            "faces_detected": len(face_encodings),
-            "matches": matches,
-            "attendance_marked": attendance_results,
-            "message": f"Processed {len(face_encodings)} faces, marked attendance for {len([r for r in attendance_results if r['moodle_marked']])} students"
-        })
+        # Return consistent response format
+        if len(matches) > 0:
+            return jsonify({
+                "success": True,
+                "faces_detected": len(face_encodings),
+                "matches": matches,
+                "attendance_marked": attendance_results,
+                "message": f"Processed {len(face_encodings)} faces, marked attendance for {len([r for r in attendance_results if r['moodle_marked']])} students"
+            })
+        else:
+            # Face detected but no match
+            return jsonify({
+                "success": False,
+                "error": "Face not recognized",
+                "faces_detected": len(face_encodings),
+                "matches": [],
+                "attendance_marked": []
+            })
         
     except Exception as e:
         logger.error(f"❌ Recognition and marking error: {str(e)}")
@@ -423,27 +434,35 @@ def recognize():
                 model=FACE_DETECTION_MODEL
             )
             face_encodings = face_recognition.face_encodings(image, face_locations)
-            logger.info(f"🔍 Faces detected: {len(face_encodings)}")
+            logger.info(f" Faces detected: {len(face_encodings)}")
         except Exception as e:
-            logger.error(f"❌ Face detection failed: {e}")
+            logger.error(f" Face detection failed: {e}")
             return jsonify({"error": f"face detection failed: {str(e)}"}), 500
         
         if len(face_encodings) == 0:
-            logger.info("⚠️ No faces detected in image")
-            return jsonify([])
+            logger.info("No faces detected in image")
+            return jsonify({
+                "success": False,
+                "error": "No face detected",
+                "faces_detected": 0
+            })
         
         # Check if we have any enrolled students
         current_encodings = get_encodings()
         known_ids = list(current_encodings.keys())
         if len(known_ids) == 0:
-            logger.warning("⚠️ No enrolled students yet")
-            return jsonify([])
-        
+            logger.warning(" No enrolled students yet")
+            return jsonify({
+                "success": False,
+                "error": "No enrolled students",
+                "faces_detected": len(face_encodings)
+            })
+
         logger.info(f"👥 Comparing against {len(known_ids)} enrolled students: {known_ids}")
-        
+
         # Convert stored encodings back to numpy arrays
         known_encodings = [np.array(current_encodings[k]) for k in known_ids]
-        
+
         matches = []
         
         # Compare each detected face
@@ -474,10 +493,27 @@ def recognize():
                 logger.info(f"❌ No match - distance {min_distance:.3f} > threshold {THRESHOLD}")
         
         logger.info(f"📊 Total matches: {len(matches)}")
-        return jsonify(matches)
+        
+        # Return consistent response format
+        if len(matches) > 0:
+            # Return first match with success=true
+            match = matches[0]
+            return jsonify({
+                "success": True,
+                "student_id": match["student_id"],
+                "confidence": match["confidence"],
+                "faces_detected": len(face_encodings)
+            })
+        else:
+            # Face detected but no match
+            return jsonify({
+                "success": False,
+                "error": "Face not recognized",
+                "faces_detected": len(face_encodings)
+            })
         
     except Exception as e:
-        logger.error(f"❌ Recognition error: {str(e)}")
+        logger.error(f" Recognition error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"recognition failed: {str(e)}"}), 500

@@ -110,7 +110,47 @@ router.post('/', upload.single('photo'), async (req, res) => {
   }
 });
 
-// Delete student
+// Get student attendance history
+router.get('/:id/attendance', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Support both STU001 format and numeric registration numbers
+    let numericStudentId;
+    if (typeof id === 'string' && isNaN(id)) {
+      // Handle STU001 format - look up by student_id field
+      const lookup = await db.query('SELECT id FROM students WHERE student_id = $1', [id]);
+      if (lookup.rows.length === 0) {
+        return res.status(404).json({ error: `Student ${id} not found` });
+      }
+      numericStudentId = lookup.rows[0].id;
+    } else {
+      // Handle numeric registration numbers
+      numericStudentId = parseInt(id, 10);
+      if (Number.isNaN(numericStudentId)) {
+        return res.status(400).json({ 
+          error: `Invalid student ID format: ${id}`,
+          expected: "STU001 or numeric registration number"
+        });
+      }
+    }
+
+    const result = await db.query(`
+      SELECT 
+        session_date,
+        CASE WHEN present = true THEN 'present' ELSE 'absent' END as status
+      FROM attendance
+      WHERE student_id = $1
+      ORDER BY session_date DESC
+    `, [numericStudentId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching student attendance history:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete student
 router.delete('/:id', async (req, res) => {
   try {
