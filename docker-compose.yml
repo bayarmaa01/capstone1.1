@@ -13,6 +13,7 @@ services:
       - FACE_SERVICE_URL=http://blue_face:5001
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+      - TZ=Asia/Kolkata
     ports:
       - 4000:4000
     volumes:
@@ -42,6 +43,7 @@ services:
       - REACT_APP_API_URL=/api/
       - REACT_APP_FACE_API_URL=/face/
       - REACT_APP_MOODLE_URL=/moodle/
+      - TZ=Asia/Kolkata
     networks:
       - app_network
     depends_on:
@@ -53,6 +55,8 @@ services:
       context: ./face-service
       dockerfile: Dockerfile
     restart: unless-stopped
+    ports:
+      - "5002:5001"
     environment:
       - FLASK_ENV=production
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
@@ -60,6 +64,7 @@ services:
       - ENCODINGS_FOLDER=/app/encodings
       # Prefer CPU-friendly model for webcam frames (fixes "No face detected" on CPU-only hosts)
       - FACE_DETECTION_MODEL=hog
+      - TZ=Asia/Kolkata
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
@@ -86,6 +91,7 @@ services:
       - FACE_SERVICE_URL=http://green_face:5001
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
       - REDIS_URL=redis://redis:6379
+      - TZ=Asia/Kolkata
     volumes:
       - ./backend/uploads:/app/uploads
     networks:
@@ -112,6 +118,7 @@ services:
       - REACT_APP_API_URL=/api/
       - REACT_APP_FACE_API_URL=/face/
       - REACT_APP_MOODLE_URL=/moodle/
+      - TZ=Asia/Kolkata
     networks:
       - app_network
     depends_on:
@@ -122,12 +129,15 @@ services:
       context: ./face-service
       dockerfile: Dockerfile
     restart: unless-stopped
+    ports:
+      - "5001:5001"
     environment:
       - FLASK_ENV=production
       - MOODLE_URL=http://moodle:80/webservice/rest/server.php
       - UPLOAD_FOLDER=/app/uploads
       - ENCODINGS_FOLDER=/app/encodings
       - FACE_DETECTION_MODEL=hog
+      - TZ=Asia/Kolkata
     volumes:
       - ./uploads:/app/uploads
       - ./encodings:/app/encodings
@@ -149,6 +159,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://app:secret@postgres:5432/attendance
       - REDIS_URL=redis://redis:6379
+      - TZ=Asia/Kolkata
     networks:
       - app_network
     depends_on:
@@ -171,6 +182,8 @@ services:
       - POSTGRES_DB=attendance
       - POSTGRES_USER=app
       - POSTGRES_PASSWORD=secret
+      - TZ=Asia/Kolkata
+      - PGTZ=Asia/Kolkata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -185,6 +198,8 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    environment:
+      - TZ=Asia/Kolkata
     networks:
       - app_network
     healthcheck:
@@ -204,6 +219,8 @@ services:
     volumes:
       - moodle_data:/var/www/moodledata
       - ./moodle-data/plugins/attendance:/var/www/html/mod/attendance:ro
+      - ./moodle-app/php-timezone.ini:/usr/local/etc/php/conf.d/timezone.ini:ro
+      - ./moodle-data/config.php:/var/www/html/config.php:ro
     environment:
       - TZ=Asia/Kolkata
       - MOODLE_DB_HOST=moodle-db
@@ -232,8 +249,11 @@ services:
       - MARIADB_DATABASE=moodle
       - MARIADB_USER=moodle
       - MARIADB_PASSWORD=moodle_secret
+      - TZ=Asia/Kolkata
+    command: --default-time-zone='+05:30'
     volumes:
       - moodle_db_data:/var/lib/mysql
+      - ./moodle-app/mysql-timezone.cnf:/etc/mysql/conf.d/timezone.cnf:ro
     networks:
       - app_network
     healthcheck:

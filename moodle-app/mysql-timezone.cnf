@@ -1,0 +1,6 @@
+# MySQL/MariaDB timezone configuration
+[mysqld]
+default-time-zone='+05:30'
+
+[client]
+default-time-zone='+05:30'
