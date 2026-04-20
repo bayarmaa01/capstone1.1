@@ -7,12 +7,12 @@ from datetime import timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import face_recognition
+import numpy as np
 from PIL import Image
 import io
 import threading
 import time
 import pickle
-import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -289,87 +289,79 @@ def recognize_and_mark():
         matches = []
         attendance_results = []
         
-        # Compare each detected face
-        for idx, face_encoding in enumerate(face_encodings):
-            logger.info(f"👤 Analyzing face {idx + 1}/{len(face_encodings)}")
-            
-            # Calculate Euclidean distances to all known faces
-            distances = np.linalg.norm(np.array(known_encodings) - face_encoding, axis=1)
-            min_distance_idx = int(np.argmin(distances))
-            min_distance = float(distances[min_distance_idx])
-            
-            # Threshold for recognition (tune this value)
-            THRESHOLD = 0.6
-            
-            logger.info(f"   Best match: {known_ids[min_distance_idx]} - Distance: {min_distance:.3f}")
-            
-            if min_distance < THRESHOLD:
-                # Calculate confidence score (0 to 1)
-                confidence = float(max(0, 1.0 - min_distance))
-                matched_student_id = known_ids[min_distance_idx]
+        # DEBUG LOGS
+        print("ENCODINGS:", len(face_encodings))
+        print("KNOWN:", len(known_encodings))
+        
+        matches = []
+        if len(known_encodings) > 0 and len(face_encodings) > 0:
+            distances = face_recognition.face_distance(known_encodings, face_encodings[0])
+            best_match_index = np.argmin(distances)
+            confidence = 1 - distances[best_match_index]
+
+            if confidence > 0.6:
+                matches.append({
+                    "student_id": known_ids[best_match_index],
+                    "confidence": float(confidence)
+                })
+        
+        print("MATCHES:", matches)
                 
-                # Check if attendance can be marked
-                if can_mark_attendance(matched_student_id):
-                    # Mark attendance in Moodle
-                    moodle_success, moodle_message = mark_attendance_in_moodle(matched_student_id, status=1)
+        # Process attendance marking for matches
+        for match in matches:
+            student_id = match["student_id"]
+            
+            # Check if attendance can be marked
+            if can_mark_attendance(student_id):
+                # Mark attendance in Moodle
+                moodle_success, moodle_message = mark_attendance_in_moodle(student_id, status=1)
+                
+                if moodle_success:
+                    # Update local attendance session
+                    update_attendance_session(student_id)
                     
-                    if moodle_success:
-                        # Update local attendance session
-                        update_attendance_session(matched_student_id)
-                        
-                        # Log attendance
-                        attendance_entry = {
-                            "student_id": matched_student_id,
-                            "timestamp": datetime.now().isoformat(),
-                            "confidence": confidence,
-                            "distance": min_distance,
-                            "moodle_status": "success",
-                            "method": "face_recognition"
-                        }
-                        
-                        # Add to attendance log
-                        current_attendance_log = get_attendance_log()
-                        today = datetime.now().strftime("%Y-%m-%d")
-                        if today not in current_attendance_log:
-                            current_attendance_log[today] = []
-                        current_attendance_log[today].append(attendance_entry)
-                        save_attendance_log(current_attendance_log)
-                        
-                        attendance_results.append({
-                            "student_id": matched_student_id,
-                            "confidence": round(confidence, 3),
-                            "distance": round(min_distance, 3),
-                            "moodle_marked": True,
-                            "moodle_message": moodle_message
-                        })
-                        
-                        logger.info(f"✅ ATTENDANCE MARKED: {matched_student_id} (confidence: {confidence:.3f})")
-                    else:
-                        attendance_results.append({
-                            "student_id": matched_student_id,
-                            "confidence": round(confidence, 3),
-                            "distance": round(min_distance, 3),
-                            "moodle_marked": False,
-                            "moodle_message": moodle_message
-                        })
-                        logger.error(f"❌ Failed to mark attendance for {matched_student_id}: {moodle_message}")
+                    # Log attendance
+                    attendance_entry = {
+                        "student_id": student_id,
+                        "timestamp": datetime.now().isoformat(),
+                        "confidence": match["confidence"],
+                        "distance": 1 - match["confidence"],
+                        "moodle_status": "success",
+                        "method": "face_recognition"
+                    }
+                    
+                    # Add to attendance log
+                    current_attendance_log = get_attendance_log()
+                    today = datetime.now().strftime("%Y-%m-%d")
+                    if today not in current_attendance_log:
+                        current_attendance_log[today] = []
+                    current_attendance_log[today].append(attendance_entry)
+                    save_attendance_log(current_attendance_log)
+                    
+                    attendance_results.append({
+                        "student_id": student_id,
+                        "confidence": match["confidence"],
+                        "moodle_marked": True,
+                        "moodle_message": moodle_message
+                    })
+                    
+                    logger.info(f"✅ ATTENDANCE MARKED: {student_id} (confidence: {match['confidence']:.3f})")
                 else:
                     attendance_results.append({
-                        "student_id": matched_student_id,
-                        "confidence": round(confidence, 3),
-                        "distance": round(min_distance, 3),
+                        "student_id": student_id,
+                        "confidence": match["confidence"],
                         "moodle_marked": False,
-                        "moodle_message": "Duplicate attendance - session timeout not reached"
+                        "moodle_message": moodle_message
                     })
-                    logger.warning(f"⏰ Duplicate attendance prevented for {matched_student_id}")
-                
-                matches.append({
-                    "student_id": matched_student_id,
-                    "confidence": round(confidence, 3),
-                    "distance": round(min_distance, 3)
-                })
+                    logger.error(f"❌ Failed to mark attendance for {student_id}: {moodle_message}")
             else:
-                logger.info(f"❌ No match - distance {min_distance:.3f} > threshold {THRESHOLD}")
+                attendance_results.append({
+                    "student_id": student_id,
+                    "confidence": match["confidence"],
+                    "moodle_marked": False,
+                    "moodle_message": "Duplicate attendance - session timeout not reached"
+                })
+                logger.warning(f" Duplicate attendance prevented for {student_id}")
         
         logger.info(f"📊 Total matches: {len(matches)}")
         logger.info(f"📊 Attendance marked for: {len([r for r in attendance_results if r['moodle_marked']])} students")
@@ -465,47 +457,34 @@ def recognize():
 
         matches = []
         
-        # Compare each detected face
-        for idx, face_encoding in enumerate(face_encodings):
-            logger.info(f"👤 Analyzing face {idx + 1}/{len(face_encodings)}")
-            
-            # Calculate Euclidean distances to all known faces
-            distances = np.linalg.norm(np.array(known_encodings) - face_encoding, axis=1)
-            min_distance_idx = int(np.argmin(distances))
-            min_distance = float(distances[min_distance_idx])
-            
-            # Threshold for recognition
-            THRESHOLD = 0.6
-            
-            logger.info(f"   Best match: {known_ids[min_distance_idx]} - Distance: {min_distance:.3f}")
-            
-            if min_distance < THRESHOLD:
-                # Calculate confidence score (0 to 1)
-                confidence = float(max(0, 1.0 - min_distance))
-                match_data = {
-                    "student_id": known_ids[min_distance_idx],
-                    "confidence": round(confidence, 3),
-                    "distance": round(min_distance, 3)
-                }
-                matches.append(match_data)
-                logger.info(f"✅ Recognized: {known_ids[min_distance_idx]} (confidence: {confidence:.3f})")
-            else:
-                logger.info(f"❌ No match - distance {min_distance:.3f} > threshold {THRESHOLD}")
+        # DEBUG LOGS
+        print("ENCODINGS:", len(face_encodings))
+        print("KNOWN:", len(known_encodings))
+        
+        matches = []
+        if len(known_encodings) > 0 and len(face_encodings) > 0:
+            distances = face_recognition.face_distance(known_encodings, face_encodings[0])
+            best_match_index = np.argmin(distances)
+            confidence = 1 - distances[best_match_index]
+
+            if confidence > 0.6:
+                matches.append({
+                    "student_id": known_ids[best_match_index],
+                    "confidence": float(confidence)
+                })
+        
+        print("MATCHES:", matches)
         
         logger.info(f"📊 Total matches: {len(matches)}")
         
-        # Return consistent response format
+        # FINAL RESPONSE (STRICT)
         if len(matches) > 0:
-            # Return first match with success=true
-            match = matches[0]
             return jsonify({
                 "success": True,
-                "student_id": match["student_id"],
-                "confidence": match["confidence"],
+                "matches": matches,
                 "faces_detected": len(face_encodings)
             })
         else:
-            # Face detected but no match
             return jsonify({
                 "success": False,
                 "error": "Face not recognized",

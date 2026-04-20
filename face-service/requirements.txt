@@ -5,22 +5,17 @@
 Flask==2.3.3
 Flask-CORS==4.0.0
 
-# Computer Vision & Face Recognition - OpenCV based
-# Use OpenCV for face detection to avoid dlib compilation issues
-opencv-python==4.8.1.78
-opencv-contrib-python==4.8.1.78
-Pillow==10.0.1
-numpy==1.24.3
-scikit-learn==1.3.0
+# Face Recognition
+face_recognition
+dlib
+numpy
 
-# Use OpenCV for face detection instead
-# This avoids dlib compilation issues
+# Computer Vision
+opencv-python
+Pillow==10.0.1
 
 # HTTP Requests
 requests==2.31.0
-
-# Data Processing
-scipy==1.11.4
 
 # Development & Testing
 pytest==7.4.3

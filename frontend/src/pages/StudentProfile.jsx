@@ -18,7 +18,7 @@ const getStudentPhotoUrl = (photoUrl) => {
   if (!photoUrl) return null;
   if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) return photoUrl;
   if (photoUrl.startsWith('/uploads/')) return photoUrl;
-  return `/uploads/${photoUrl}`;
+  return `https://attendance-ml.duckdns.org/${photoUrl}`;
 };
 
 export default function StudentProfile() {

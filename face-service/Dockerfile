@@ -4,14 +4,11 @@ FROM python:3.10-slim
 RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
-    python3-dev \
     libopenblas-dev \
     liblapack-dev \
     libx11-dev \
     libgtk-3-dev \
-    libgl1 \
-    libglib2.0-0 \
-    git \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setuptools
@@ -29,8 +26,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code with correct permissions
-# IMPORTANT: run the OpenCV-based implementation to avoid dlib issues.
-COPY --chown=appuser:appuser app_opencv.py app.py
+COPY --chown=appuser:appuser app.py app.py
 
 # Create necessary directories
 RUN mkdir -p encodings logs && \
