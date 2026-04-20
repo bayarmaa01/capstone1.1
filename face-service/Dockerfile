@@ -28,9 +28,13 @@ RUN git clone https://github.com/ageitgey/face_recognition_models.git /tmp/face_
 # Install main library
 RUN python -m pip install --no-cache-dir face_recognition
 
+# Install remaining requirements including gunicorn
+RUN python -m pip install --no-cache-dir -r requirements.txt
+
 # Verify installation
 RUN python -c "import face_recognition_models; print('MODELS OK'); print('MODELS PATH:', face_recognition_models.__file__)" && \
-    python -c "import face_recognition; print('FACE_RECOGNITION OK')"
+    python -c "import face_recognition; print('FACE_RECOGNITION OK')" && \
+    python -c "import gunicorn; print('GUNICORN OK')"
 
 COPY . .
 
