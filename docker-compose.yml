@@ -257,7 +257,7 @@ services:
     networks:
       - app_network
     healthcheck:
-      test: ["CMD", "mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u moodle -pmoodle_secret -e 'SELECT 1' moodle || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
