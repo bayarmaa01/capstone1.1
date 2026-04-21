@@ -46,21 +46,30 @@ case $OPTION in
         curl -L -o "$IMAGE_DIR/face5.jpg" "https://picsum.photos/seed/face5/200/200.jpg" 2>/dev/null
         ;;
     3)
-        echo "Creating placeholder images..."
-        IMAGE_DIR="./placeholder-faces"
+        echo "Downloading sample images..."
+        IMAGE_DIR="./sample-faces"
         mkdir -p $IMAGE_DIR
         
-        # Create simple placeholder images using ImageMagick if available
-        if command -v convert &> /dev/null; then
-            for i in {1..5}; do
-                convert -size 200x200 xc:lightblue -pointsize 20 -fill black -gravity center -annotate +0+0 "Student $i" "$IMAGE_DIR/face$i.jpg"
-            done
-        else
-            echo "ImageMagick not found. Creating simple placeholder files..."
-            for i in {1..5}; do
-                echo "placeholder image $i" > "$IMAGE_DIR/face$i.txt"
-            done
-        fi
+        # Always download sample images for enrollment
+        echo "Downloading sample face images for enrollment..."
+        for i in {1..5}; do
+            echo "Downloading image $i..."
+            curl -L -o "$IMAGE_DIR/face$i.jpg" "https://picsum.photos/seed/student$i/200/200.jpg" 2>/dev/null || {
+                echo "Failed to download image $i, trying alternative..."
+                # Try alternative source
+                curl -L -o "$IMAGE_DIR/face$i.jpg" "https://picsum.photos/200/200.jpg?random=$i" 2>/dev/null || {
+                    echo "All downloads failed, creating minimal placeholder..."
+                    # Create a minimal valid JPEG using base64
+                    echo "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/8A8A" | base64 -d > "$IMAGE_DIR/face$i.jpg"
+                }
+            }
+            # Verify file was created and is not empty
+            if [[ -f "$IMAGE_DIR/face$i.jpg" && -s "$IMAGE_DIR/face$i.jpg" ]]; then
+                echo "✓ Image $i downloaded successfully"
+            else
+                echo "✗ Image $i failed to download"
+            fi
+        done
         ;;
     *)
         echo "Invalid option. Exiting."
@@ -77,14 +86,16 @@ for STUDENT_ID in "${!STUDENTS[@]}"; do
     INDEX=$((INDEX + 1))
     
     # Select image for this student
-    if [[ "$OPTION" == "3" && ! -f "$IMAGE_DIR/face$INDEX.jpg" ]]; then
-        IMAGE_FILE="$IMAGE_DIR/face$INDEX.txt"
-    else
-        IMAGE_FILE="$IMAGE_DIR/face$INDEX.jpg"
-    fi
+    IMAGE_FILE="$IMAGE_DIR/face$INDEX.jpg"
     
     if [[ ! -f "$IMAGE_FILE" ]]; then
         echo "Warning: Image file $IMAGE_FILE not found for $STUDENT_ID. Skipping..."
+        continue
+    fi
+    
+    # Check if file is actually an image (not .txt)
+    if [[ "$IMAGE_FILE" == *.txt ]]; then
+        echo "Warning: $IMAGE_FILE is not a valid image file. Skipping..."
         continue
     fi
     
@@ -97,7 +108,7 @@ for STUDENT_ID in "${!STUDENTS[@]}"; do
     PHOTO_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/students" \
         -F "student_id=$STUDENT_ID" \
         -F "name=$STUDENT_NAME" \
-        -F "image=@$IMAGE_FILE")
+        -F "photo=@$IMAGE_FILE")
     
     if echo "$PHOTO_RESPONSE" | jq -e '.success' > /dev/null 2>&1; then
         echo "   Photo upload: SUCCESS"

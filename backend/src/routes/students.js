@@ -61,13 +61,19 @@ router.get('/:id', async (req, res) => {
 // Add new student with photo
 router.post('/', upload.single('photo'), async (req, res) => {
   try {
-    const { student_id, name, email } = req.body;
+    console.log('📸 Student upload request received');
+    console.log('📸 Request body:', req.body);
+    console.log('📸 Uploaded file:', req.file);
     
+    const { student_id, name, email } = req.body;
+
     if (!student_id || !name) {
+      console.log('❌ Missing required fields:', { student_id, name });
       return res.status(400).json({ error: 'student_id and name are required' });
     }
-    
+
     const photoPath = req.file ? req.file.filename : null;
+    console.log('📸 Photo path extracted:', photoPath);
     
     // Insert student into database
     const result = await db.query(

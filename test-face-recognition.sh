@@ -11,7 +11,8 @@ curl -s "$FACE_SERVICE_URL/health" | jq .
 
 echo ""
 echo "2. Checking enrolled students..."
-curl -s "$FACE_SERVICE_URL/face/health" | jq .
+FACE_HEALTH=$(curl -s "$FACE_SERVICE_URL/face/health")
+echo "$FACE_HEALTH" | jq . 2>/dev/null || echo "$FACE_HEALTH"
 
 echo ""
 echo "3. Testing face recognition with sample image..."
@@ -71,14 +72,14 @@ fi
 
 echo ""
 echo "5. Testing via nginx (production route)..."
-# Test the full API path through nginx
+# Test full API path through nginx
 NGINX_RESPONSE=$(curl -s -X POST "http://localhost/api/face/recognize" \
     -F "image=@./test-face.jpg" \
     -F "class_id=1" \
     -F "session_id=18")
 
 echo "Nginx Route Response:"
-echo "$NGINX_RESPONSE" | jq .
+echo "$NGINX_RESPONSE" | jq . 2>/dev/null || echo "$NGINX_RESPONSE"
 
 echo ""
 echo "=== Test Complete ==="

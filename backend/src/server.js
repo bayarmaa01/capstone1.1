@@ -272,7 +272,15 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
   console.log('📁 Created uploads directory');
 }
-app.use('/uploads', express.static(uploadsDir));
+
+// Debug logging for uploads
+app.use('/uploads', (req, res, next) => {
+  console.log('📁 Uploads request:', req.method, req.url);
+  next();
+}, express.static(uploadsDir));
+
+console.log('📁 Uploads directory configured at:', uploadsDir);
+console.log('📁 Uploads accessible at: /uploads/*');
 
 // =======================================
 // Health Check Endpoint
