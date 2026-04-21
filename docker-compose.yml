@@ -250,7 +250,6 @@ services:
       - MARIADB_USER=moodle
       - MARIADB_PASSWORD=moodle_secret
       - TZ=Asia/Kolkata
-    command: --default-time-zone='+05:30'
     volumes:
       - moodle_db_data:/var/lib/mysql
       - ./moodle-app/mysql-timezone.cnf:/etc/mysql/conf.d/timezone.cnf:ro
