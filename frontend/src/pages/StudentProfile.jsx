@@ -355,11 +355,17 @@ export default function StudentProfile() {
                         fontSize: '14px',
                         fontWeight: '500'
                       }}>
-                        {new Date(item.date).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric'
-                        })}
+                        {item.session_date ? 
+                          (new Date(item.session_date).toString() === 'Invalid Date' ? 
+                            'N/A' : 
+                            new Date(item.session_date).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric'
+                            })
+                          ) : 
+                          'N/A'
+                        }
                       </td>
                       <td style={{
                         padding: '12px 16px',
