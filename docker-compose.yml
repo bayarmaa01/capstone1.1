@@ -256,8 +256,6 @@ services:
       - ./moodle-app/mysql-timezone.cnf:/etc/mysql/conf.d/timezone.cnf:ro
     networks:
       - app_network
-    healthcheck:
-      disable: true
 
   nginx:
     image: nginx:alpine
