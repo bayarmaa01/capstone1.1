@@ -102,7 +102,12 @@ export default function StudentProfile() {
     .slice(0, 10)
     .reverse()
     .map((record) => ({
-      date: new Date(record.session_date).toLocaleDateString(),
+      date: record.session_date ? 
+        (new Date(record.session_date).toString() === 'Invalid Date' ? 
+          'N/A' : 
+          new Date(record.session_date).toLocaleDateString()
+        ) : 
+        'N/A',
       attended: record.present ? 1 : 0
     }));
 

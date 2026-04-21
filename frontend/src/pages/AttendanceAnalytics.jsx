@@ -461,7 +461,13 @@ export default function AttendanceAnalytics() {
                     color: '#64748b',
                     fontSize: '14px'
                   }}>
-                    {new Date(record.timestamp).toLocaleString()}
+                    {record.timestamp ? 
+                      (new Date(record.timestamp).toString() === 'Invalid Date' ? 
+                        'N/A' : 
+                        new Date(record.timestamp).toLocaleString()
+                      ) : 
+                      'N/A'
+                    }
                   </td>
                 </tr>
               ))}

@@ -317,13 +317,23 @@ export default function AttendancePage() {
 
   const getStudentPhotoUrl = (photoUrl) => {
     if (!photoUrl) return null;
+    
+    // If it's already a full URL, return as is
     if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
       return photoUrl;
     }
+    
+    // If it starts with /uploads/, return as is
     if (photoUrl.startsWith('/uploads/')) {
       return photoUrl;
     }
-    return `/uploads/${photoUrl}`;
+    
+    // If it's just a filename or relative path, prepend /uploads/
+    if (!photoUrl.startsWith('/')) {
+      return `/uploads/${photoUrl}`;
+    }
+    
+    return photoUrl;
   };
 
   if (loading || !classInfo) {
@@ -687,12 +697,15 @@ export default function AttendancePage() {
                   {student.present ? (
                     <span style={styles.presentBadge}>Present</span>
                   ) : (
-                    <button 
-                      onClick={() => handleManualMark(student)}
-                      style={styles.markBtn}
-                    >
-                      Mark Present
-                    </button>
+                    <>
+                      <span style={styles.absentBadge}>Absent</span>
+                      <button 
+                        onClick={() => handleManualMark(student)}
+                        style={styles.markBtn}
+                      >
+                        Mark Present
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -878,6 +891,15 @@ const styles = {
     borderRadius: '6px',
     fontSize: '14px',
     fontWeight: '600'
+  },
+  absentBadge: {
+    padding: '8px 16px',
+    background: '#dc3545',
+    color: 'white',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    marginRight: '8px'
   },
   markBtn: {
     padding: '8px 16px',

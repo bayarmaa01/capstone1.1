@@ -132,16 +132,19 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
         console.log("Sending image length:", imageSrc.length);
 
         try {
+          // Convert base64 to Blob for FormData
+          const imageBlob = base64ToBlob(imageSrc);
+          const formData = new FormData();
+          formData.append('image', imageBlob, 'capture.jpg');
+          formData.append('class_id', String(classId));
+          formData.append('session_id', String(sessionId));
+
           const response = await axios.post(
             "/api/face/recognize",
-            {
-              image: imageSrc,   // MUST be string
-              class_id: String(classId),
-              session_id: String(sessionId)
-            },
+            formData,
             {
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "multipart/form-data"
               }
             }
           );

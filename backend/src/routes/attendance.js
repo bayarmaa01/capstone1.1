@@ -469,7 +469,7 @@ router.get('/session/:sessionId', async (req, res) => {
         s.name as student_name,
         COALESCE(a.present, false) as present,
         COALESCE(a.method, 'manual') as method,
-        COALESCE(a.recorded_at, NOW()) as timestamp
+        COALESCE(a.recorded_at, NOW())::text as timestamp
       FROM students s
       JOIN enrollments e ON e.student_id = s.id
       LEFT JOIN attendance a ON a.student_id = s.id 
@@ -533,7 +533,7 @@ router.get('/session/:sessionId/records', async (req, res) => {
         s.name as student_name,
         COALESCE(a.present, false) as present,
         COALESCE(a.method, 'manual') as method,
-        COALESCE(a.recorded_at, NOW()) as timestamp
+        COALESCE(a.recorded_at, NOW())::text as timestamp
       FROM students s
       JOIN enrollments e ON e.student_id = s.id
       LEFT JOIN attendance a ON a.student_id = s.id
