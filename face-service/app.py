@@ -56,12 +56,26 @@ def load_encodings():
         try:
             with open(ENC_PATH, "rb") as f:
                 data = pickle.load(f)
-            logger.info(f"✅ Loaded {len(data)} face encodings: {list(data.keys())}")
-            return data
+            
+            # Handle both list and dictionary formats
+            if isinstance(data, list):
+                # Convert list format to dictionary format
+                encodings_dict = {}
+                for item in data:
+                    if isinstance(item, dict) and 'student_id' in item and 'encoding' in item:
+                        encodings_dict[item['student_id']] = item['encoding']
+                logger.info(f"Converted {len(encodings_dict)} face encodings from list format: {list(encodings_dict.keys())}")
+                return encodings_dict
+            elif isinstance(data, dict):
+                logger.info(f"Loaded {len(data)} face encodings: {list(data.keys())}")
+                return data
+            else:
+                logger.error(f"Invalid encodings format: {type(data)}")
+                return {}
         except Exception as e:
-            logger.error(f"❌ Error loading encodings: {e}")
+            logger.error(f"Error loading encodings: {e}")
             return {}
-    logger.info("⚠️ No encodings file found. Please enroll faces first.")
+    logger.info("No encodings file found. Please enroll faces first.")
     return {}
 
 def save_encodings(encodings_dict):

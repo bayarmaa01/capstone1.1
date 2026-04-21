@@ -136,18 +136,31 @@ router.get('/:id/attendance', async (req, res) => {
     }
 
     // Get all class sessions for this student and their attendance status
-    const result = await db.query(`
-      SELECT 
-        cs.session_date,
-        CASE WHEN a.present = true THEN 'present' ELSE 'absent' END as status
-      FROM class_schedules cs
-      JOIN enrollments e ON e.class_id = cs.class_id
-      LEFT JOIN attendance a ON a.student_id = $1 
-        AND a.class_id = cs.class_id 
-        AND a.session_date = cs.session_date
-      WHERE e.student_id = $1
-      ORDER BY cs.session_date DESC
-    `, [numericStudentId]);
+    let result;
+    try {
+      result = await db.query(`
+        SELECT 
+          cs.session_date,
+          CASE WHEN a.present = true THEN 'present' ELSE 'absent' END as status
+        FROM class_schedules cs
+        JOIN enrollments e ON e.class_id = cs.class_id
+        LEFT JOIN attendance a ON a.student_id = $1 
+          AND a.class_id = cs.class_id 
+          AND a.session_date = cs.session_date
+        WHERE e.student_id = $1
+        ORDER BY cs.session_date DESC
+      `, [numericStudentId]);
+    } catch (error) {
+      console.log('class_schedules table not found, using attendance table fallback');
+      result = await db.query(`
+        SELECT 
+          session_date,
+          CASE WHEN present = true THEN 'present' ELSE 'absent' END as status
+        FROM attendance
+        WHERE student_id = $1
+        ORDER BY session_date DESC
+      `, [numericStudentId]);
+    }
 
     res.json(result.rows);
   } catch (error) {
