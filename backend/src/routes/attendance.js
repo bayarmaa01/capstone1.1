@@ -51,7 +51,7 @@ async function safeUpsertAttendance(query, params, conflictColumns) {
 router.post('/record', async (req, res) => {
   console.log("📝 Attendance record route hit:", req.originalUrl);
   try {
-    const { class_id, student_id, session_date, session_id, method, confidence } = req.body;
+    const { class_id, student_id, session_date, session_id, method, confidence, present } = req.body;
 
     console.log('📥 ATTENDANCE REQUEST:', { 
       class_id, 
@@ -60,6 +60,7 @@ router.post('/record', async (req, res) => {
       session_id,
       method, 
       confidence,
+      present,
       bodyKeys: Object.keys(req.body)
     });
 
@@ -119,15 +120,26 @@ router.post('/record', async (req, res) => {
     const targetDate = session_date || new Date().toISOString().slice(0, 10);
     const attendanceMethod = method || 'face_recognition';
     const attendanceConfidence = confidence || 1.0;
+    const isPresent = present !== undefined ? present : true; // Default to true if not specified
+    
+    console.log('🎯 Attendance Details:', {
+      class_id,
+      numericStudentId,
+      uniqueSessionId,
+      targetDate,
+      attendanceMethod,
+      attendanceConfidence,
+      isPresent
+    });
     
     if (uniqueSessionId) {
       // Use safe UPSERT for session-based attendance
       result = await safeUpsertAttendance(`
         INSERT INTO attendance (class_id, student_id, session_id, session_date, present, method, confidence)
-        VALUES ($1, $2, $3, $4, true, $5, $6)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (class_id, student_id, session_id)
         WHERE session_id IS NOT NULL
-        DO UPDATE SET present = true, method = EXCLUDED.method,
+        DO UPDATE SET present = $5, method = EXCLUDED.method,
                       confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
                       recorded_at = now()
         RETURNING *;
@@ -136,6 +148,7 @@ router.post('/record', async (req, res) => {
         numericStudentId,
         uniqueSessionId,
         targetDate,
+        isPresent,
         attendanceMethod,
         attendanceConfidence
       ]);
@@ -143,17 +156,17 @@ router.post('/record', async (req, res) => {
       // Use safe UPSERT for date-based attendance
       result = await safeUpsertAttendance(`
         INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
-        VALUES ($1, $2, $3, true, $4, $5)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (class_id, student_id, session_date)
         WHERE session_id IS NULL
-        DO UPDATE SET present = true, method = EXCLUDED.method, 
+        DO UPDATE SET present = $4, method = EXCLUDED.method, 
                       confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
                       recorded_at = now()
         RETURNING *;
-      `, [class_id, numericStudentId, targetDate, attendanceMethod, attendanceConfidence, null]);
+      `, [class_id, numericStudentId, targetDate, isPresent, attendanceMethod, attendanceConfidence, null]);
     }
 
-    console.log(`✅ Marked: ${student_id} (ID: ${numericStudentId})`);
+    console.log(`✅ Marked: ${student_id} (ID: ${numericStudentId}) as ${isPresent ? 'PRESENT' : 'ABSENT'}`);
     res.json({ success: true, attendance: result.rows[0] });
 
   } catch (error) {

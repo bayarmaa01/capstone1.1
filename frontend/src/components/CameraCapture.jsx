@@ -40,7 +40,7 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
     cameraStatusRef.current = cameraStatus;
   }, [cameraStatus]);
 
-  // Draw bounding boxes on overlay canvas
+  // Draw enhanced bounding boxes
   const drawBoundingBoxes = useCallback((faces, videoWidth, videoHeight) => {
     const canvas = overlayCanvasRef.current;
     if (!canvas) return;
@@ -59,24 +59,48 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       const width = (face.width / 100) * videoWidth;
       const height = (face.height / 100) * videoHeight;
       
-      // Draw rectangle
-      ctx.strokeStyle = face.recognized ? '#28a745' : '#ffc107';
+      // Choose colors based on recognition status
+      const strokeColor = face.recognized ? '#28a745' : '#ffc107';
+      const fillColor = face.recognized ? 'rgba(40, 167, 69, 0.2)' : 'rgba(255, 193, 7, 0.2)';
+      const textColor = face.recognized ? '#ffffff' : '#000000';
+      
+      // Draw filled rectangle with transparency
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(x, y, width, height);
+      
+      // Draw rectangle border
+      ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 3;
       ctx.strokeRect(x, y, width, height);
       
-      // Draw label background
-      ctx.fillStyle = face.recognized ? '#28a745' : '#ffc107';
+      // Draw label background for better visibility
       const labelText = face.recognized ? `${face.student_id}` : `Face ${index + 1}`;
-      ctx.font = '14px Arial';
+      ctx.font = 'bold 14px Arial';
       const textWidth = ctx.measureText(labelText).width;
-      ctx.fillRect(x, y - 25, textWidth + 10, 25);
+      const textHeight = 20;
+      const padding = 8;
+      
+      // Draw label background with rounded corners
+      ctx.fillStyle = strokeColor;
+      ctx.fillRect(x - padding, y - textHeight - padding, textWidth + padding * 2, textHeight + padding * 2);
       
       // Draw label text
-      ctx.fillStyle = 'white';
-      ctx.fillText(labelText, x + 5, y - 7);
+      ctx.fillStyle = textColor;
+      ctx.fillText(labelText, x, y - 5);
       
+      // Draw confidence below label
       if (face.confidence) {
-        ctx.fillText(`${Math.round(face.confidence)}%`, x + 5, y - 7 + 15);
+        ctx.font = '12px Arial';
+        ctx.fillStyle = textColor;
+        ctx.fillText(`${Math.round(face.confidence)}%`, x, y + textHeight + 5);
+      }
+      
+      // Draw corner indicators for recognized faces
+      if (face.recognized) {
+        ctx.fillStyle = '#28a745';
+        ctx.beginPath();
+        ctx.arc(x + width, y + height, 5, 0, 2 * Math.PI);
+        ctx.fill();
       }
     });
   }, []);
@@ -88,11 +112,8 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
 
   const showSuccessNotification = useCallback((studentId, confidencePercent) => {
     const note = document.createElement('div');
-    note.style.cssText = `
-      position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg,#28a745 0%,#20c997 100%);
-      color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;
-    `;
-    note.innerHTML = `✅ ${studentId} recognized<br/><small>${Math.round(confidencePercent)}%</small>`;
+    note.style.cssText = 'position: fixed; top: 18px; right: 18px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 10px 14px; border-radius: 8px; z-index: 99999; font-weight: 700;';
+    note.innerHTML = `\u2705 ${studentId} recognized<br/><small>${Math.round(confidencePercent)}%</small>`;
     document.body.appendChild(note);
     setTimeout(() => note.remove(), 3000);
   }, []);

@@ -264,6 +264,7 @@ def recognize_and_mark():
         
         # Load image
         image = face_recognition.load_image_file(file)
+        logger.info(f"🧠 Image loaded: {image.shape}")
         
         # Find all faces in image using configured model
         logger.info(f"🧠 Face detection model: {FACE_DETECTION_MODEL} | upsample: {FACE_UPSAMPLE_TIMES}")
@@ -273,7 +274,6 @@ def recognize_and_mark():
             model=FACE_DETECTION_MODEL
         )
         face_encodings = face_recognition.face_encodings(image, face_locations)
-        
         logger.info(f"🔍 Recognition request - Faces detected: {len(face_encodings)}")
         
         if len(face_encodings) == 0:
@@ -293,110 +293,9 @@ def recognize_and_mark():
             logger.warning("⚠️ No enrolled students yet")
             return jsonify({
                 "success": False,
-                "message": "No enrolled students in system",
-                "attendance_marked": []
-            })
-        
-        # Convert stored encodings back to numpy arrays
-        known_encodings = [np.array(current_encodings[k]) for k in known_ids]
-        
-        matches = []
-        attendance_results = []
-        
-        # DEBUG LOGS
-        print("ENCODINGS:", len(face_encodings))
-        print("KNOWN:", len(known_encodings))
-        
-        matches = []
-        if len(known_encodings) > 0 and len(face_encodings) > 0:
-            distances = face_recognition.face_distance(known_encodings, face_encodings[0])
-            best_match_index = np.argmin(distances)
-            confidence = 1 - distances[best_match_index]
-
-            if confidence > 0.6:
-                matches.append({
-                    "student_id": known_ids[best_match_index],
-                    "confidence": float(confidence)
-                })
-        
-        print("MATCHES:", matches)
-                
-        # Process attendance marking for matches
-        for match in matches:
-            student_id = match["student_id"]
-            
-            # Check if attendance can be marked
-            if can_mark_attendance(student_id):
-                # Mark attendance in Moodle
-                moodle_success, moodle_message = mark_attendance_in_moodle(student_id, status=1)
-                
-                if moodle_success:
-                    # Update local attendance session
-                    update_attendance_session(student_id)
-                    
-                    # Log attendance
-                    attendance_entry = {
-                        "student_id": student_id,
-                        "timestamp": datetime.now().isoformat(),
-                        "confidence": match["confidence"],
-                        "distance": 1 - match["confidence"],
-                        "moodle_status": "success",
-                        "method": "face_recognition"
-                    }
-                    
-                    # Add to attendance log
-                    current_attendance_log = get_attendance_log()
-                    today = datetime.now().strftime("%Y-%m-%d")
-                    if today not in current_attendance_log:
-                        current_attendance_log[today] = []
-                    current_attendance_log[today].append(attendance_entry)
-                    save_attendance_log(current_attendance_log)
-                    
-                    attendance_results.append({
-                        "student_id": student_id,
-                        "confidence": match["confidence"],
-                        "moodle_marked": True,
-                        "moodle_message": moodle_message
-                    })
-                    
-                    logger.info(f"✅ ATTENDANCE MARKED: {student_id} (confidence: {match['confidence']:.3f})")
-                else:
-                    attendance_results.append({
-                        "student_id": student_id,
-                        "confidence": match["confidence"],
-                        "moodle_marked": False,
-                        "moodle_message": moodle_message
-                    })
-                    logger.error(f"❌ Failed to mark attendance for {student_id}: {moodle_message}")
-            else:
-                attendance_results.append({
-                    "student_id": student_id,
-                    "confidence": match["confidence"],
-                    "moodle_marked": False,
-                    "moodle_message": "Duplicate attendance - session timeout not reached"
-                })
-                logger.warning(f" Duplicate attendance prevented for {student_id}")
-        
-        logger.info(f"📊 Total matches: {len(matches)}")
-        logger.info(f"📊 Attendance marked for: {len([r for r in attendance_results if r['moodle_marked']])} students")
-        
-        # Return consistent response format
-        if len(matches) > 0:
-            return jsonify({
-                "success": True,
+                "error": "No enrolled students in system",
                 "faces_detected": len(face_encodings),
-                "matches": matches,
-                "attendance_marked": attendance_results,
-                "message": f"Processed {len(face_encodings)} faces, marked attendance for {len([r for r in attendance_results if r['moodle_marked']])} students"
-            })
-        else:
-            # Face detected but no match
-            return jsonify({
-                "success": False,
-                "error": "Face not recognized",
-                "faces_detected": len(face_encodings),
-                "matches": [],
-                "attendance_marked": []
+                "matches": []
             })
         
     except Exception as e:
@@ -407,7 +306,7 @@ def recognize_and_mark():
 
 @app.route('/recognize', methods=['POST'])
 def recognize():
-    """Recognize faces without marking attendance"""
+    """Recognize faces without marking attendance - supports multi-face detection"""
     try:
         logger.info("🎯 Face recognition request received")
         
@@ -450,7 +349,8 @@ def recognize():
             return jsonify({
                 "success": False,
                 "error": "No face detected",
-                "faces_detected": 0
+                "faces_detected": 0,
+                "matches": []
             })
         
         # Check if we have any enrolled students
@@ -461,7 +361,8 @@ def recognize():
             return jsonify({
                 "success": False,
                 "error": "No enrolled students",
-                "faces_detected": len(face_encodings)
+                "faces_detected": len(face_encodings),
+                "matches": []
             })
 
         logger.info(f"👥 Comparing against {len(known_ids)} enrolled students: {known_ids}")
@@ -469,44 +370,66 @@ def recognize():
         # Convert stored encodings back to numpy arrays
         known_encodings = [np.array(current_encodings[k]) for k in known_ids]
 
+        # Process each detected face for multi-face support
         matches = []
         
-        # DEBUG LOGS
-        print("ENCODINGS:", len(face_encodings))
-        print("KNOWN:", len(known_encodings))
-        
-        matches = []
-        if len(known_encodings) > 0 and len(face_encodings) > 0:
-            distances = face_recognition.face_distance(known_encodings, face_encodings[0])
-            best_match_index = np.argmin(distances)
-            confidence = 1 - distances[best_match_index]
-
-            if confidence > 0.6:
+        for i, face_encoding in enumerate(face_encodings):
+            face_location = face_locations[i]
+            x, y, w, h = face_recognition.face_utils.rect_to_bb(face_location)
+            
+            # Compare this face with all known faces
+            face_matches = []
+            for j, known_encoding in enumerate(known_encodings):
+                face_distances = face_recognition.face_distance([known_encoding], face_encoding)
+                best_match_distance = np.min(face_distances)
+                confidence = 1 - best_match_distance
+                
+                if confidence > 0.6:  # Recognition threshold
+                    face_matches.append({
+                        "student_id": known_ids[j],
+                        "confidence": float(confidence),
+                        "distance": float(best_match_distance)
+                    })
+            
+            # Find best match for this face
+            if face_matches:
+                best_match = max(face_matches, key=lambda x: x['confidence'])
                 matches.append({
-                    "student_id": known_ids[best_match_index],
-                    "confidence": float(confidence)
+                    "student_id": best_match["student_id"],
+                    "face_index": i,
+                    "x": int(x),
+                    "y": int(y),
+                    "width": int(w),
+                    "height": int(h),
+                    "confidence": round(best_match["confidence"], 2),
+                    "recognized": True
                 })
+                logger.info(f"✅ Face {i+1} matched: {best_match['student_id']} (confidence: {best_match['confidence']:.3f})")
+            else:
+                # Unrecognized face - still include with coordinates
+                matches.append({
+                    "face_index": i,
+                    "x": int(x),
+                    "y": int(y),
+                    "width": int(w),
+                    "height": int(h),
+                    "recognized": False,
+                    "confidence": 0
+                })
+                logger.info(f"❌ Face {i+1} not recognized")
         
-        print("MATCHES:", matches)
+        logger.info(f"📊 Total faces detected: {len(face_encodings)}")
+        logger.info(f"📊 Total matches: {len([m for m in matches if m['recognized']])}")
         
-        logger.info(f"📊 Total matches: {len(matches)}")
-        
-        # FINAL RESPONSE (STRICT)
-        if len(matches) > 0:
-            return jsonify({
-                "success": True,
-                "matches": matches,
-                "faces_detected": len(face_encodings)
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": "Face not recognized",
-                "faces_detected": len(face_encodings)
-            })
+        # Return comprehensive response with all faces and coordinates
+        return jsonify({
+            "success": True,
+            "faces_detected": len(face_encodings),
+            "matches": matches
+        })
         
     except Exception as e:
-        logger.error(f" Recognition error: {str(e)}")
+        logger.error(f"❌ Recognition error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"recognition failed: {str(e)}"}), 500

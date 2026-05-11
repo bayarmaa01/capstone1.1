@@ -5,6 +5,19 @@ import QRScanner from '../components/QRScanner';
 import CameraCapture from '../components/CameraCapture';
 import moment from 'moment';
 
+// Add this function at the top of the file, after imports
+const getStudentPhotoUrl = (photoUrl) => {
+  if (!photoUrl) return null;  
+  
+  // Handle both relative and absolute URLs
+  if (photoUrl.startsWith('http')) {
+    return photoUrl;
+  }
+  
+  // For local development or relative paths
+  return `${window.location.origin}/uploads/${photoUrl}`;
+};
+
 export default function AttendancePage() {
   const { scheduleId } = useParams();
   const navigate = useNavigate();
@@ -309,22 +322,25 @@ export default function AttendancePage() {
       
       console.log('Recording absent attendance - Student DB ID:', student.id, 'Class ID:', classInfo.id);
       
-      // Record absent attendance
+      // Record absent attendance using /record endpoint with present=false
       await api.post('/attendance/record', {
         class_id: classInfo.id,
         student_id: student.id,
         session_date: sessionDate,
         ...(scheduleId ? { session_id: scheduleId } : {}),
         method: 'manual',
-        present: false,
+        present: false,  // CRITICAL: Explicitly mark as absent
         confidence: 1.0
       });
       
+      // Remove from recognized set since they're marked absent
       setRecognizedIds(prev => {
         const newSet = new Set(prev);
         newSet.delete(student.student_id);
         return newSet;
       });
+      
+      // Refresh attendance data
       await fetchTodayAttendance(classInfo.id, sessionDate);
       showNotification(`${student.name} marked absent`, 'warning');
       
