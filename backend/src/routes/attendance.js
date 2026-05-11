@@ -6,6 +6,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { v4: uuidv4 } = require('uuid');
+const { manualFinalizeAttendance, finalizeAttendanceSession } = require('../services/attendanceFinalizer');
 
 // Safe UPSERT helper function with fallback
 async function safeUpsertAttendance(query, params, conflictColumns) {
@@ -589,41 +590,168 @@ router.get('/student/:studentId', async (req, res) => {
       numericStudentId = parseInt(studentId);
     }
     
-    const result = await db.query(`
-      SELECT 
-        a.id,
-        a.class_id,
-        a.session_date,
-        a.present,
-        a.method,
-        a.confidence,
-        a.recorded_at,
-        c.code as class_code,
-        c.name as class_name,
-        s.name as student_name
-      FROM attendance a
-      JOIN classes c ON c.id = a.class_id
-      JOIN students s ON s.id = a.student_id
-      WHERE a.student_id = $1
-      ORDER BY a.session_date DESC, a.recorded_at DESC
+    // Get all classes the student is enrolled in
+    const enrolledClassesResult = await db.query(`
+      SELECT DISTINCT c.id, c.code, c.name
+      FROM classes c
+      JOIN enrollments e ON c.id = e.class_id
+      WHERE e.student_id = $1
+      ORDER BY c.code
     `, [numericStudentId]);
     
+    const allAttendanceRecords = [];
+    
+    // For each enrolled class, get all attendance sessions (including auto-generated absents)
+    for (const classInfo of enrolledClassesResult.rows) {
+      const classAttendanceResult = await db.query(`
+        SELECT 
+          a.id,
+          a.session_date,
+          a.present,
+          a.method,
+          a.confidence,
+          a.recorded_at,
+          '${classInfo.code}' as class_code,
+          '${classInfo.name}' as class_name,
+          s.name as student_name,
+          s.student_id
+        FROM attendance a
+        JOIN students s ON s.id = a.student_id
+        WHERE a.class_id = $1 AND a.student_id = $2
+        ORDER BY a.session_date DESC, a.recorded_at DESC
+      `, [classInfo.id, numericStudentId]);
+      
+      allAttendanceRecords.push(...classAttendanceResult.rows);
+    }
+    
+    // Sort all records by date
+    allAttendanceRecords.sort((a, b) => {
+      const dateCompare = new Date(b.session_date) - new Date(a.session_date);
+      if (dateCompare !== 0) return dateCompare;
+      return new Date(b.recorded_at) - new Date(a.recorded_at);
+    });
+    
     // Calculate attendance statistics
-    const totalSessions = result.rows.length;
-    const presentSessions = result.rows.filter(r => r.present).length;
+    const totalSessions = allAttendanceRecords.length;
+    const presentSessions = allAttendanceRecords.filter(r => r.present).length;
+    const absentSessions = totalSessions - presentSessions;
     const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions * 100).toFixed(2) : 0;
     
+    console.log(`📊 Student ${studentId} attendance summary:`, {
+      totalSessions,
+      presentSessions,
+      absentSessions,
+      attendanceRate
+    });
+    
     res.json({
-      attendance: result.rows,
+      attendance: allAttendanceRecords,
       stats: {
         total_sessions: totalSessions,
         present_sessions: presentSessions,
+        absent_sessions: absentSessions,
         attendance_rate: parseFloat(attendanceRate)
       }
     });
     
   } catch (error) {
     console.error('Error fetching student attendance:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =======================================
+// 🎓 Finalize Attendance Session
+// =======================================
+router.post('/finalize', async (req, res) => {
+  console.log("🎓 Attendance finalization route hit:", req.originalUrl);
+  try {
+    const { class_id, session_date, session_id, recognized_student_ids } = req.body;
+
+    console.log('🎓 FINALIZATION REQUEST:', { 
+      class_id, 
+      session_date, 
+      session_id,
+      recognized_student_ids,
+      bodyKeys: Object.keys(req.body)
+    });
+
+    if (!class_id || !session_date) {
+      console.log('❌ MISSING REQUIRED FIELDS:', { class_id, session_date });
+      return res.status(400).json({ 
+        error: 'class_id and session_date are required' 
+      });
+    }
+
+    // Convert recognized_student_ids to array if it's a string
+    let recognizedIds = recognized_student_ids || [];
+    if (typeof recognizedIds === 'string') {
+      recognizedIds = recognizedIds.split(',').map(id => id.trim());
+    }
+
+    const result = await manualFinalizeAttendance(
+      parseInt(class_id), 
+      session_date, 
+      session_id ? parseInt(session_id) : null, 
+      recognizedIds
+    );
+
+    console.log('✅ Attendance finalization completed:', result);
+    res.json({ 
+      success: true, 
+      message: 'Attendance session finalized successfully',
+      ...result
+    });
+
+  } catch (error) {
+    console.error('❌ Attendance finalization error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =======================================
+// 🎓 Auto-Finalize Attendance (called by frontend when session ends)
+// =======================================
+router.post('/auto-finalize', async (req, res) => {
+  console.log("🎓 Auto attendance finalization route hit:", req.originalUrl);
+  try {
+    const { class_id, session_date, session_id } = req.body;
+
+    if (!class_id || !session_date) {
+      return res.status(400).json({ 
+        error: 'class_id and session_date are required' 
+      });
+    }
+
+    // Get currently recognized students for this session
+    const recognizedResult = await db.query(`
+      SELECT DISTINCT s.student_id
+      FROM attendance a
+      JOIN students s ON a.student_id = s.id
+      WHERE a.class_id = $1 
+        AND a.session_date = $2 
+        AND a.present = true
+        ${session_id ? 'AND a.session_id = $3' : 'AND a.session_id IS NULL'}
+    `, session_id ? [parseInt(class_id), session_date, parseInt(session_id)] : [parseInt(class_id), session_date]);
+
+    const recognizedStudentIds = recognizedResult.rows.map(row => row.student_id);
+    
+    const result = await finalizeAttendanceSession(
+      parseInt(class_id), 
+      session_date, 
+      session_id ? parseInt(session_id) : null, 
+      recognizedStudentIds
+    );
+
+    console.log('✅ Auto attendance finalization completed:', result);
+    res.json({ 
+      success: true, 
+      message: 'Attendance automatically finalized',
+      ...result
+    });
+
+  } catch (error) {
+    console.error('❌ Auto attendance finalization error:', error);
     res.status(500).json({ error: error.message });
   }
 });

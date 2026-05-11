@@ -20,6 +20,7 @@ function base64ToBlob(base64) {
 export default function CameraCapture({ classId, sessionId, sessionDate, onRecognized, onError }) {
   const videoRef = useRef(null);
   const debugCanvasRef = useRef(null);
+  const overlayCanvasRef = useRef(null);
 
   const streamRef = useRef(null);
   const intervalRef = useRef(null);
@@ -27,16 +28,58 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
   const cameraStatusRef = useRef('idle');
 
   const [cameraStatus, setCameraStatus] = useState('idle'); // 'idle'|'requesting'|'active'|'stopped'|'error'
-
-  // Update ref when cameraStatus changes
-  useEffect(() => {
-    cameraStatusRef.current = cameraStatus;
-  }, [cameraStatus]);
   const [permissionError, setPermissionError] = useState('');
   const [scanStatus, setScanStatus] = useState('Idle');
   const [scanColor, setScanColor] = useState('#17a2b8');
   const [scanCount, setScanCount] = useState(0);
   const [isScanning, setIsScanning] = useState(false);
+  const [detectedFaces, setDetectedFaces] = useState([]);
+
+  // Update ref when cameraStatus changes
+  useEffect(() => {
+    cameraStatusRef.current = cameraStatus;
+  }, [cameraStatus]);
+
+  // Draw bounding boxes on overlay canvas
+  const drawBoundingBoxes = useCallback((faces, videoWidth, videoHeight) => {
+    const canvas = overlayCanvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    canvas.width = videoWidth;
+    canvas.height = videoHeight;
+    
+    // Clear previous drawings
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    faces.forEach((face, index) => {
+      // Scale face coordinates to video dimensions
+      const x = (face.x / 100) * videoWidth;
+      const y = (face.y / 100) * videoHeight;
+      const width = (face.width / 100) * videoWidth;
+      const height = (face.height / 100) * videoHeight;
+      
+      // Draw rectangle
+      ctx.strokeStyle = face.recognized ? '#28a745' : '#ffc107';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(x, y, width, height);
+      
+      // Draw label background
+      ctx.fillStyle = face.recognized ? '#28a745' : '#ffc107';
+      const labelText = face.recognized ? `${face.student_id}` : `Face ${index + 1}`;
+      ctx.font = '14px Arial';
+      const textWidth = ctx.measureText(labelText).width;
+      ctx.fillRect(x, y - 25, textWidth + 10, 25);
+      
+      // Draw label text
+      ctx.fillStyle = 'white';
+      ctx.fillText(labelText, x + 5, y - 7);
+      
+      if (face.confidence) {
+        ctx.fillText(`${Math.round(face.confidence)}%`, x + 5, y - 7 + 15);
+      }
+    });
+  }, []);
 
   const setBanner = useCallback((text, color) => {
     setScanStatus(text);
@@ -185,53 +228,82 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       // Handle different response scenarios
       if (!resp || !resp.data || resp.data.error) {
         setBanner('❌ Request failed', '#dc3545');
+        setDetectedFaces([]);
         return;
       }
 
       const matches = Array.isArray(resp.data.matches) ? resp.data.matches : [];
+      const facesDetected = resp.data.faces_detected || 0;
+      
       if (!resp.data.success) {
         setBanner('❌ Request failed', '#dc3545');
+        setDetectedFaces([]);
         return;
       }
 
-      if (resp.data.faces_detected === 0) {
+      if (facesDetected === 0) {
         setBanner('❌ No face detected', '#dc3545');
+        setDetectedFaces([]);
         return;
       }
 
-      if (matches.length === 0) {
-        setBanner('❌ Face detected but not recognized', '#dc3545');
-        return;
+      // Prepare face data for bounding boxes
+      const faceData = [];
+      let recognizedCount = 0;
+
+      // Add detected faces (even if not recognized)
+      for (let i = 0; i < facesDetected; i++) {
+        const match = matches.find(m => m.face_index === i);
+        if (match) {
+          // Recognized face
+          let rawConfidence = typeof match.confidence === 'number' ? match.confidence : parseFloat(match.confidence);
+          if (Number.isNaN(rawConfidence)) rawConfidence = 0;
+          const confidencePercent = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
+          
+          faceData.push({
+            x: match.x || 20 + (i * 25), // Default positioning if no coords
+            y: match.y || 20,
+            width: match.width || 20,
+            height: match.height || 25,
+            recognized: confidencePercent > 50,
+            student_id: match.student_id,
+            confidence: confidencePercent
+          });
+          
+          if (confidencePercent > 50) {
+            recognizedCount++;
+            const key = `${match.student_id}-${sessionDate}`;
+            
+            // only emit once per student/session
+            if (!recognizedRef.current.has(key)) {
+              recognizedRef.current.add(key);
+              showSuccessNotification(match.student_id, confidencePercent);
+              if (onRecognized) onRecognized({ ...match, confidence_percent: confidencePercent });
+            }
+          }
+        } else {
+          // Unrecognized face
+          faceData.push({
+            x: 20 + (i * 25),
+            y: 20,
+            width: 20,
+            height: 25,
+            recognized: false,
+            student_id: null,
+            confidence: 0
+          });
+        }
       }
 
-      const best = matches[0];
+      // Draw bounding boxes
+      drawBoundingBoxes(faceData, w, h);
+      setDetectedFaces(faceData);
 
-      // normalize confidence (support 0..1 or 0..100)
-      let rawConfidence = typeof best.confidence === 'number' ? best.confidence : parseFloat(best.confidence);
-      if (Number.isNaN(rawConfidence)) rawConfidence = 0;
-      const confidencePercent = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
-      const roundedPct = Math.round(confidencePercent);
-
-      const key = `${best.student_id}-${sessionDate}`;
-
-      console.debug('Best match:', { student_id: best.student_id, rawConfidence, confidencePercent });
-
-      // THRESHOLD: strictly greater than 50% (demo safety)
-      if (!(confidencePercent > 50)) {
-        setBanner(`Low confidence (${roundedPct}%)`, '#dc3545');
-        return;
-      }
-
-      setBanner(`✅ Match: ${best.student_id} (${roundedPct}%)`, '#28a745');
-
-      // only emit once per student/session
-      if (!recognizedRef.current.has(key)) {
-        recognizedRef.current.add(key);
-        showSuccessNotification(best.student_id, confidencePercent);
-        if (onRecognized) onRecognized({ ...best, confidence_percent: confidencePercent });
-        setBanner(`✅ Recognized: ${best.student_id} (${roundedPct}%)`, '#28a745');
+      // Update status banner
+      if (recognizedCount > 0) {
+        setBanner(`✅ ${recognizedCount} face(s) recognized`, '#28a745');
       } else {
-        console.debug('Already recorded for this session:', key);
+        setBanner(`❌ ${facesDetected} face(s) detected, none recognized`, '#dc3545');
       }
 
     } catch (err) {
@@ -239,7 +311,7 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       setBanner('⚠️ Recognition unavailable', '#6c757d');
       if (onError) onError(err);
     }
-  }, [cameraStatus, isScanning, sessionDate, setBanner, showSuccessNotification, onRecognized, onError]);
+  }, [cameraStatus, isScanning, sessionDate, setBanner, showSuccessNotification, onRecognized, onError, drawBoundingBoxes]);
 
   const startCamera = useCallback(async () => {
     try {
@@ -296,7 +368,14 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
-
+    
+    // Clear overlay canvas
+    if (overlayCanvasRef.current) {
+      const ctx = overlayCanvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, overlayCanvasRef.current.width, overlayCanvasRef.current.height);
+    }
+    
+    setDetectedFaces([]);
     setCameraStatus('stopped');
     setBanner('Stopped', '#6c757d');
     setIsScanning(false);
@@ -329,10 +408,23 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
           muted
           playsInline
         />
+        <canvas
+          ref={overlayCanvasRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+            borderRadius: 10
+          }}
+        />
         <div style={{
           position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
           backgroundColor: scanColor, color: 'white',
-          padding: '8px 14px', borderRadius: 20, fontWeight: 700
+          padding: '8px 14px', borderRadius: 20, fontWeight: 700,
+          zIndex: 10
         }}>
           {scanStatus}
         </div>
@@ -359,6 +451,11 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
           </button>
         )}
         <span style={{ marginLeft: 12, fontWeight: 700 }}>Scans: {scanCount}</span>
+        {detectedFaces.length > 0 && (
+          <span style={{ marginLeft: 12, fontWeight: 700, color: '#28a745' }}>
+            Faces: {detectedFaces.filter(f => f.recognized).length}/{detectedFaces.length}
+          </span>
+        )}
       </div>
     </div>
   );

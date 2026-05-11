@@ -294,9 +294,50 @@ export default function AttendancePage() {
     }
   };
 
+  const handleManualMarkAbsent = async (student) => {
+    try {
+      console.log('Manual marking absent for:', student);
+      
+      if (!student || !student.id) {
+        alert('Invalid student data');
+        return;
+      }
+      
+      // Confirm action
+      const confirmed = window.confirm(`Mark ${student.name} (${student.student_id}) as absent?`);
+      if (!confirmed) return;
+      
+      console.log('Recording absent attendance - Student DB ID:', student.id, 'Class ID:', classInfo.id);
+      
+      // Record absent attendance
+      await api.post('/attendance/record', {
+        class_id: classInfo.id,
+        student_id: student.id,
+        session_date: sessionDate,
+        ...(scheduleId ? { session_id: scheduleId } : {}),
+        method: 'manual',
+        present: false,
+        confidence: 1.0
+      });
+      
+      setRecognizedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(student.student_id);
+        return newSet;
+      });
+      await fetchTodayAttendance(classInfo.id, sessionDate);
+      showNotification(`${student.name} marked absent`, 'warning');
+      
+    } catch (error) {
+      console.error('Manual absent marking error:', error);
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to record absent attendance';
+      alert(`Error: ${errorMsg}`);
+    }
+  };
+
   const showNotification = (message, type = 'success') => {
     const notification = document.createElement('div');
-    const bgColor = type === 'success' ? '#28a745' : '#dc3545';
+    const bgColor = type === 'success' ? '#28a745' : type === 'warning' ? '#ffc107' : '#dc3545';
     notification.style.cssText = `
       position: fixed;
       top: 20px;
@@ -313,6 +354,49 @@ export default function AttendancePage() {
     notification.textContent = message;
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 3000);
+  };
+
+  const finalizeAttendanceSession = async () => {
+    try {
+      console.log('🎓 Finalizing attendance session...', {
+        classId: classInfo.id,
+        sessionDate,
+        sessionId: scheduleId
+      });
+
+      const response = await api.post('/attendance/auto-finalize', {
+        class_id: classInfo.id,
+        session_date: sessionDate,
+        session_id: scheduleId
+      });
+
+      console.log('✅ Attendance finalization response:', response.data);
+      
+      showNotification(
+        `Session finalized: ${response.data.markedAbsent} marked absent, ${response.data.totalEnrolled} total students`,
+        'success'
+      );
+
+      // Refresh attendance data to show the updated records
+      await fetchTodayAttendance(classInfo.id, sessionDate);
+      
+      return response.data;
+
+    } catch (error) {
+      console.error('❌ Attendance finalization error:', error);
+      showNotification('Failed to finalize attendance session', 'error');
+    }
+  };
+
+  const handleEndSession = async () => {
+    const confirmed = window.confirm(
+      'End attendance session?\n\n' +
+      'This will automatically mark all unrecognized students as absent and finalize the attendance records.'
+    );
+    
+    if (!confirmed) return;
+
+    await finalizeAttendanceSession();
   };
 
   const getStudentPhotoUrl = (photoUrl) => {
@@ -559,6 +643,12 @@ export default function AttendancePage() {
               <div style={styles.statLabel}>Current Time</div>
             </div>
           )}
+          <button 
+            onClick={handleEndSession}
+            style={styles.endSessionBtn}
+          >
+            🎓 End Session
+          </button>
         </div>
       </header>
 
@@ -695,7 +785,15 @@ export default function AttendancePage() {
                 </div>
                 <div>
                   {student.present ? (
-                    <span style={styles.presentBadge}>Present</span>
+                    <>
+                      <span style={styles.presentBadge}>Present</span>
+                      <button 
+                        onClick={() => handleManualMarkAbsent(student)}
+                        style={styles.markAbsentBtn}
+                      >
+                        Mark Absent
+                      </button>
+                    </>
                   ) : (
                     <>
                       <span style={styles.absentBadge}>Absent</span>
@@ -912,6 +1010,18 @@ const styles = {
     fontWeight: '600',
     transition: 'background 0.3s'
   },
+  markAbsentBtn: {
+    padding: '8px 16px',
+    background: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background 0.3s',
+    marginLeft: '8px'
+  },
   emptyState: {
     textAlign: 'center',
     padding: '40px',
@@ -927,5 +1037,18 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     marginTop: '15px'
+  },
+  endSessionBtn: {
+    padding: '12px 20px',
+    background: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '700',
+    boxShadow: '0 4px 12px rgba(238, 90, 82, 0.3)',
+    transition: 'all 0.3s',
+    minWidth: '140px'
   }
 };

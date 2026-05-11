@@ -46,10 +46,22 @@ export default function StudentProfile() {
       setLoading(true);
       const response = await api.get(`/students/${id}`);
       setStudent(response.data);
+      
+      // Use the enhanced attendance endpoint that includes all records
       const attendanceResponse = await api.get(`/attendance/student/${id}`);
+      console.log('📊 Student attendance data:', attendanceResponse.data);
       setAttendanceSummary(attendanceResponse.data);
-      const historyResponse = await api.get(`/students/${id}/attendance`);
-      setAttendanceHistory(historyResponse.data);
+      
+      // Get detailed attendance history
+      const historyResponse = await api.get(`/attendance/student/${id}`);
+      setAttendanceHistory(historyResponse.data.attendance || []);
+      
+      console.log('📈 Student attendance summary:', {
+        total_sessions: attendanceResponse.data.total_sessions,
+        present_sessions: attendanceResponse.data.present_sessions,
+        absent_sessions: attendanceResponse.data.absent_sessions,
+        attendance_rate: attendanceResponse.data.attendance_rate
+      });
     } catch (error) {
       console.error('Error fetching student data:', error);
     } finally {
@@ -90,15 +102,11 @@ export default function StudentProfile() {
   }
 
   const pieData = [
-    { name: 'Attended', value: attendanceSummary.attended_classes, color: '#10b981' },
-    {
-      name: 'Missed',
-      value: Math.max(0, attendanceSummary.total_classes - attendanceSummary.attended_classes),
-      color: '#ef4444'
-    }
+    { name: 'Present', value: attendanceSummary.present_sessions || 0, color: '#10b981' },
+    { name: 'Absent', value: attendanceSummary.absent_sessions || 0, color: '#ef4444' }
   ];
 
-  const barData = attendanceSummary.recent_records
+  const barData = (attendanceHistory || [])
     .slice(0, 10)
     .reverse()
     .map((record) => ({
@@ -108,7 +116,7 @@ export default function StudentProfile() {
           new Date(record.session_date).toLocaleDateString()
         ) : 
         'N/A',
-      attended: record.present ? 1 : 0
+      attended: (record.present === true || record.status === 'present') ? 1 : 0
     }));
 
   return (
@@ -276,7 +284,7 @@ export default function StudentProfile() {
             </div>
           </div>
           <p style={{ marginTop: '10px', color: '#64748b', fontSize: '14px' }}>
-            Total classes: {attendanceSummary.total_classes} | Attended: {attendanceSummary.attended_classes} | Attendance rate: {attendanceSummary.attendance_rate}%
+            Total sessions: {attendanceSummary.total_sessions} | Present: {attendanceSummary.present_sessions} | Absent: {attendanceSummary.absent_sessions} | Attendance rate: {attendanceSummary.attendance_rate}%
           </p>
         </div>
       </div>
@@ -336,11 +344,21 @@ export default function StudentProfile() {
                   }}>
                     Status
                   </th>
+                  <th style={{
+                    padding: '12px 16px',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    color: '#374151',
+                    borderBottom: '2px solid #e5e7eb',
+                    fontSize: '14px'
+                  }}>
+                    Method
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {attendanceHistory
-                  .filter(item => !showOnlyAbsences || item.status === 'absent')
+                  .filter(item => !showOnlyAbsences || (item.status === 'absent' || !item.present))
                   .map((item, index) => (
                     <tr 
                       key={index} 
@@ -378,10 +396,33 @@ export default function StudentProfile() {
                           gap: '6px',
                           padding: '4px 12px',
                           borderRadius: '20px',
-                          backgroundColor: item.status === 'present' ? '#d1fae5' : '#fee2e2',
-                          color: item.status === 'present' ? '#065f46' : '#991b1b'
+                          backgroundColor: (item.status === 'present' || item.present) ? '#d1fae5' : '#fee2e2',
+                          color: (item.status === 'present' || item.present) ? '#065f46' : '#991b1b'
                         }}>
-                          {item.status === 'present' ? '✅' : '❌'} {item.status === 'present' ? 'Present' : 'Absent'}
+                          {(item.status === 'present' || item.present) ? '✅' : '❌'} {(item.status === 'present' || item.present) ? 'Present' : 'Absent'}
+                        </span>
+                      </td>
+                      <td style={{
+                        padding: '12px 16px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        color: '#6b7280'
+                      }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          padding: '2px 8px',
+                          borderRadius: '12px',
+                          backgroundColor: item.method === 'auto_absent' ? '#fef3c7' : '#f3f4f6',
+                          color: '#374151',
+                          fontSize: '12px'
+                        }}>
+                          {item.method === 'face' && '👤'}
+                          {item.method === 'qr' && '📱'}
+                          {item.method === 'manual' && '✋'}
+                          {item.method === 'auto_absent' && '🤖'}
+                          {item.method || 'Unknown'}
                         </span>
                       </td>
                     </tr>
