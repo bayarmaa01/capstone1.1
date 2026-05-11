@@ -375,7 +375,18 @@ def recognize():
         
         for i, face_encoding in enumerate(face_encodings):
             face_location = face_locations[i]
-            x, y, w, h = face_recognition.face_utils.rect_to_bb(face_location)
+            # Convert face location tuple to bounding box coordinates
+            if len(face_location) == 4:  # (top, right, bottom, left)
+                top, right, bottom, left = face_location
+                x = left
+                y = top
+                w = right - left
+                h = bottom - top
+            else:  # Fallback positioning
+                x = 20 + (i * 25)
+                y = 20
+                w = 20
+                h = 25
             
             # Compare this face with all known faces
             face_matches = []
