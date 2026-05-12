@@ -52,9 +52,8 @@ export default function StudentProfile() {
       console.log('📊 Student attendance data:', attendanceResponse.data);
       setAttendanceSummary(attendanceResponse.data);
       
-      // Get detailed attendance history
-      const historyResponse = await api.get(`/attendance/student/${id}`);
-      setAttendanceHistory(historyResponse.data.attendance || []);
+      // Use the same response for history - it already contains all records
+      setAttendanceHistory(attendanceResponse.data.recent_records || []);
       
       console.log('📈 Student attendance summary:', {
         total_sessions: attendanceResponse.data.total_sessions,

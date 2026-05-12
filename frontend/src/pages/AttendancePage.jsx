@@ -31,6 +31,7 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
   const [error, setError] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const queryParams = new URLSearchParams(location.search);
   const classIdFromQuery = queryParams.get('classId');
@@ -309,21 +310,28 @@ export default function AttendancePage() {
 
   const handleManualMarkAbsent = async (student) => {
     try {
-      console.log('Manual marking absent for:', student);
+      console.log('🔴 Manual marking absent for:', student);
+      setIsProcessing(true); // Set loading state
       
       if (!student || !student.id) {
+        console.error('❌ Invalid student data:', student);
         alert('Invalid student data');
+        setIsProcessing(false);
         return;
       }
       
       // Confirm action
       const confirmed = window.confirm(`Mark ${student.name} (${student.student_id}) as absent?`);
-      if (!confirmed) return;
+      if (!confirmed) {
+        console.log('⚠️ User cancelled absent marking');
+        setIsProcessing(false);
+        return;
+      }
       
-      console.log('Recording absent attendance - Student DB ID:', student.id, 'Class ID:', classInfo.id);
+      console.log('📝 Recording absent attendance - Student DB ID:', student.id, 'Class ID:', classInfo.id, 'Session:', sessionDate);
       
       // Record absent attendance using /record endpoint with present=false
-      await api.post('/attendance/record', {
+      const response = await api.post('/attendance/record', {
         class_id: classInfo.id,
         student_id: student.id,
         session_date: sessionDate,
@@ -332,6 +340,8 @@ export default function AttendancePage() {
         present: false,  // CRITICAL: Explicitly mark as absent
         confidence: 1.0
       });
+      
+      console.log('✅ Absent attendance response:', response.data);
       
       // Remove from recognized set since they're marked absent
       setRecognizedIds(prev => {
@@ -343,11 +353,19 @@ export default function AttendancePage() {
       // Refresh attendance data
       await fetchTodayAttendance(classInfo.id, sessionDate);
       showNotification(`${student.name} marked absent`, 'warning');
+      console.log('✅ Successfully marked absent:', student.name);
       
     } catch (error) {
-      console.error('Manual absent marking error:', error);
+      console.error('❌ Manual absent marking error:', error);
+      console.error('Error details:', {
+        response: error.response?.data,
+        status: error.response?.status,
+        message: error.message
+      });
       const errorMsg = error.response?.data?.error || error.message || 'Failed to record absent attendance';
       alert(`Error: ${errorMsg}`);
+    } finally {
+      setIsProcessing(false); // Clear loading state
     }
   };
 

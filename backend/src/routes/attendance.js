@@ -115,12 +115,28 @@ router.post('/record', async (req, res) => {
     const uniqueSessionId = session_id || uuidv4();
     
     // Mark attendance (session-scoped when session_id is provided).
-    // This fixes cross-session bleed on the same calendar date.
+    // This fixes cross-session bleed on same calendar date.
     let result;
     const targetDate = session_date || new Date().toISOString().slice(0, 10);
     const attendanceMethod = method || 'face_recognition';
     const attendanceConfidence = confidence || 1.0;
     const isPresent = present !== undefined ? present : true; // Default to true if not specified
+    
+    // Prevent duplicate attendance records for same student, session, and status
+    const duplicateCheck = await db.query(`
+      SELECT id FROM attendance 
+      WHERE student_id = $1 AND class_id = $2 AND session_id = $3 
+      AND present = $4 AND session_date = $5
+      LIMIT 1
+    `, [numericStudentId, class_id, uniqueSessionId, isPresent, targetDate]);
+    
+    if (duplicateCheck.rows.length > 0) {
+      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId}`);
+      return res.status(409).json({ 
+        error: 'Duplicate attendance record',
+        message: 'Student already marked for this session'
+      });
+    }
     
     console.log('🎯 Attendance Details:', {
       class_id,
@@ -352,13 +368,12 @@ router.get('/class/:classId/stats', async (req, res) => {
       SELECT 
         s.id, s.student_id, s.name, s.email,
         COUNT(CASE WHEN a.present = true THEN 1 END) AS total_present,
-        (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1) AS total_sessions,
+        COUNT(a.session_date) AS total_sessions,
         CASE 
-          WHEN (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1) = 0 THEN 0
+          WHEN COUNT(a.session_date) = 0 THEN 0
           ELSE ROUND(
-            ((COUNT(CASE WHEN a.present = true THEN 1 END)::float /
-              (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1)) * 100)::numeric,
-            2
+            (COUNT(CASE WHEN a.present = true THEN 1 END)::float / 
+             COUNT(a.session_date)) * 100, 2
           )
         END AS attendance_percentage
       FROM students s
@@ -369,7 +384,13 @@ router.get('/class/:classId/stats', async (req, res) => {
       ORDER BY attendance_percentage DESC NULLS LAST, s.name;
     `, [req.params.classId]);
 
-    res.json(result.rows);
+    // Clamp percentages between 0 and 100
+    const clampedResults = result.rows.map(row => ({
+      ...row,
+      attendance_percentage: Math.min(100, Math.max(0, row.attendance_percentage))
+    }));
+
+    res.json(clampedResults);
 
   } catch (error) {
     console.error('❌ Error fetching stats:', error);

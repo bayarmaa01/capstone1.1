@@ -316,8 +316,11 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
         }
       }
 
-      // Draw bounding boxes
-      drawBoundingBoxes(faceData, w, h);
+      // Draw bounding boxes with proper video dimensions
+      const video = videoRef.current;
+      if (video && video.videoWidth && video.videoHeight) {
+        drawBoundingBoxes(faceData, video.videoWidth, video.videoHeight);
+      }
       setDetectedFaces(faceData);
 
       // Update status banner
