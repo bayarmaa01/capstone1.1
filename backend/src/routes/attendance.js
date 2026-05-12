@@ -164,20 +164,12 @@ router.post('/record', async (req, res) => {
                       confidence = GREATEST(attendance.confidence, EXCLUDED.confidence),
                       recorded_at = now()
         RETURNING *;
-      `, [
-        class_id,
-        numericStudentId,
-        uniqueSessionId,
-        targetDate,
-        isPresent,
-        attendanceMethod,
-        attendanceConfidence
-      ]);
+      `, [class_id, numericStudentId, uniqueSessionId, targetDate, isPresent, attendanceMethod, attendanceConfidence]);
     } else {
       // Use safe UPSERT for date-based attendance
       result = await safeUpsertAttendance(`
         INSERT INTO attendance (class_id, student_id, session_date, present, method, confidence)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (class_id, student_id, session_date)
         WHERE session_id IS NULL
         DO UPDATE SET present = $4, method = EXCLUDED.method, 

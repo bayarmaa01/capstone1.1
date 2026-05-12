@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
+const getStudentPhotoUrl = (photoUrl) => {
+  if (!photoUrl) return null;
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) return photoUrl;
+  if (photoUrl.startsWith('/uploads/')) return photoUrl;
+  return `/uploads/${photoUrl}`;
+};
+
 export default function EnrollmentModal({ isOpen, onClose, classId, onEnrollmentSuccess }) {
   const [students, setStudents] = useState([]);
   const [filteredStudents, setFilteredStudents] = useState([]);
@@ -191,7 +198,7 @@ export default function EnrollmentModal({ isOpen, onClose, classId, onEnrollment
                 <div style={styles.studentInfo}>
                   {student.photo_url && (
                     <img 
-                      src={`/uploads/${student.photo_url}`} 
+                      src={getStudentPhotoUrl(student.photo_url)} 
                       alt={student.name}
                       style={styles.studentPhoto}
                       onError={(e) => e.target.style.display = 'none'}

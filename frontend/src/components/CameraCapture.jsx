@@ -43,21 +43,31 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
   // Draw enhanced bounding boxes
   const drawBoundingBoxes = useCallback((faces, videoWidth, videoHeight) => {
     const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
     
     const ctx = canvas.getContext('2d');
-    canvas.width = videoWidth;
-    canvas.height = videoHeight;
+    
+    // Get actual display dimensions of video element
+    const videoDisplayWidth = video.offsetWidth;
+    const videoDisplayHeight = video.offsetHeight;
+    
+    // Set canvas to match display dimensions
+    canvas.width = videoDisplayWidth;
+    canvas.height = videoDisplayHeight;
     
     // Clear previous drawings
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     faces.forEach((face, index) => {
-      // Scale face coordinates to video dimensions
-      const x = (face.x / 100) * videoWidth;
-      const y = (face.y / 100) * videoHeight;
-      const width = (face.width / 100) * videoWidth;
-      const height = (face.height / 100) * videoHeight;
+      // Scale face coordinates from video native dimensions to display dimensions
+      const scaleX = videoDisplayWidth / videoWidth;
+      const scaleY = videoDisplayHeight / videoHeight;
+      
+      const x = (face.x / 100) * videoWidth * scaleX;
+      const y = (face.y / 100) * videoHeight * scaleY;
+      const width = (face.width / 100) * videoWidth * scaleX;
+      const height = (face.height / 100) * videoHeight * scaleY;
       
       // Choose colors based on recognition status
       const strokeColor = face.recognized ? '#28a745' : '#ffc107';
