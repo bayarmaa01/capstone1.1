@@ -7,15 +7,10 @@ import moment from 'moment';
 
 // Add this function at the top of the file, after imports
 const getStudentPhotoUrl = (photoUrl) => {
-  if (!photoUrl) return null;  
-  
-  // Handle both relative and absolute URLs
-  if (photoUrl.startsWith('http')) {
-    return photoUrl;
-  }
-  
-  // For local development or relative paths
-  return `${window.location.origin}/uploads/${photoUrl}`;
+  if (!photoUrl) return null;
+  if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) return photoUrl;
+  if (photoUrl.startsWith('/uploads/')) return photoUrl;
+  return `/uploads/${photoUrl}`;
 };
 
 export default function AttendancePage() {
