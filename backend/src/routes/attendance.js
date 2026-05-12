@@ -18,8 +18,14 @@ async function safeUpsertAttendance(query, params, conflictColumns) {
     if (error.message.includes('there is no unique or exclusion constraint matching the ON CONFLICT specification')) {
       console.log('ON CONFLICT failed, using fallback UPDATE then INSERT logic');
       
-      // Extract values from params
-      const [class_id, student_id, session_date, session_id, present, method, confidence] = params;
+      // Extract values from params based on call type
+      if (params.length === 7) {
+        // Session-based call: [class_id, student_id, session_id, session_date, present, method, confidence]
+        var [class_id, student_id, session_id, session_date, present, method, confidence] = params;
+      } else {
+        // Date-based call: [class_id, student_id, session_date, present, method, confidence, session_id]
+        var [class_id, student_id, session_date, present, method, confidence, session_id] = params;
+      }
       
       // Try UPDATE first
       const updateResult = await db.query(`
@@ -125,7 +131,7 @@ router.post('/record', async (req, res) => {
     // Prevent duplicate attendance records for same student, session, and status
     const duplicateCheck = await db.query(`
       SELECT id, present, method, recorded_at FROM attendance 
-      WHERE student_id = $1 AND class_id = $2 AND session_date = $5
+      WHERE student_id = $1 AND class_id = $2 AND session_date = $3
       ORDER BY recorded_at DESC
       LIMIT 5
     `, [numericStudentId, class_id, targetDate]);
