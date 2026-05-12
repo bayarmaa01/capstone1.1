@@ -129,20 +129,32 @@ router.post('/record', async (req, res) => {
     const isPresent = present !== undefined ? present : true; // Default to true if not specified
     
     // Prevent duplicate attendance records for same student, session, and status
-    const duplicateCheck = await db.query(`
-      SELECT id, present, method, recorded_at FROM attendance 
-      WHERE student_id = $1 AND class_id = $2 AND session_date = $3
-      ORDER BY recorded_at DESC
-      LIMIT 5
-    `, [numericStudentId, class_id, targetDate]);
+    let duplicateCheck;
+    if (uniqueSessionId) {
+      // Session-based duplicate check
+      duplicateCheck = await db.query(`
+        SELECT id, present, method, recorded_at FROM attendance 
+        WHERE student_id = $1 AND class_id = $2 AND session_id = $3
+        ORDER BY recorded_at DESC
+        LIMIT 5
+      `, [numericStudentId, class_id, uniqueSessionId]);
+    } else {
+      // Date-based duplicate check (fallback)
+      duplicateCheck = await db.query(`
+        SELECT id, present, method, recorded_at FROM attendance 
+        WHERE student_id = $1 AND class_id = $2 AND session_date = $3 AND session_id IS NULL
+        ORDER BY recorded_at DESC
+        LIMIT 5
+      `, [numericStudentId, class_id, targetDate]);
+    }
     
-    // Check for existing attendance with same status on same session date
+    // Check for existing attendance with same status in the same session
     const hasExistingStatus = duplicateCheck.rows.some(record => 
       record.present === isPresent
     );
     
     if (hasExistingStatus) {
-      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId} - already marked as ${isPresent ? 'present' : 'absent'} for session ${targetDate}`);
+      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId} - already marked as ${isPresent ? 'present' : 'absent'} for session ${uniqueSessionId || targetDate}`);
       return res.status(409).json({ 
         error: 'Duplicate attendance record',
         message: `Student already marked as ${isPresent ? 'present' : 'absent'} for this session`
