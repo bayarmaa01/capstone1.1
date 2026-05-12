@@ -124,17 +124,23 @@ router.post('/record', async (req, res) => {
     
     // Prevent duplicate attendance records for same student, session, and status
     const duplicateCheck = await db.query(`
-      SELECT id FROM attendance 
-      WHERE student_id = $1 AND class_id = $2 AND session_id = $3 
-      AND present = $4 AND session_date = $5
-      LIMIT 1
-    `, [numericStudentId, class_id, uniqueSessionId, isPresent, targetDate]);
+      SELECT id, present, method, recorded_at FROM attendance 
+      WHERE student_id = $1 AND class_id = $2 AND session_date = $5
+      ORDER BY recorded_at DESC
+      LIMIT 5
+    `, [numericStudentId, class_id, targetDate]);
     
-    if (duplicateCheck.rows.length > 0) {
-      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId}`);
+    // Check for existing attendance with same status on same date
+    const hasExistingPresent = duplicateCheck.rows.some(record => 
+      record.present === isPresent && 
+      new Date(record.recorded_at).toDateString() === new Date().toDateString()
+    );
+    
+    if (hasExistingPresent) {
+      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId} - already marked as ${isPresent ? 'present' : 'absent'} today`);
       return res.status(409).json({ 
         error: 'Duplicate attendance record',
-        message: 'Student already marked for this session'
+        message: `Student already marked as ${isPresent ? 'present' : 'absent'} for this session`
       });
     }
     
