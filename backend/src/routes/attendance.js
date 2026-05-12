@@ -703,13 +703,11 @@ router.get('/student/:studentId', async (req, res) => {
     });
     
     res.json({
-      attendance: allAttendanceRecords,
-      stats: {
-        total_sessions: totalSessions,
-        present_sessions: presentSessions,
-        absent_sessions: absentSessions,
-        attendance_rate: parseFloat(attendanceRate)
-      }
+      recent_records: allAttendanceRecords,
+      total_sessions: totalSessions,
+      present_sessions: presentSessions,
+      absent_sessions: absentSessions,
+      attendance_rate: parseFloat(attendanceRate)
     });
     
   } catch (error) {
