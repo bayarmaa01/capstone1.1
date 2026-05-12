@@ -283,7 +283,7 @@ router.get('/student/:id', async (req, res) => {
       [numericStudentId]
     );
     const attendedResult = await db.query(
-      'SELECT COUNT(*) AS attended_classes FROM attendance WHERE student_id = $1 AND present = true',
+      'SELECT COUNT(DISTINCT session_date) AS attended_classes FROM attendance WHERE student_id = $1 AND present = true',
       [numericStudentId]
     );
     const recentResult = await db.query(`
@@ -327,7 +327,12 @@ router.get('/class/:classId/date/:date', async (req, res) => {
     const result = sessionId
       ? await db.query(`
         SELECT 
-          s.id, s.student_id, s.name, s.photo_url,
+          s.id, s.student_id, s.name, 
+          CASE 
+            WHEN s.photo_url IS NOT NULL AND s.photo_url != '' THEN 
+              CASE WHEN s.photo_url LIKE 'http%' THEN s.photo_url ELSE '/uploads/' || s.photo_url END
+            ELSE NULL 
+          END as photo_url,
           COALESCE(a.present, false) AS present,
           a.method, a.confidence, a.recorded_at
         FROM students s
@@ -341,7 +346,12 @@ router.get('/class/:classId/date/:date', async (req, res) => {
       `, [classId, sessionId])
       : await db.query(`
         SELECT 
-          s.id, s.student_id, s.name, s.photo_url,
+          s.id, s.student_id, s.name, 
+          CASE 
+            WHEN s.photo_url IS NOT NULL AND s.photo_url != '' THEN 
+              CASE WHEN s.photo_url LIKE 'http%' THEN s.photo_url ELSE '/uploads/' || s.photo_url END
+            ELSE NULL 
+          END as photo_url,
           COALESCE(a.present, false) AS present,
           a.method, a.confidence, a.recorded_at
         FROM students s
@@ -372,12 +382,12 @@ router.get('/class/:classId/stats', async (req, res) => {
     const result = await db.query(`
       SELECT 
         s.id, s.student_id, s.name, s.email,
-        COUNT(CASE WHEN a.present = true THEN 1 END) AS total_present,
+        COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) AS total_present,
         COUNT(DISTINCT a.session_date) AS total_sessions,
         CASE 
           WHEN COUNT(DISTINCT a.session_date) = 0 THEN 0
           ELSE ROUND(
-            (COUNT(CASE WHEN a.present = true THEN 1 END)::float / 
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END)::float / 
              COUNT(DISTINCT a.session_date)) * 100, 2
           )
         END AS attendance_percentage
@@ -412,14 +422,13 @@ router.get('/class/:classId/stats/above75', async (req, res) => {
     const result = await db.query(`
       SELECT 
         s.id, s.student_id, s.name, s.email,
-        COUNT(CASE WHEN a.present = true THEN 1 END) AS total_present,
+        COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) AS total_present,
         (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1) AS total_sessions,
         CASE 
           WHEN (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1) = 0 THEN 0
           ELSE ROUND(
-            ((COUNT(CASE WHEN a.present = true THEN 1 END)::float /
-              (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1)) * 100)::numeric,
-            2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END)::float /
+              (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1)) * 100, 2
           )
         END AS attendance_percentage
       FROM students s
@@ -429,11 +438,10 @@ router.get('/class/:classId/stats/above75', async (req, res) => {
       GROUP BY s.id, s.student_id, s.name, s.email
       HAVING 
         (CASE 
-          WHEN (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1) = 0 THEN 0
+          WHEN COUNT(DISTINCT a.session_date) = 0 THEN 0
           ELSE ROUND(
-            ((COUNT(CASE WHEN a.present = true THEN 1 END)::float /
-              (SELECT COUNT(DISTINCT session_date) FROM attendance WHERE class_id = $1)) * 100)::numeric,
-            2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END)::float /
+              COUNT(DISTINCT a.session_date)) * 100, 2
           )
         END) >= 75
       ORDER BY attendance_percentage DESC, s.name;
@@ -640,10 +648,10 @@ router.get('/student/:studentId', async (req, res) => {
     
     const allAttendanceRecords = [];
     
-    // For each enrolled class, get all attendance sessions (including auto-generated absents)
+    // For each enrolled class, get unique attendance sessions (deduplicated)
     for (const classInfo of enrolledClassesResult.rows) {
       const classAttendanceResult = await db.query(`
-        SELECT 
+        SELECT DISTINCT ON (session_date)
           a.id,
           a.session_date,
           a.present,
@@ -657,7 +665,7 @@ router.get('/student/:studentId', async (req, res) => {
         FROM attendance a
         JOIN students s ON s.id = a.student_id
         WHERE a.class_id = $1 AND a.student_id = $2
-        ORDER BY a.session_date DESC, a.recorded_at DESC
+        ORDER BY session_date DESC, recorded_at DESC
       `, [classInfo.id, numericStudentId]);
       
       allAttendanceRecords.push(...classAttendanceResult.rows);
@@ -670,8 +678,9 @@ router.get('/student/:studentId', async (req, res) => {
       return new Date(b.recorded_at) - new Date(a.recorded_at);
     });
     
-    // Calculate attendance statistics
-    const totalSessions = allAttendanceRecords.length;
+    // Calculate attendance statistics using distinct sessions
+    const uniqueSessions = new Set(allAttendanceRecords.map(r => `${r.session_date}-${r.class_code}`));
+    const totalSessions = uniqueSessions.size;
     const presentSessions = allAttendanceRecords.filter(r => r.present).length;
     const absentSessions = totalSessions - presentSessions;
     const attendanceRate = totalSessions > 0 ? (presentSessions / totalSessions * 100).toFixed(2) : 0;

@@ -33,10 +33,10 @@ router.get('/risk-students', requireAuth, async (req, res) => {
           s.student_id,
           s.name,
           s.email,
-          COUNT(*) as total_sessions,
-          COUNT(CASE WHEN a.present = true THEN 1 END) as present_sessions,
+          COUNT(DISTINCT a.session_date) as total_sessions,
+          COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) as present_sessions,
           ROUND(
-            (COUNT(CASE WHEN a.present = true THEN 1 END) * 100.0 / COUNT(*)), 2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) * 100.0 / COUNT(DISTINCT a.session_date)), 2
           ) as attendance_percentage
         FROM students s
         JOIN attendance a ON s.id = a.student_id

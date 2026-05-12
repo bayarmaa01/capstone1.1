@@ -148,56 +148,56 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
   // Persisting attendance is handled by the parent so session scoping is consistent.
 
   const captureAndRecognize = useCallback(async () => {
-    const video = videoRef.current;
-    if (!video || cameraStatusRef.current !== 'active') return;
-    if (video.paused || video.ended) return;
+    const videoElement = videoRef.current;
+    if (!videoElement || cameraStatusRef.current !== 'active') return;
+    if (videoElement.paused || videoElement.ended) return;
 
-    const w = video.videoWidth;
-    const h = video.videoHeight;
-    if (!w || !h) return;
+    const videoWidth = videoElement.videoWidth;
+    const videoHeight = videoElement.videoHeight;
+    if (!videoWidth || !videoHeight) return;
 
     setBanner('🟡 Scanning...', '#ffc107');
-    setScanCount(c => c + 1);
+    setScanCount(count => count + 1);
 
     try {
       // draw frame to canvas
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, w, h);
+      const captureCanvas = document.createElement('canvas');
+      captureCanvas.width = videoWidth;
+      captureCanvas.height = videoHeight;
+      const canvasContext = captureCanvas.getContext('2d');
+      canvasContext.drawImage(videoElement, 0, 0, videoWidth, videoHeight);
 
       // optional debug draw
       if (debugCanvasRef.current) {
-        const dbg = debugCanvasRef.current.getContext('2d');
-        dbg.clearRect(0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
-        dbg.drawImage(canvas, 0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
+        const debugContext = debugCanvasRef.current.getContext('2d');
+        debugContext.clearRect(0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
+        debugContext.drawImage(captureCanvas, 0, 0, debugCanvasRef.current.width, debugCanvasRef.current.height);
       }
 
       // Capture image as base64 string
-      const imageSrc = canvas.toDataURL("image/jpeg");
+      const capturedImageSrc = captureCanvas.toDataURL("image/jpeg");
       
       // Add debug logs
-      console.log("Captured image:", imageSrc?.slice(0, 50));
-      console.log("Type:", typeof imageSrc);
-      console.log("VALUE:", imageSrc?.substring(0, 50));
+      console.log("Captured image:", capturedImageSrc?.slice(0, 50));
+      console.log("Type:", typeof capturedImageSrc);
+      console.log("VALUE:", capturedImageSrc?.substring(0, 50));
       
       // Validate image capture
-      if (!imageSrc || typeof imageSrc !== "string") {
+      if (!capturedImageSrc || typeof capturedImageSrc !== "string") {
         throw new Error("Invalid image capture");
       }
 
       // Face recognition request with retries - this is where you saw timeouts
       const callFaceService = async () => {
-        if (!imageSrc || typeof imageSrc !== "string" || imageSrc.length < 1000) {
+        if (!capturedImageSrc || typeof capturedImageSrc !== "string" || capturedImageSrc.length < 1000) {
           throw new Error("Invalid image capture");
         }
 
-        console.log("Sending image length:", imageSrc.length);
+        console.log("Sending image length:", capturedImageSrc.length);
 
         try {
           // Convert base64 to Blob for FormData
-          const imageBlob = base64ToBlob(imageSrc);
+          const imageBlob = base64ToBlob(capturedImageSrc);
           const formData = new FormData();
           formData.append('image', imageBlob, 'capture.jpg');
           formData.append('class_id', String(classId));
@@ -317,9 +317,9 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       }
 
       // Draw bounding boxes with proper video dimensions
-      const video = videoRef.current;
-      if (video && video.videoWidth && video.videoHeight) {
-        drawBoundingBoxes(faceData, video.videoWidth, video.videoHeight);
+      const currentVideo = videoRef.current;
+      if (currentVideo && currentVideo.videoWidth && currentVideo.videoHeight) {
+        drawBoundingBoxes(faceData, currentVideo.videoWidth, currentVideo.videoHeight);
       } else {
         // Fallback dimensions if video not ready
         drawBoundingBoxes(faceData, 640, 480);

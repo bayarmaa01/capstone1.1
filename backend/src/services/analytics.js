@@ -7,10 +7,10 @@ class AnalyticsService {
       const query = `
         SELECT 
           session_date,
-          COUNT(*) as total_students,
-          COUNT(CASE WHEN present = true THEN 1 END) as present_students,
+          COUNT(DISTINCT a.student_id) as total_students,
+          COUNT(DISTINCT CASE WHEN a.present = true THEN a.student_id END) as present_students,
           ROUND(
-            (COUNT(CASE WHEN present = true THEN 1 END) * 100.0 / COUNT(*)), 2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.student_id END) * 100.0 / COUNT(DISTINCT a.student_id)), 2
           ) as attendance_percentage
         FROM attendance 
         WHERE class_id = $1 
@@ -35,10 +35,10 @@ class AnalyticsService {
           s.student_id,
           s.name,
           s.email,
-          COUNT(*) as total_sessions,
-          COUNT(CASE WHEN a.present = true THEN 1 END) as present_sessions,
+          COUNT(DISTINCT a.session_date) as total_sessions,
+          COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) as present_sessions,
           ROUND(
-            (COUNT(CASE WHEN a.present = true THEN 1 END) * 100.0 / COUNT(*)), 2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) * 100.0 / COUNT(DISTINCT a.session_date)), 2
           ) as attendance_percentage
         FROM students s
         JOIN attendance a ON s.id = a.student_id
@@ -135,10 +135,10 @@ class AnalyticsService {
         SELECT 
           session_date,
           EXTRACT(DOW FROM session_date) as day_of_week,
-          COUNT(*) as total_students,
-          COUNT(CASE WHEN present = true THEN 1 END) as present_students,
+          COUNT(DISTINCT a.student_id) as total_students,
+          COUNT(DISTINCT CASE WHEN a.present = true THEN a.student_id END) as present_students,
           ROUND(
-            (COUNT(CASE WHEN present = true THEN 1 END) * 100.0 / COUNT(*)), 2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.student_id END) * 100.0 / COUNT(DISTINCT a.student_id)), 2
           ) as attendance_percentage
         FROM attendance 
         WHERE class_id = $1 
@@ -186,10 +186,10 @@ class AnalyticsService {
           s.id,
           s.student_id,
           s.name,
-          COUNT(*) as total_sessions,
-          COUNT(CASE WHEN a.present = true THEN 1 END) as present_sessions,
+          COUNT(DISTINCT a.session_date) as total_sessions,
+          COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) as present_sessions,
           ROUND(
-            (COUNT(CASE WHEN a.present = true THEN 1 END) * 100.0 / COUNT(*)), 2
+            (COUNT(DISTINCT CASE WHEN a.present = true THEN a.session_date END) * 100.0 / COUNT(DISTINCT a.session_date)), 2
           ) as attendance_percentage
         FROM students s
         JOIN attendance a ON s.id = a.student_id

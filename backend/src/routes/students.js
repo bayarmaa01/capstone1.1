@@ -37,7 +37,15 @@ const upload = multer({
 // Get all students
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT id, student_id, name, email, photo_url, created_at FROM students ORDER BY name');
+    const result = await db.query(`
+      SELECT id, student_id, name, email, 
+             CASE 
+               WHEN photo_url IS NOT NULL AND photo_url != '' THEN 
+                 CASE WHEN photo_url LIKE 'http%' THEN photo_url ELSE '/uploads/' || photo_url END
+               ELSE NULL 
+             END as photo_url,
+             created_at FROM students ORDER BY name
+    `);
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching students:', error);
