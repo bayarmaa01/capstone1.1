@@ -320,6 +320,9 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
       const video = videoRef.current;
       if (video && video.videoWidth && video.videoHeight) {
         drawBoundingBoxes(faceData, video.videoWidth, video.videoHeight);
+      } else {
+        // Fallback dimensions if video not ready
+        drawBoundingBoxes(faceData, 640, 480);
       }
       setDetectedFaces(faceData);
 
@@ -441,7 +444,8 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
             width: '100%',
             height: '100%',
             pointerEvents: 'none',
-            borderRadius: 10
+            borderRadius: 10,
+            zIndex: 10  // Ensure canvas is on top
           }}
         />
         <div style={{

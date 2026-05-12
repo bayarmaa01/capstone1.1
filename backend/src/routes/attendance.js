@@ -381,6 +381,7 @@ router.get('/class/:classId/stats', async (req, res) => {
       LEFT JOIN attendance a ON a.student_id = s.id AND a.class_id = $1
       WHERE e.class_id = $1
       GROUP BY s.id, s.student_id, s.name, s.email
+      HAVING COUNT(a.session_date) > 0  -- Only include students with actual attendance records
       ORDER BY attendance_percentage DESC NULLS LAST, s.name;
     `, [req.params.classId]);
 
