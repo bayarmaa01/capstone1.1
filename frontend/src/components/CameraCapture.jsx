@@ -282,10 +282,10 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
           const confidencePercent = rawConfidence <= 1 ? rawConfidence * 100 : rawConfidence;
           
           faceData.push({
-            x: match.x || 20 + (i * 25), // Default positioning if no coords
-            y: match.y || 20,
-            width: match.width || 20,
-            height: match.height || 25,
+            x: match.x || (10 + (i * 30)), // Better default positioning
+            y: match.y || 10,
+            width: match.width || 100, // Larger default size for visibility
+            height: match.height || 120,
             recognized: confidencePercent > 50,
             student_id: match.student_id,
             confidence: confidencePercent
@@ -305,10 +305,10 @@ export default function CameraCapture({ classId, sessionId, sessionDate, onRecog
         } else {
           // Unrecognized face
           faceData.push({
-            x: 20 + (i * 25),
-            y: 20,
-            width: 20,
-            height: 25,
+            x: 10 + (i * 30),
+            y: 10,
+            width: 100,
+            height: 120,
             recognized: false,
             student_id: null,
             confidence: 0

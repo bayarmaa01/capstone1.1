@@ -130,14 +130,13 @@ router.post('/record', async (req, res) => {
       LIMIT 5
     `, [numericStudentId, class_id, targetDate]);
     
-    // Check for existing attendance with same status on same date
-    const hasExistingPresent = duplicateCheck.rows.some(record => 
-      record.present === isPresent && 
-      new Date(record.recorded_at).toDateString() === new Date().toDateString()
+    // Check for existing attendance with same status on same session date
+    const hasExistingStatus = duplicateCheck.rows.some(record => 
+      record.present === isPresent
     );
     
-    if (hasExistingPresent) {
-      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId} - already marked as ${isPresent ? 'present' : 'absent'} today`);
+    if (hasExistingStatus) {
+      console.log(`⚠️ Duplicate attendance prevented for student ${numericStudentId} - already marked as ${isPresent ? 'present' : 'absent'} for session ${targetDate}`);
       return res.status(409).json({ 
         error: 'Duplicate attendance record',
         message: `Student already marked as ${isPresent ? 'present' : 'absent'} for this session`
@@ -374,12 +373,12 @@ router.get('/class/:classId/stats', async (req, res) => {
       SELECT 
         s.id, s.student_id, s.name, s.email,
         COUNT(CASE WHEN a.present = true THEN 1 END) AS total_present,
-        COUNT(a.session_date) AS total_sessions,
+        COUNT(DISTINCT a.session_date) AS total_sessions,
         CASE 
-          WHEN COUNT(a.session_date) = 0 THEN 0
+          WHEN COUNT(DISTINCT a.session_date) = 0 THEN 0
           ELSE ROUND(
             (COUNT(CASE WHEN a.present = true THEN 1 END)::float / 
-             COUNT(a.session_date)) * 100, 2
+             COUNT(DISTINCT a.session_date)) * 100, 2
           )
         END AS attendance_percentage
       FROM students s
@@ -387,7 +386,6 @@ router.get('/class/:classId/stats', async (req, res) => {
       LEFT JOIN attendance a ON a.student_id = s.id AND a.class_id = $1
       WHERE e.class_id = $1
       GROUP BY s.id, s.student_id, s.name, s.email
-      HAVING COUNT(a.session_date) > 0  -- Only include students with actual attendance records
       ORDER BY attendance_percentage DESC NULLS LAST, s.name;
     `, [req.params.classId]);
 
