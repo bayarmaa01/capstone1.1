@@ -441,7 +441,7 @@ export default function AttendancePage() {
       return photoUrl;
     }
     
-    // If it starts with /uploads/, return as is
+    // Always use relative path for local development
     if (photoUrl.startsWith('/uploads/')) {
       return photoUrl;
     }
