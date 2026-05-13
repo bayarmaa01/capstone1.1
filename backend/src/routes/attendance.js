@@ -118,7 +118,7 @@ router.post('/record', async (req, res) => {
     }
 
     // Generate unique session_id if not provided to prevent cross-week duplication
-    const uniqueSessionId = session_id || uuidv4();
+    const uniqueSessionId = session_id || null;
     
     // Mark attendance (session-scoped when session_id is provided).
     // This fixes cross-session bleed on same calendar date.
